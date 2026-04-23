@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --primary: #0060ad;
+    --on-primary: #ffffff;
+    --primary-container: #afdaff;
+
+    --background: #f8fafc;
+    --on-background: #0f172a;
+
+    --surface: #ffffff;
+    --on-surface: #0f172a;
+    --surface-low: #f1f5f9;
+    --surface-lowest: #ffffff;
+    --surface-container: #e2e8f0;
+
+    --border-color: #e2e8f0;
+  }
+
+  .dark {
+    --primary: #68abff;
+    --on-primary: #00335c;
+    --primary-container: #004a87;
+
+    --background: #09090b;
+    --on-background: #f8fafc;
+
+    --surface: #18181b;
+    --on-surface: #f8fafc;
+    --surface-low: #27272a;
+    --surface-lowest: #09090b;
+    --surface-container: #3f3f46;
+
+    --border-color: #27272a;
+  }
+
+  body {
+    @apply bg-background text-on-surface font-inter transition-colors duration-500 antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-manrope font-bold text-on-surface tracking-tight;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/70 dark:bg-zinc-950/70 backdrop-blur-xl border border-white/20 dark:border-white/5;
+  }
+
+  .weightless-card {
+    /* Ganti hover:border-primary/20 dengan hex code manual atau hilangkan transparansinya */
+    @apply bg-surface dark:bg-surface-low border border-border-color shadow-sm hover:shadow-xl transition-all duration-500 rounded-2xl overflow-hidden;
+
+    /* Gunakan cara manual jika tetap ingin ada transparansi */
+    &:hover {
+      border-color: rgba(0, 96, 173, 0.2);
+    }
+  }
+
+  .weightless-tabs .ant-tabs-nav::before {
+    @apply border-border-color;
+  }
+
+  .weightless-pagination .ant-pagination-item {
+    @apply bg-surface border-border-color;
+  }
+
+  .weightless-pagination .ant-pagination-item-active {
+    @apply bg-primary border-primary;
+  }
+
+  .weightless-pagination .ant-pagination-item-active a {
+    @apply !text-white;
+  }
+}

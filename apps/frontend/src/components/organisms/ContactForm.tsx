@@ -1,0 +1,71 @@
+import React from 'react';
+import { Typography, Row, Col, Form, Input, Button, Card } from 'antd';
+import { SendOutlined } from '@ant-design/icons';
+
+const { Title, Paragraph } = Typography;
+const { TextArea } = Input;
+
+const ContactForm: React.FC = () => {
+  const onFinish = (values: any) => {
+    console.log('Success:', values);
+  };
+
+  return (
+    <section id="kontak" className="py-24 bg-white dark:bg-black transition-colors duration-500">
+      <div className="max-w-4xl mx-auto px-4">
+        <div className="text-center mb-16">
+          <Title level={2} className="!text-4xl !font-manrope mb-4">Hubungi Kami</Title>
+          <Paragraph className="text-lg text-surface-on/60">
+            Ada pertanyaan atau butuh bantuan? Tim kami siap melayani Anda.
+          </Paragraph>
+        </div>
+
+        <Card className="border-none glass shadow-xl rounded-[2rem] overflow-hidden p-4 md:p-12">
+          <Form
+            layout="vertical"
+            onFinish={onFinish}
+            autoComplete="off"
+            className="space-y-4"
+          >
+            <Row gutter={24}>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  label={<span className="font-semibold">Nama Lengkap</span>}
+                  name="name"
+                  rules={[{ required: true, message: 'Harap isi nama Anda' }]}
+                >
+                  <Input placeholder="Contoh: Andi Wijaya" className="h-12 rounded-xl" />
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={12}>
+                <Form.Item
+                  label={<span className="font-semibold">Email</span>}
+                  name="email"
+                  rules={[{ required: true, type: 'email', message: 'Harap isi email yang valid' }]}
+                >
+                  <Input placeholder="andi@example.com" className="h-12 rounded-xl" />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Form.Item
+              label={<span className="font-semibold">Pesan</span>}
+              name="message"
+              rules={[{ required: true, message: 'Harap tulis pesan Anda' }]}
+            >
+              <TextArea rows={4} placeholder="Tuliskan pertanyaan Anda di sini..." className="rounded-xl" />
+            </Form.Item>
+
+            <Form.Item className="text-center pt-6 mb-0">
+              <Button type="primary" size="large" icon={<SendOutlined />} htmlType="submit" className="h-14 px-12 text-lg rounded-full shadow-lg shadow-primary/30">
+                Kirim Pesan
+              </Button>
+            </Form.Item>
+          </Form>
+        </Card>
+      </div>
+    </section>
+  );
+};
+
+export default ContactForm;
