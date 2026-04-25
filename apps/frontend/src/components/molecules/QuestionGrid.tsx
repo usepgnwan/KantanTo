@@ -14,7 +14,7 @@ const QuestionGrid: React.FC = () => {
       <Row gutter={[16, 16]}>
         {questions.map((num) => (
           <Col span={4.8} key={num} style={{ width: '20%' }}>
-            <Button 
+            <Button
               className="w-full aspect-square rounded-2xl font-bold flex items-center justify-center border-surface-container bg-surface-low/50 hover:border-primary hover:text-primary transition-all shadow-sm"
             >
               {num}
