@@ -1,0 +1,235 @@
+basePath: /
+definitions:
+  controller.Response:
+    properties:
+      data: {}
+      message:
+        type: string
+      status:
+        type: boolean
+    type: object
+  helpers.ResponsePaginate:
+    properties:
+      currentPage:
+        type: integer
+      from:
+        type: integer
+      lastPage:
+        type: integer
+      perPage:
+        type: integer
+      rows: {}
+      to:
+        type: integer
+      total:
+        type: integer
+    type: object
+  model.Mapel:
+    properties:
+      created_at:
+        type: string
+      deskripsi:
+        type: string
+      id:
+        type: integer
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+info:
+  contact:
+    name: Admin
+  description: Dokumentasi API untuk CRUD Mapel
+  title: Mapel API Documentation
+  version: "1.0"
+paths:
+  /api/mapel:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of mata pelajaran
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Limit per page
+        in: query
+        name: limit
+        type: integer
+      - description: Search by title
+        in: query
+        name: title
+        type: string
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/controller.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/helpers.ResponsePaginate'
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/controller.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get all Mapel (Paginated)
+      tags:
+      - Mapel
+    post:
+      consumes:
+      - application/json
+      description: Create a new mata pelajaran
+      parameters:
+      - description: Mapel Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.Mapel'
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/controller.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Create new Mapel
+      tags:
+      - Mapel
+  /api/mapel/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete mapel by ID
+      parameters:
+      - description: Mapel ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/controller.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete Mapel
+      tags:
+      - Mapel
+    get:
+      consumes:
+      - application/json
+      description: Get specific mata pelajaran by its ID
+      parameters:
+      - description: Mapel ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/controller.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Mapel by ID
+      tags:
+      - Mapel
+    put:
+      consumes:
+      - application/json
+      description: Update mapel by ID
+      parameters:
+      - description: Mapel ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Mapel Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.Mapel'
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/controller.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Update Mapel
+      tags:
+      - Mapel
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: secret-to-apps
+    type: apiKey
+swagger: "2.0"
