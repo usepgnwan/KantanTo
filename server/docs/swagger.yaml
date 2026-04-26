@@ -1,5 +1,15 @@
 basePath: /
 definitions:
+  controller.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
   controller.RegisterRequest:
     properties:
       asal_sekolah:
@@ -106,6 +116,276 @@ info:
   title: Mapel API Documentation
   version: "1.0"
 paths:
+  /api/artikel:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated artikel dengan filter status dan is_priority
+      parameters:
+      - default: 1
+        description: Page
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Limit
+        in: query
+        name: limit
+        type: integer
+      - description: Cari berdasarkan judul
+        in: query
+        name: search
+        type: string
+      - description: 'Filter status: publish / draft'
+        in: query
+        name: status
+        type: string
+      - description: Filter is_priority
+        in: query
+        name: priority
+        type: boolean
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      summary: Get list artikel
+      tags:
+      - Artikel
+    post:
+      consumes:
+      - multipart/form-data
+      description: Supports multipart/form-data dengan thumbnail upload + kompresi
+        otomatis
+      parameters:
+      - description: Judul
+        in: formData
+        name: judul
+        required: true
+        type: string
+      - description: Konten Markdown
+        in: formData
+        name: konten
+        required: true
+        type: string
+      - description: Deskripsi singkat
+        in: formData
+        name: deskripsi
+        type: string
+      - description: 'Status: publish / draft'
+        in: formData
+        name: status
+        required: true
+        type: string
+      - description: Apakah headline?
+        in: formData
+        name: is_priority
+        type: boolean
+      - description: Category ID
+        in: formData
+        name: category_id
+        type: integer
+      - description: File gambar thumbnail
+        in: formData
+        name: thumbnail
+        type: file
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      summary: Create artikel baru
+      tags:
+      - Artikel
+  /api/artikel/{id}:
+    delete:
+      parameters:
+      - description: Artikel ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      summary: Delete artikel
+      tags:
+      - Artikel
+    get:
+      parameters:
+      - description: Artikel ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      summary: Get artikel by ID
+      tags:
+      - Artikel
+    put:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Artikel ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Judul
+        in: formData
+        name: judul
+        type: string
+      - description: Konten
+        in: formData
+        name: konten
+        type: string
+      - description: Deskripsi
+        in: formData
+        name: deskripsi
+        type: string
+      - description: 'Status: publish / draft'
+        in: formData
+        name: status
+        type: string
+      - description: Headline?
+        in: formData
+        name: is_priority
+        type: boolean
+      - description: Category ID
+        in: formData
+        name: category_id
+        type: integer
+      - description: User ID
+        in: formData
+        name: user_id
+        type: integer
+      - description: Thumbnail baru (opsional)
+        in: formData
+        name: thumbnail
+        type: file
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      summary: Update artikel
+      tags:
+      - Artikel
+  /api/artikel/slug/{slug}:
+    get:
+      parameters:
+      - description: Artikel Slug
+        in: path
+        name: slug
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      summary: Get artikel by Slug (for public page)
+      tags:
+      - Artikel
+  /api/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate using email and password, returning a JWT token payload
+        containing nama, phone, email, roleid, deskripsi role.
+      parameters:
+      - description: Login Credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controller.LoginRequest'
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      summary: Login and get token
+      tags:
+      - Auth
   /api/category:
     get:
       consumes:

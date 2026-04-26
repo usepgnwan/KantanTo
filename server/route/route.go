@@ -10,6 +10,7 @@ import (
 )
 
 func InitRouting(e *echo.Echo) {
+	e.Static("/uploads", "uploads")
 	// Swagger Endpoint with Basic Auth
 	swaggerGroup := e.Group("/swagger")
 	swaggerGroup.Use(echoMiddleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {
@@ -34,4 +35,6 @@ func InitRouting(e *echo.Echo) {
 	RouteSetting(api)
 	RouteRole(api)
 	RouteUser(api)
+	RouteAuth(api)
+	RouteArtikel(api)
 }

@@ -51,3 +51,24 @@ export const registerUser = async (data: { name: string; email: string; nohp: st
   const response = await api.post('/user/register', data);
   return response.data.data;
 };
+
+export interface LoginResponse {
+  token: string;
+  roleid: number; // extracted from jwt payload after parsing
+  user: User;
+}
+
+export const loginUser = async (data: { email: string; password: string }): Promise<LoginResponse> => {
+  const response = await api.post('/auth/login', data);
+  const { token, user } = response.data.data;
+
+  // Decode roleid from JWT payload (base64 decode middle part)
+  let roleid = 2;
+  try {
+    const payloadBase64 = token.split('.')[1];
+    const decoded = JSON.parse(atob(payloadBase64));
+    roleid = decoded.roleid ?? 2;
+  } catch {}
+
+  return { token, roleid, user };
+};

@@ -1,28 +1,47 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Checkbox, Divider, Typography } from 'antd';
+import { Form, Input, Button, Checkbox, Divider, Typography, message } from 'antd';
 import { MailOutlined, LockOutlined, GoogleOutlined, AppleOutlined } from '@ant-design/icons';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../layouts/AuthLayout';
 import authVisual from '../assets/auth-visual.png';
 import PageLoader from '../components/atoms/PageLoader';
+import { loginUser } from '../services/userService';
+import { useAuth } from '../context/AuthContext';
 
 const { Text } = Typography;
 
 const LoginPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
+  const navigate = useNavigate();
+  const { login } = useAuth();
 
-  const onFinish = (values: any) => {
+  const onFinish = async (values: any) => {
     setLoading(true);
-    console.log('Login Success:', values);
+    try {
+      const result = await loginUser({ email: values.email, password: values.password });
 
-    // Simulate API call
-    setTimeout(() => {
+      // Persist token in AuthContext (also saves to localStorage internally)
+      login(result.token);
+
+      message.success('Login berhasil! Mengalihkan...');
       setPageLoading(true);
+
+      // Redirect based on roleid
       setTimeout(() => {
-        window.location.href = '/';
-      }, 1500);
-    }, 1000);
+        if (result.roleid === 1) {
+          navigate('/admin/dashboard');
+        } else {
+          navigate('/dashboard');
+        }
+      }, 800);
+
+    } catch (error: any) {
+      const msg = error.response?.data?.message || 'Terjadi kesalahan. Coba lagi nanti.';
+      message.error(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (pageLoading) return <PageLoader />;
@@ -117,3 +136,5 @@ const LoginPage: React.FC = () => {
 };
 
 export default LoginPage;
+
+
