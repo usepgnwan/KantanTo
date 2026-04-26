@@ -16,6 +16,8 @@ export interface PackageProps {
   studentCount: number;
   duration: string;
   category: string;
+  classes: string[];
+  subjects: string[];
   isPopular?: boolean;
 }
 
@@ -29,6 +31,8 @@ const PackageCard: React.FC<PackageProps> = ({
   studentCount,
   duration,
   category,
+  classes,
+  subjects,
   isPopular
 }) => {
   return (
@@ -66,12 +70,13 @@ const PackageCard: React.FC<PackageProps> = ({
             <Rate disabled defaultValue={rating} className="!text-xs" />
             <Text className="text-xs text-surface-on/40">({studentCount})</Text>
           </div>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {classes?.map(c => <Tag key={c} className="m-0 rounded-md border-none bg-on-surface/5 text-on-surface/40 font-bold text-[9px] px-2">{c}</Tag>)}
+            {subjects?.map(s => <Tag key={s} className="m-0 rounded-md border-none bg-blue-500/10 text-blue-500 font-bold text-[9px] px-2">{s}</Tag>)}
+          </div>
           <div className="flex flex-wrap gap-3 text-xs text-surface-on/60">
             <span className="flex items-center gap-1">
               <ClockCircleOutlined className="text-primary" /> {duration}
-            </span>
-            <span className="flex items-center gap-1">
-              <UserOutlined className="text-primary" /> {studentCount} Siswa
             </span>
           </div>
         </div>

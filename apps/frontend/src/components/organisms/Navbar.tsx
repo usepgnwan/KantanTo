@@ -9,7 +9,9 @@ import {
   LogoutOutlined,
   SettingOutlined,
   HistoryOutlined,
-  ShoppingOutlined
+  ShoppingOutlined,
+  ThunderboltOutlined,
+  BookOutlined
 } from '@ant-design/icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -39,6 +41,16 @@ const Navbar: React.FC = () => {
   };
 
   const userMenuItems: MenuProps['items'] = [
+    {
+      key: 'dashboard',
+      label: <Link to="/dashboard">Dashboard</Link>,
+      icon: <ThunderboltOutlined />,
+    },
+    {
+      key: 'latihan',
+      label: <Link to="/latihan">Belajar</Link>,
+      icon: <BookOutlined />,
+    },
     {
       key: 'profile',
       label: <Link to="/profile">Profil Saya</Link>,

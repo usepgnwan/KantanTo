@@ -16,6 +16,7 @@
     "autoprefixer": "^10.4.17",
     "axios": "^1.13.4",
     "dayjs": "^1.11.19",
+    "echarts-for-react": "^3.0.6",
     "jwt-decode": "^4.0.0",
     "postcss": "^8.4.35",
     "react": "^19.2.4",

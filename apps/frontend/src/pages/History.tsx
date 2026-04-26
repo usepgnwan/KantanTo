@@ -112,10 +112,11 @@ const HistoryPage: React.FC = () => {
     {
       title: 'Aksi',
       key: 'action',
-      render: () => (
+      render: (record: any) => (
         <Button
           type="text"
           icon={<ArrowRightOutlined />}
+          onClick={() => navigate(`/riwayat/${record.key}/review`)}
           className="hover:text-primary font-bold flex items-center gap-2"
         >
           Lihat Detail

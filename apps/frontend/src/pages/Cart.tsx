@@ -3,10 +3,12 @@ import AppLayout from '../layouts/AppLayout';
 import { Breadcrumb, Typography, Row, Col } from 'antd';
 import CartItemList from '../components/organisms/CartItemList';
 import CartSummary from '../components/organisms/CartSummary';
+import { useNavigate } from 'react-router-dom';
 
 const { Title, Paragraph } = Typography;
 
 const CartPage: React.FC = () => {
+  const navigate = useNavigate();
   const [items, setItems] = useState([
     {
       id: '1',
@@ -73,7 +75,7 @@ const CartPage: React.FC = () => {
                   subtotal={subtotal} 
                   tax={tax} 
                   total={total} 
-                  onCheckout={() => alert('Proceeding to checkout...')} 
+                  onCheckout={() => navigate('/checkout')} 
                 />
               </Col>
             </Row>

@@ -33,6 +33,8 @@ const mockPackages: PackageProps[] = [
     studentCount: 850,
     duration: '30 Hari',
     category: 'Intensive Bootcamp',
+    classes: ['Kelas 12', 'Alumni'],
+    subjects: ['Matematika IPA', 'Fisika', 'Kimia'],
     isPopular: true
   },
   {
@@ -45,7 +47,9 @@ const mockPackages: PackageProps[] = [
     rating: 4.8,
     studentCount: 920,
     duration: '30 Hari',
-    category: 'Intensive Bootcamp'
+    category: 'Intensive Bootcamp',
+    classes: ['Kelas 12'],
+    subjects: ['Sejarah', 'Geografi', 'Sosiologi'],
   },
   {
     id: '3',
@@ -57,7 +61,9 @@ const mockPackages: PackageProps[] = [
     rating: 4.9,
     studentCount: 1200,
     duration: '7 Hari',
-    category: 'Mock Exams'
+    category: 'Mock Exams',
+    classes: ['Kelas 10', 'Kelas 11', 'Kelas 12', 'Alumni'],
+    subjects: ['TPS', 'Literasi'],
   },
   {
     id: '4',
@@ -69,7 +75,9 @@ const mockPackages: PackageProps[] = [
     rating: 4.7,
     studentCount: 450,
     duration: '14 Hari',
-    category: 'Subject Mastery'
+    category: 'Subject Mastery',
+    classes: ['Kelas 11', 'Kelas 12'],
+    subjects: ['Bahasa Inggris'],
   },
   {
     id: '5',
@@ -82,6 +90,8 @@ const mockPackages: PackageProps[] = [
     studentCount: 680,
     duration: '14 Hari',
     category: 'Subject Mastery',
+    classes: ['Kelas 12'],
+    subjects: ['Pengetahuan Kuantitatif'],
     isPopular: true
   },
   {
@@ -94,7 +104,9 @@ const mockPackages: PackageProps[] = [
     rating: 4.5,
     studentCount: 2100,
     duration: '1 Hari',
-    category: 'Mock Exams'
+    category: 'Mock Exams',
+    classes: ['Alumni'],
+    subjects: ['All Subjects'],
   }
 ];
 

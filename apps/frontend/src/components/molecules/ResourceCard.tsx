@@ -10,6 +10,7 @@ interface ResourceCardProps {
   duration?: string;
   isLocked: boolean;
   thumbnail?: string;
+  onClick?: () => void;
 }
 
 const ResourceCard: React.FC<ResourceCardProps> = ({ 
@@ -17,13 +18,15 @@ const ResourceCard: React.FC<ResourceCardProps> = ({
   type, 
   duration, 
   isLocked, 
-  thumbnail 
+  thumbnail,
+  onClick
 }) => {
   return (
     <Card 
-      className={`border-none overflow-hidden group shadow-sm hover:shadow-md transition-all ${
+      onClick={!isLocked && onClick ? onClick : undefined}
+      className={`border-none overflow-hidden group shadow-sm transition-all ${
         type === 'discussion' ? 'bg-surface-low' : 'bg-surface'
-      }`}
+      } ${!isLocked && onClick ? 'cursor-pointer hover:shadow-md hover:scale-[1.01]' : ''}`}
       bodyStyle={{ padding: type === 'discussion' ? '16px' : '12px' }}
     >
       {type === 'video' ? (

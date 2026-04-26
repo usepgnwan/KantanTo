@@ -11,7 +11,11 @@ import {
   TrophyOutlined, 
   RocketOutlined, 
   HistoryOutlined,
-  SaveOutlined
+  SaveOutlined,
+  StarOutlined,
+  BulbOutlined,
+  CheckSquareOutlined,
+  BankOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../context/AuthContext';
 import PageLoader from '../components/atoms/PageLoader';
@@ -132,7 +136,8 @@ const ProfilePage: React.FC = () => {
                       email: user?.email,
                       whatsapp: '081234567890',
                       school: 'SMA Negeri 1 Jakarta',
-                      target: 'Kedokteran UI'
+                      dreamDescription: 'Ingin menjadi Dokter Spesialis Bedah yang bisa membantu banyak orang kurang mampu di pelosok Indonesia.',
+                      bucketList: 'Lolos SNBT 2024, Skor UTBK > 700, KKN di Desa Penari',
                     }}
                     disabled={!editing}
                   >
@@ -154,7 +159,27 @@ const ProfilePage: React.FC = () => {
                       </Col>
                       <Col xs={24} md={12}>
                         <Form.Item name="school" label={<Text className="text-[10px] uppercase font-bold text-on-surface/40 tracking-widest">Asal Sekolah</Text>}>
-                          <Input className="h-12 rounded-xl bg-surface-low border-none font-bold" />
+                          <Input className="h-12 rounded-xl bg-surface-low border-none font-bold" prefix={<BankOutlined className="opacity-20" />} />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+
+                    <Divider className="my-8" />
+                    
+                    <div className="flex items-center gap-2 mb-6">
+                        <BulbOutlined className="text-secondary" />
+                        <Title level={4} className="!font-manrope !m-0 !font-black tracking-tight">Vision Board</Title>
+                    </div>
+
+                    <Row gutter={24}>
+                      <Col span={24}>
+                        <Form.Item name="dreamDescription" label={<Text className="text-[10px] uppercase font-bold text-on-surface/40 tracking-widest">Dream Description (Apa Targetmu?)</Text>}>
+                          <Input.TextArea rows={3} className="rounded-2xl bg-surface-low border-none font-medium p-4" placeholder="Tuliskan cita-cita besarmu di sini..." />
+                        </Form.Item>
+                      </Col>
+                      <Col span={24}>
+                        <Form.Item name="bucketList" label={<Text className="text-[10px] uppercase font-bold text-on-surface/40 tracking-widest">Bucket List (Pisahkan dengan koma)</Text>}>
+                          <Input className="h-12 rounded-xl bg-surface-low border-none font-bold" prefix={<CheckSquareOutlined className="opacity-20" />} placeholder="Cth: Lolos UI, Juara OSN, Hafal 30 Juz" />
                         </Form.Item>
                       </Col>
                     </Row>

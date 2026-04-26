@@ -15,6 +15,8 @@ interface PackageDetailHeaderProps {
   joinedCount: number;
   duration: string;
   category: string;
+  classes: string[];
+  subjects: string[];
 }
 
 const PackageDetailHeader: React.FC<PackageDetailHeaderProps> = ({
@@ -22,7 +24,9 @@ const PackageDetailHeader: React.FC<PackageDetailHeaderProps> = ({
   description,
   joinedCount,
   duration,
-  category
+  category,
+  classes,
+  subjects
 }) => {
   return (
     <div className="relative pt-32 pb-16 overflow-hidden">
@@ -45,9 +49,10 @@ const PackageDetailHeader: React.FC<PackageDetailHeaderProps> = ({
                 <Tag color="blue" className="rounded-full px-4 border-none font-bold bg-primary text-white">
                   {category}
                 </Tag>
-                <Tag className="rounded-full px-4 border-border-color bg-surface font-semibold flex items-center gap-2">
-                  <SafetyCertificateFilled className="text-primary" /> Verified Content
-                </Tag>
+                <Space size={4} wrap>
+                  {classes?.map(c => <Tag key={c} className="rounded-full px-3 border-none bg-on-surface/5 text-on-surface/40 font-bold text-[10px] m-0">{c}</Tag>)}
+                  {subjects?.map(s => <Tag key={s} className="rounded-full px-3 border-none bg-blue-500/10 text-blue-500 font-bold text-[10px] m-0">{s}</Tag>)}
+                </Space>
               </Space>
 
               <div>

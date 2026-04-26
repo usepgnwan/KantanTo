@@ -1,5 +1,6 @@
 import React from 'react';
 import Navbar from '../components/organisms/Navbar';
+import BottomNav from '../components/organisms/BottomNav';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -9,9 +10,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main className="flex-grow">
+      <main className="flex-grow pb-20 md:pb-0">
         {children}
       </main>
+      <BottomNav />
       <footer className="bg-surface-low dark:bg-zinc-900/80 pt-20 pb-10 mt-auto transition-colors duration-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">

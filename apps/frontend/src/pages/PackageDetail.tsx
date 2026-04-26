@@ -1,11 +1,12 @@
 import React from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, Layout, Row, Col, Card, Button, Typography, Space, Empty } from 'antd';
 import { 
   ExperimentOutlined, 
   FileSearchOutlined, 
   VideoCameraOutlined,
-  ShoppingOutlined 
+  ShoppingOutlined,
+  PlayCircleOutlined
 } from '@ant-design/icons';
 import AppLayout from '../layouts/AppLayout';
 import PackageDetailHeader from '../components/organisms/PackageDetailHeader';
@@ -22,7 +23,9 @@ const getPackageData = (slug: string) => {
     joinedCount: 1250,
     duration: '45 Menit / Sesi',
     category: 'Intensive Bootcamp',
-    isPurchased: false // Mock status
+    classes: ['Kelas 12', 'Alumni'],
+    subjects: ['Matematika IPA', 'Fisika', 'Kimia'],
+    isPurchased: true // Mock status as true for Latihan flow
   };
 };
 
@@ -43,6 +46,7 @@ const videos = [
 
 const PackageDetailPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
   const packageData = getPackageData(slug || 'premium-packet');
 
   const tabItems = [
@@ -70,6 +74,7 @@ const PackageDetailPage: React.FC = () => {
               title={item.title}
               type="discussion"
               isLocked={!packageData.isPurchased}
+              onClick={() => navigate(`/materi/${item.id}`)}
             />
           ))}
         </div>
@@ -93,6 +98,7 @@ const PackageDetailPage: React.FC = () => {
                   thumbnail={video.thumbnail}
                   type="video"
                   isLocked={!packageData.isPurchased}
+                  onClick={() => navigate(`/video/${video.id}`)}
                 />
               </Col>
             ))}
@@ -122,39 +128,68 @@ const PackageDetailPage: React.FC = () => {
 
             <Col xs={24} lg={8}>
               <Card className="border-none shadow-2xl rounded-[2rem] p-6 lg:-mt-24 relative z-20 bg-white dark:bg-zinc-950">
-                <Space direction="vertical" size="large" className="w-full">
-                  <div>
-                    <Text className="text-xs text-primary font-bold uppercase tracking-widest mb-2 block">Premium Access</Text>
-                    <Title level={3} className="!m-0">Mulai Belajar Hari Ini</Title>
-                    <Paragraph className="text-surface-on/60 mt-4">
-                      Dapatkan akses penuh ke seluruh soal, pembahasan eksklusif, dan video tutorial premium.
-                    </Paragraph>
-                  </div>
-
-                  <div className="bg-surface-low p-6 rounded-2xl border border-surface-container">
-                    <Text className="text-xs text-surface-on/40 line-through">Rp 150.000</Text>
-                    <div className="flex items-baseline gap-2">
-                      <Title level={2} className="!m-0 !text-primary">Rp 75.000</Title>
-                      <Text className="text-xs text-surface-on/40">/ Lifetime</Text>
+                {packageData.isPurchased ? (
+                  <Space direction="vertical" size="large" className="w-full">
+                    <div>
+                      <Text className="text-xs text-green-500 font-bold uppercase tracking-widest mb-2 block">Paket Aktif</Text>
+                      <Title level={3} className="!m-0">Siap Untuk Simulasi?</Title>
+                      <Paragraph className="text-surface-on/60 mt-4">
+                        Uji kemampuanmu sekarang dengan simulasi ujian sesuai standar CBT terbaru.
+                      </Paragraph>
                     </div>
-                  </div>
 
-                  <Button 
-                    type="primary" 
-                    block 
-                    size="large" 
-                    className="h-14 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-primary/20"
-                    icon={<ShoppingOutlined />}
-                  >
-                    Beli Paket Sekarang
-                  </Button>
+                    <Button 
+                      type="primary" 
+                      block 
+                      size="large" 
+                      className="h-14 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-primary/20"
+                      icon={<PlayCircleOutlined />}
+                      onClick={() => navigate(`/exam/${slug}`)}
+                    >
+                      Mulai Simulasi Ujian
+                    </Button>
 
-                  <div className="text-center pt-4 border-t border-surface-container">
-                    <Text className="text-[10px] text-surface-on/40 uppercase font-bold tracking-tight">
-                      Jaminan 100% Kualitas Materi Terbaik
-                    </Text>
-                  </div>
-                </Space>
+                    <div className="text-center pt-4 border-t border-surface-container">
+                      <Text className="text-[10px] text-surface-on/40 uppercase font-bold tracking-tight">
+                        Pastikan koneksi internet stabil
+                      </Text>
+                    </div>
+                  </Space>
+                ) : (
+                  <Space direction="vertical" size="large" className="w-full">
+                    <div>
+                      <Text className="text-xs text-primary font-bold uppercase tracking-widest mb-2 block">Premium Access</Text>
+                      <Title level={3} className="!m-0">Mulai Belajar Hari Ini</Title>
+                      <Paragraph className="text-surface-on/60 mt-4">
+                        Dapatkan akses penuh ke seluruh soal, pembahasan eksklusif, dan video tutorial premium.
+                      </Paragraph>
+                    </div>
+
+                    <div className="bg-surface-low p-6 rounded-2xl border border-surface-container">
+                      <Text className="text-xs text-surface-on/40 line-through">Rp 150.000</Text>
+                      <div className="flex items-baseline gap-2">
+                        <Title level={2} className="!m-0 !text-primary">Rp 75.000</Title>
+                        <Text className="text-xs text-surface-on/40">/ Lifetime</Text>
+                      </div>
+                    </div>
+
+                    <Button 
+                      type="primary" 
+                      block 
+                      size="large" 
+                      className="h-14 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-primary/20"
+                      icon={<ShoppingOutlined />}
+                    >
+                      Beli Paket Sekarang
+                    </Button>
+
+                    <div className="text-center pt-4 border-t border-surface-container">
+                      <Text className="text-[10px] text-surface-on/40 uppercase font-bold tracking-tight">
+                        Jaminan 100% Kualitas Materi Terbaik
+                      </Text>
+                    </div>
+                  </Space>
+                )}
               </Card>
             </Col>
           </Row>
