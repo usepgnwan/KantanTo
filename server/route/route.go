@@ -23,10 +23,15 @@ func InitRouting(e *echo.Echo) {
 
 	// API Group
 	api := e.Group("/api")
-	
+
 	// Apply Header Authorization
 	api.Use(middleware.HeaderAuthorizationMiddleware)
 
 	// Call separate route logic
 	RouteMapel(api)
+	RouteCategory(api)
+	RouteGrade(api)
+	RouteSetting(api)
+	RouteRole(api)
+	RouteUser(api)
 }

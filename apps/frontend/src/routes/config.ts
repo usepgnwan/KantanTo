@@ -31,6 +31,7 @@ const AdminSettings = React.lazy(() => import('../pages/admin/AdminSettings'));
 const AdminCategories = React.lazy(() => import('../pages/admin/AdminCategories'));
 const AdminClasses = React.lazy(() => import('../pages/admin/AdminClasses'));
 const AdminSubjects = React.lazy(() => import('../pages/admin/AdminSubjects'));
+const AdminRoles = React.lazy(() => import('../pages/admin/AdminRoles'));
 const NotFound = React.lazy(() => import('../pages/NotFound'));
 
 export interface MenuItem {
@@ -233,6 +234,13 @@ export const menuConfig: MenuItem[] = [
     path: '/admin/settings',
     name: 'Pengaturan',
     component: AdminSettings,
+    hidden: true,
+  },
+  {
+    id: 'admin-roles',
+    path: '/admin/roles',
+    name: 'Manajemen Roles',
+    component: AdminRoles,
     hidden: true,
   },
   {

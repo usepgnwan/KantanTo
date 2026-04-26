@@ -1,6 +1,25 @@
 basePath: /
 definitions:
-  controller.Response:
+  controller.RegisterRequest:
+    properties:
+      asal_sekolah:
+        type: string
+      email:
+        type: string
+      name:
+        type: string
+      nohp:
+        type: string
+      password:
+        minLength: 6
+        type: string
+    required:
+    - email
+    - name
+    - nohp
+    - password
+    type: object
+  helpers.Response:
     properties:
       data: {}
       message:
@@ -24,6 +43,19 @@ definitions:
       total:
         type: integer
     type: object
+  model.Category:
+    properties:
+      created_at:
+        type: string
+      deskripsi:
+        type: string
+      id:
+        type: integer
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
   model.Mapel:
     properties:
       created_at:
@@ -37,6 +69,36 @@ definitions:
       updated_at:
         type: string
     type: object
+  model.Role:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  model.Setting:
+    properties:
+      alamat:
+        type: string
+      created_at:
+        type: string
+      deskripsi:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      nama_aplikasi:
+        type: string
+      no_wa:
+        type: string
+      updated_at:
+        type: string
+    type: object
 info:
   contact:
     name: Admin
@@ -44,6 +106,372 @@ info:
   title: Mapel API Documentation
   version: "1.0"
 paths:
+  /api/category:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of Category
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Limit per page
+        in: query
+        name: limit
+        type: integer
+      - description: Search by title
+        in: query
+        name: title
+        type: string
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/helpers.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/helpers.ResponsePaginate'
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get all Category (Paginated)
+      tags:
+      - Category
+    post:
+      consumes:
+      - application/json
+      description: Create a new mata pelajaran
+      parameters:
+      - description: Category Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.Category'
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Create new Category
+      tags:
+      - Category
+  /api/category/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete Category by ID
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete Category
+      tags:
+      - Category
+    get:
+      consumes:
+      - application/json
+      description: Get specific Category by its ID
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Category by ID
+      tags:
+      - Category
+    put:
+      consumes:
+      - application/json
+      description: Update Category by ID
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Category Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.Category'
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Update Category
+      tags:
+      - Category
+  /api/grade:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of Grade
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Limit per page
+        in: query
+        name: limit
+        type: integer
+      - description: Search by title
+        in: query
+        name: title
+        type: string
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/helpers.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/helpers.ResponsePaginate'
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get all Grade (Paginated)
+      tags:
+      - Grade
+    post:
+      consumes:
+      - application/json
+      description: Create a new Grade
+      parameters:
+      - description: Category Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.Category'
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Create new Grade
+      tags:
+      - Grade
+  /api/grade/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete Grade by ID
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete Grade
+      tags:
+      - Grade
+    get:
+      consumes:
+      - application/json
+      description: Get specific Grade by its ID
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Grade by ID
+      tags:
+      - Grade
+    put:
+      consumes:
+      - application/json
+      description: Update Grade by ID
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Category Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.Category'
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Update Grade
+      tags:
+      - Grade
   /api/mapel:
     get:
       consumes:
@@ -77,7 +505,7 @@ paths:
           description: OK
           schema:
             allOf:
-            - $ref: '#/definitions/controller.Response'
+            - $ref: '#/definitions/helpers.Response'
             - properties:
                 data:
                   $ref: '#/definitions/helpers.ResponsePaginate'
@@ -85,7 +513,7 @@ paths:
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/controller.Response'
+            $ref: '#/definitions/helpers.Response'
       security:
       - ApiKeyAuth: []
       summary: Get all Mapel (Paginated)
@@ -114,11 +542,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/controller.Response'
+            $ref: '#/definitions/helpers.Response'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/controller.Response'
+            $ref: '#/definitions/helpers.Response'
       security:
       - ApiKeyAuth: []
       summary: Create new Mapel
@@ -147,11 +575,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/controller.Response'
+            $ref: '#/definitions/helpers.Response'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/controller.Response'
+            $ref: '#/definitions/helpers.Response'
       security:
       - ApiKeyAuth: []
       summary: Delete Mapel
@@ -179,11 +607,11 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/controller.Response'
+            $ref: '#/definitions/helpers.Response'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/controller.Response'
+            $ref: '#/definitions/helpers.Response'
       security:
       - ApiKeyAuth: []
       summary: Get Mapel by ID
@@ -217,16 +645,328 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/controller.Response'
+            $ref: '#/definitions/helpers.Response'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/controller.Response'
+            $ref: '#/definitions/helpers.Response'
       security:
       - ApiKeyAuth: []
       summary: Update Mapel
       tags:
       - Mapel
+  /api/role:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated list of roles.
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Search by title
+        in: query
+        name: search
+        type: string
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.ResponsePaginate'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get list of Roles
+      tags:
+      - Role
+    post:
+      consumes:
+      - application/json
+      description: Create a new Role entry
+      parameters:
+      - description: Role request body
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.Role'
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new Role
+      tags:
+      - Role
+  /api/role/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete Role by ID
+      parameters:
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a Role
+      tags:
+      - Role
+    get:
+      consumes:
+      - application/json
+      description: Get Role By ID
+      parameters:
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Role By ID
+      tags:
+      - Role
+    put:
+      consumes:
+      - application/json
+      description: Update Role by ID
+      parameters:
+      - description: Role ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Role Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.Role'
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Update a Role
+      tags:
+      - Role
+  /api/setting:
+    get:
+      consumes:
+      - application/json
+      description: Get setting configuration. If not exist, generates a default.
+      parameters:
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get Application Setting
+      tags:
+      - Setting
+    put:
+      consumes:
+      - application/json
+      description: Update the first and only row of application setting
+      parameters:
+      - description: Setting Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.Setting'
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Update Application Setting
+      tags:
+      - Setting
+  /api/user:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated list of users including preloaded Role.
+      parameters:
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: Items per page
+        in: query
+        name: limit
+        type: integer
+      - description: Search by name or email
+        in: query
+        name: search
+        type: string
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.ResponsePaginate'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get list of Users
+      tags:
+      - User
+  /api/user/register:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user with default status Active and Role 2 (Student).
+        Email and Nohp must be unique.
+      parameters:
+      - description: Registration data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controller.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      summary: Register a new User
+      tags:
+      - User
 securityDefinitions:
   ApiKeyAuth:
     in: header

@@ -1,12 +1,19 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import AppLayout from '../layouts/AppLayout';
-import { Row, Col, Typography, Input, Button, Form, Card, Divider } from 'antd';
+import { Row, Col, Typography, Input, Button, Form, Card, Divider, Skeleton } from 'antd';
 import { MailOutlined, PhoneOutlined, EnvironmentOutlined, SendOutlined } from '@ant-design/icons';
+import { getSetting, Setting } from '../services/settingService';
 
 const { Title, Paragraph, Text } = Typography;
 const { TextArea } = Input;
 
 const ContactPage: React.FC = () => {
+  const [setting, setSetting] = useState<Setting | null>(null);
+
+  useEffect(() => {
+    getSetting().then(data => setSetting(data)).catch(() => console.error('Gagal mengambil kontak'));
+  }, []);
+
   const onFinish = (values: any) => {
     console.log('Success:', values);
     alert('Pesan Anda berhasil dikirim! Tim Kantan akan segera menghubungi Anda.');
@@ -23,7 +30,7 @@ const ContactPage: React.FC = () => {
               Pusat Dukungan
             </Text>
             <Title level={1} className="!text-4xl md:!text-5xl !font-manrope !font-black !mb-6">
-              Hubungi Tim Kantan
+              Hubungi {setting?.nama_aplikasi || 'Tim Kantan'}
             </Title>
             <Paragraph className="text-lg text-on-surface/60">
               Ada pertanyaan terkait paket pembelajaran SNBT, kendala teknis, atau ingin tahu lebih lanjut bagaimana Kantan membantu ribuan siswa lolos PTN impian? Kami siap membantu.
@@ -35,15 +42,24 @@ const ContactPage: React.FC = () => {
             <Col xs={24} lg={10} className="animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
               <div className="pr-0 md:pr-8">
                 <Title level={3} className="!font-manrope !font-black !mb-4">
-                  Tentang Kantan
+                  Tentang {setting?.nama_aplikasi || 'Kantan'}
                 </Title>
                 <div className="prose prose-p:text-on-surface/70 prose-p:leading-relaxed mb-10">
-                  <p>
-                    <strong>Kantan</strong> didirikan dengan satu misi sederhana: mendemokratisasi akses pendidikan berstandar tinggi untuk persiapan Seleksi Nasional Berdasarkan Tes (SNBT).
-                  </p>
-                  <p>
-                    Kami percaya bahwa kelulusan ke PTN impian bukanlah tentang seberapa keras Anda menghafal, melainkan seberapa cerdas Anda menggunakan <i>Cognitive Sanctuary</i>—sebuah ruang fokus yang dirancang khusus untuk meminimalkan beban mental dan memaksimalkan retensi materi.
-                  </p>
+                  {setting?.deskripsi ? (
+                    <div className="whitespace-pre-wrap text-on-surface/70 leading-relaxed">
+                      {/* Simple stripping of markdown symbols just for clean frontend display */}
+                      {setting.deskripsi.replace(/[*_#]/g, '')}
+                    </div>
+                  ) : (
+                    <>
+                      <p>
+                        <strong>Kantan</strong> didirikan dengan satu misi sederhana: mendemokratisasi akses pendidikan berstandar tinggi untuk persiapan Seleksi Nasional Berdasarkan Tes (SNBT).
+                      </p>
+                      <p>
+                        Kami percaya bahwa kelulusan ke PTN impian bukanlah tentang seberapa keras Anda menghafal, melainkan seberapa cerdas Anda menggunakan <i>Cognitive Sanctuary</i>—sebuah ruang fokus yang dirancang khusus untuk meminimalkan beban mental dan memaksimalkan retensi materi.
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 <Divider className="border-on-surface/10" />
@@ -59,7 +75,7 @@ const ContactPage: React.FC = () => {
                     </div>
                     <div>
                       <Text className="font-bold text-on-surface block text-base mb-1">Email</Text>
-                      <Text className="text-on-surface/60">support@kantan.edu.id</Text>
+                      {setting ? <Text className="text-on-surface/60">{setting.email}</Text> : <Skeleton.Input active size="small" />}
                     </div>
                   </div>
                   
@@ -69,7 +85,7 @@ const ContactPage: React.FC = () => {
                     </div>
                     <div>
                       <Text className="font-bold text-on-surface block text-base mb-1">Telepon / WhatsApp</Text>
-                      <Text className="text-on-surface/60">+62 812 3456 7890</Text>
+                      {setting ? <Text className="text-on-surface/60">{setting.no_wa}</Text> : <Skeleton.Input active size="small" />}
                     </div>
                   </div>
                   
@@ -79,11 +95,7 @@ const ContactPage: React.FC = () => {
                     </div>
                     <div>
                       <Text className="font-bold text-on-surface block text-base mb-1">Kantor Pusat</Text>
-                      <Text className="text-on-surface/60 block leading-relaxed">
-                        Gedung Inovasi Pendidikan Lt. 4<br />
-                        Jl. Sudirman No. 123, Jakarta Selatan<br />
-                        DKI Jakarta 12190
-                      </Text>
+                      {setting ? <Text className="text-on-surface/60 block leading-relaxed">{setting.alamat}</Text> : <Skeleton active paragraph={{ rows: 2 }} title={false} />}
                     </div>
                   </div>
                 </div>

@@ -1,67 +1,84 @@
-import React, { useState } from 'react';
-import { Table, Button, Card, Typography, Modal, Form, Input, Space, Tag, message, Breadcrumb } from 'antd';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Table, Button, Card, Typography, Modal, Form, Input, Space, Tag, message, Breadcrumb, Popconfirm } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, AppstoreOutlined } from '@ant-design/icons';
 import AdminLayout from '../../layouts/AdminLayout';
+import { getCategories, createCategory, updateCategory, deleteCategory, Category } from '../../services/categoryService';
 
 const { Title, Text } = Typography;
 
-interface CategoryData {
-  key: string;
-  title: string;
-  description: string;
-  count: number; // e.g. how many packages use this
-}
-
 const AdminCategories: React.FC = () => {
-  const [data, setData] = useState<CategoryData[]>([
-    { key: '1', title: 'Kedinasan', description: 'Persiapan ujian masuk sekolah kedinasan (IPDN, STIS, dll)', count: 12 },
-    { key: '2', title: 'UTBK-SNBT', description: 'Seleksi Nasional Berdasarkan Tes untuk PTN', count: 25 },
-    { key: '3', title: 'CPNS', description: 'Seleksi Calon Pegawai Negeri Sipil', count: 8 },
-  ]);
+  const [data, setData] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [form] = Form.useForm();
 
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await getCategories(currentPage, perPage, searchQuery);
+      setData(response.rows); 
+      setTotal(response.total); 
+    } catch (error) {
+      message.error('Gagal mengambil data kategori');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, perPage, searchQuery]);
+
+  useEffect(() => {
+    // Debounce search query effect
+    const timeout = setTimeout(() => {
+      fetchData();
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [fetchData, searchQuery]);
+
   const handleAdd = () => {
-    setEditingKey(null);
+    setEditingId(null);
     form.resetFields();
     setIsModalOpen(true);
   };
 
-  const handleEdit = (record: CategoryData) => {
-    setEditingKey(record.key);
-    form.setFieldsValue(record);
+  const handleEdit = (record: Category) => {
+    setEditingId(record.id);
+    form.setFieldsValue({
+      title: record.title,
+      description: record.deskripsi,
+    });
     setIsModalOpen(true);
   };
 
-  const handleDelete = (key: string) => {
-    Modal.confirm({
-      title: 'Hapus Kategori?',
-      content: 'Tindakan ini tidak dapat dibatalkan.',
-      okText: 'Hapus',
-      okType: 'danger',
-      onOk: () => {
-        setData(data.filter(item => item.key !== key));
-        message.success('Kategori berhasil dihapus');
-      }
-    });
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteCategory(id);
+      message.success('Kategori berhasil dihapus');
+      fetchData();
+    } catch (error) {
+      message.error('Gagal menghapus kategori');
+    }
   };
 
-  const onFinish = (values: any) => {
-    if (editingKey) {
-      setData(data.map(item => item.key === editingKey ? { ...item, ...values } : item));
-      message.success('Kategori diperbarui');
-    } else {
-      const newEntry = {
-        key: Date.now().toString(),
-        ...values,
-        count: 0
-      };
-      setData([...data, newEntry]);
-      message.success('Kategori baru ditambahkan');
+  const onFinish = async (values: any) => {
+    const payload = { title: values.title, deskripsi: values.description };
+    try {
+      if (editingId) {
+        await updateCategory(editingId, payload);
+        message.success('Kategori diperbarui');
+      } else {
+        await createCategory(payload);
+        message.success('Kategori baru ditambahkan');
+      }
+      setIsModalOpen(false);
+      fetchData();
+    } catch (error) {
+      message.error('Gagal menyimpan perubahan');
     }
-    setIsModalOpen(false);
   };
 
   const columns = [
@@ -73,25 +90,34 @@ const AdminCategories: React.FC = () => {
     },
     {
       title: 'Deskripsi',
-      dataIndex: 'description',
-      key: 'description',
+      dataIndex: 'deskripsi',
+      key: 'deskripsi',
       ellipsis: true,
-      render: (text: string) => <Text className="text-on-surface/60 text-xs">{text}</Text>,
+      render: (text: string) => <Text className="text-on-surface/60 text-xs">{text || 'Tidak ada deskripsi'}</Text>,
     },
     {
       title: 'Total Paket',
-      dataIndex: 'count',
       key: 'count',
-      render: (count: number) => <Tag color="blue" className="rounded-lg font-bold border-none">{count} Paket</Tag>,
+      render: () => <Tag color="blue" className="rounded-lg font-bold border-none">0 Paket</Tag>,
     },
     {
       title: 'Aksi',
       key: 'action',
       width: 120,
-      render: (_: any, record: CategoryData) => (
+      render: (_: any, record: Category) => (
         <Space size="middle">
           <Button type="text" icon={<EditOutlined className="text-primary" />} onClick={() => handleEdit(record)} />
-          <Button type="text" danger icon={<DeleteOutlined />} onClick={() => handleDelete(record.key)} />
+          <Popconfirm
+            title="Hapus Kategori"
+            description="Apakah Anda yakin ingin menghapus kategori ini secara permanen?"
+            onConfirm={() => handleDelete(record.id)}
+            okText="Hapus"
+            cancelText="Batal"
+            okButtonProps={{ danger: true }}
+            placement="bottomRight"
+          >
+            <Button type="text" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
         </Space>
       ),
     },
@@ -128,14 +154,27 @@ const AdminCategories: React.FC = () => {
                 placeholder="Cari kategori..."
                 prefix={<SearchOutlined className="text-on-surface/20" />}
                 className="max-w-xs rounded-xl h-10 bg-surface-low border-none shadow-none"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
-              <Text className="text-[10px] uppercase font-black tracking-widest text-on-surface/30">Total {data.length} Kategori</Text>
+              <Text className="text-[10px] uppercase font-black tracking-widest text-on-surface/30">Total {total} Kategori</Text>
             </div>
 
             <Table
               columns={columns}
               dataSource={data}
-              pagination={{ pageSize: 8, hideOnSinglePage: true }}
+              rowKey="id"
+              loading={loading}
+              pagination={{ 
+                total: total,
+                current: currentPage,
+                pageSize: perPage,
+                onChange: (page, pageSize) => {
+                  setCurrentPage(page);
+                  setPerPage(pageSize);
+                },
+                showSizeChanger: true
+              }}
               className="kantan-table"
             />
           </Card>
@@ -144,7 +183,7 @@ const AdminCategories: React.FC = () => {
 
       {/* Modal Add/Edit */}
       <Modal
-        title={<Title level={4} className="!m-0 !font-manrope !font-black">{editingKey ? 'Edit Kategori' : 'Kategori Baru'}</Title>}
+        title={<Title level={4} className="!m-0 !font-manrope !font-black">{editingId ? 'Edit Kategori' : 'Kategori Baru'}</Title>}
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
@@ -170,7 +209,7 @@ const AdminCategories: React.FC = () => {
             <div className="flex gap-3">
               <Button block className="h-12 rounded-xl font-bold" onClick={() => setIsModalOpen(false)}>Batal</Button>
               <Button block type="primary" htmlType="submit" className="h-12 rounded-xl font-bold shadow-lg shadow-primary/20">
-                {editingKey ? 'Simpan Perubahan' : 'Tambah Kategori'}
+                {editingId ? 'Simpan Perubahan' : 'Tambah Kategori'}
               </Button>
             </div>
           </Form.Item>

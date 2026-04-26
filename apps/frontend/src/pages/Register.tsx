@@ -1,28 +1,44 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Divider, Typography, Checkbox } from 'antd';
+import { Form, Input, Button, Divider, Typography, Checkbox, message } from 'antd';
 import { MailOutlined, LockOutlined, UserOutlined, WhatsAppOutlined, GoogleOutlined, AppleOutlined } from '@ant-design/icons';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../layouts/AuthLayout';
 import authVisual from '../assets/auth-visual.png';
 import PageLoader from '../components/atoms/PageLoader';
+import { registerUser } from '../services/userService';
 
 const { Text } = Typography;
 
 const RegisterPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const onFinish = (values: any) => {
+  const onFinish = async (values: any) => {
     setLoading(true);
-    console.log('Register Success:', values);
-    
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      await registerUser({
+        name: values.name,
+        email: values.email,
+        nohp: values.whatsapp,
+        password: values.password,
+      });
+
+      message.success('Registrasi berhasil! Silakan masuk dengan akun Anda.');
       setPageLoading(true);
       setTimeout(() => {
-        window.location.href = '/login';
+        navigate('/login');
       }, 1500);
-    }, 1000);
+
+    } catch (error: any) {
+      if (error.response && error.response.data && error.response.data.message) {
+        message.error(error.response.data.message);
+      } else {
+        message.error('Gagal melakukan pendaftaran. Silahkan coba lagi nanti.');
+      }
+    } finally {
+      if (!pageLoading) setLoading(false);
+    }
   };
 
   if (pageLoading) return <PageLoader />;

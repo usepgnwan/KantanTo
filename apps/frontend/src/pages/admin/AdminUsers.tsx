@@ -1,55 +1,61 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
 import {
   Row, Col, Card, Table, Input, Button, Tag, Avatar,
-  Typography, Space, Select, Dropdown, Badge,
+  Typography, Space, Select, Dropdown, Badge, message,
 } from 'antd';
 import type { MenuProps, TableColumnsType } from 'antd';
 import {
   SearchOutlined, UserAddOutlined, MoreOutlined, FilterOutlined,
   UserOutlined, MailOutlined, CheckCircleOutlined, CloseCircleOutlined,
-  ExportOutlined, TeamOutlined, RiseOutlined,
+  ExportOutlined, TeamOutlined, RiseOutlined, PhoneOutlined,
 } from '@ant-design/icons';
+import { getUsers, User } from '../../services/userService';
 
 const { Title, Text } = Typography;
 
-interface User {
-  key: string;
-  name: string;
-  email: string;
-  package: string;
-  status: 'aktif' | 'tidak aktif' | 'pending';
-  joinDate: string;
-  score: number | null;
-}
-
-const mockUsers: User[] = [
-  { key: '1', name: 'Arief Kurniawan', email: 'arief@gmail.com', package: 'Saintek Pro', status: 'aktif', joinDate: '12 Apr 2026', score: 712 },
-  { key: '2', name: 'Siti Aminah', email: 'siti@yahoo.com', package: 'Gratis', status: 'aktif', joinDate: '18 Apr 2026', score: 634 },
-  { key: '3', name: 'Diana Fitri', email: 'diana@gmail.com', package: 'Tryout Akbar', status: 'aktif', joinDate: '20 Apr 2026', score: 688 },
-  { key: '4', name: 'Budi Santoso', email: 'budi@gmail.com', package: 'Soshum Mastery', status: 'tidak aktif', joinDate: '5 Apr 2026', score: null },
-  { key: '5', name: 'Rini Wulandari', email: 'rini@outlook.com', package: 'Saintek Pro', status: 'aktif', joinDate: '22 Apr 2026', score: 745 },
-  { key: '6', name: 'Joko Prasetyo', email: 'joko@gmail.com', package: 'Gratis', status: 'pending', joinDate: '24 Apr 2026', score: null },
-  { key: '7', name: 'Ayu Lestari', email: 'ayu@gmail.com', package: 'Intensif UTBK', status: 'aktif', joinDate: '10 Apr 2026', score: 728 },
-  { key: '8', name: 'Dani Permana', email: 'dani@yahoo.com', package: 'Soshum Mastery', status: 'aktif', joinDate: '15 Apr 2026', score: 661 },
-];
-
-const statusConfig = {
+const statusConfig: Record<string, { color: string; icon: React.ReactNode }> = {
   aktif: { color: 'green', icon: <CheckCircleOutlined /> },
-  'tidak aktif': { color: 'default', icon: <CloseCircleOutlined /> },
+  'non-aktif': { color: 'default', icon: <CloseCircleOutlined /> },
   pending: { color: 'orange', icon: null },
 };
 
 const AdminUsers: React.FC = () => {
-  const [search, setSearch] = useState('');
+  const [data, setData] = useState<User[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Note: Local frontend-only status filtering since API doesn't support status query yet, 
+  // but for massive scale you'd pass it back to API.
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedRows, setSelectedRows] = useState<string[]>([]);
+  const [selectedRows, setSelectedRows] = useState<React.Key[]>([]);
 
-  const filtered = mockUsers.filter((u) => {
-    const matchSearch = u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.email.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === 'all' || u.status === statusFilter;
-    return matchSearch && matchStatus;
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await getUsers(currentPage, perPage, searchQuery);
+      setData(result.rows || []);
+      setTotal(result.total || 0);
+    } catch (err) {
+      message.error('Gagal mengambil data pengguna');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, perPage, searchQuery]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchUsers();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [fetchUsers, searchQuery]);
+
+  const filtered = data.filter((u) => {
+    if (statusFilter === 'all') return true;
+    return u.status === statusFilter;
   });
 
   const rowActions = (record: User): MenuProps['items'] => [
@@ -67,52 +73,58 @@ const AdminUsers: React.FC = () => {
       render: (name, record) => (
         <div className="flex items-center gap-3">
           <Avatar icon={<UserOutlined />} className="bg-primary/10 text-primary shrink-0" />
-          <div>
+          <div className="flex flex-col">
             <Text className="font-bold block text-sm">{name}</Text>
-            <Text className="text-xs text-on-surface/40">{record.email}</Text>
+            <Text className="text-[10px] text-on-surface/40 flex items-center gap-1">
+              <MailOutlined className="text-[10px]" /> {record.email}
+            </Text>
+            <Text className="text-[10px] text-on-surface/40 flex items-center gap-1">
+              <PhoneOutlined className="text-[10px]" /> {record.nohp || '-'}
+            </Text>
           </div>
         </div>
       ),
     },
     {
-      title: 'Paket',
-      dataIndex: 'package',
-      key: 'package',
-      render: (pkg) => (
-        <Tag className={`rounded-full font-bold border-none px-3 ${pkg === 'Gratis' ? 'bg-surface-low text-on-surface/60' : 'bg-primary/10 text-primary'}`}>
-          {pkg}
-        </Tag>
-      ),
+      title: 'Roles',
+      key: 'role',
+      render: (_, record) => {
+        const roleTitle = record.role?.title || 'User';
+        return (
+          <Tag className={`rounded-full font-bold border-none px-3 bg-primary/10 text-primary`}>
+            {roleTitle}
+          </Tag>
+        );
+      },
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status: User['status']) => (
-        <Tag
-          icon={statusConfig[status].icon}
-          color={statusConfig[status].color}
-          className="rounded-full font-bold capitalize"
-        >
-          {status}
-        </Tag>
-      ),
+      render: (status: string) => {
+        const conf = statusConfig[status] || { color: 'default', icon: null };
+        return (
+          <Tag
+            icon={conf.icon}
+            color={conf.color}
+            className="rounded-full font-bold capitalize"
+          >
+            {status}
+          </Tag>
+        );
+      },
     },
     {
       title: 'Skor Terakhir',
-      dataIndex: 'score',
       key: 'score',
       align: 'center',
-      render: (score) => score
-        ? <Text className="font-black text-primary">{score}</Text>
-        : <Text className="text-on-surface/30">—</Text>,
-      sorter: (a, b) => (a.score ?? 0) - (b.score ?? 0),
+      render: () => <Text className="font-black text-primary">0</Text>,
     },
     {
       title: 'Bergabung',
-      dataIndex: 'joinDate',
-      key: 'joinDate',
-      render: (date) => <Text className="text-sm text-on-surface/60">{date}</Text>,
+      dataIndex: 'created_at',
+      key: 'created_at',
+      render: (date) => <Text className="text-sm text-on-surface/60">{new Date(date).toLocaleDateString()}</Text>,
     },
     {
       title: '',
@@ -126,10 +138,11 @@ const AdminUsers: React.FC = () => {
     },
   ];
 
+  // We keep some static stats based on total
   const stats = [
-    { label: 'Total Pengguna', value: mockUsers.length, icon: <TeamOutlined />, color: 'primary' },
-    { label: 'Pengguna Aktif', value: mockUsers.filter(u => u.status === 'aktif').length, icon: <CheckCircleOutlined />, color: 'green-500' },
-    { label: 'Rata-rata Skor', value: Math.round(mockUsers.filter(u => u.score).reduce((a, u) => a + (u.score ?? 0), 0) / mockUsers.filter(u => u.score).length), icon: <RiseOutlined />, color: 'blue-500' },
+    { label: 'Total Pengguna', value: total, icon: <TeamOutlined />, color: 'primary' },
+    { label: 'Pengguna Aktif', value: '-', icon: <CheckCircleOutlined />, color: 'green-500' },
+    { label: 'Rata-rata Skor', value: 0, icon: <RiseOutlined />, color: 'blue-500' },
   ];
 
   return (
@@ -170,9 +183,9 @@ const AdminUsers: React.FC = () => {
               <Input
                 prefix={<SearchOutlined className="text-on-surface/30" />}
                 placeholder="Cari nama atau email..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="rounded-xl flex-1"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="rounded-xl flex-1 max-w-sm"
                 allowClear
               />
               <Select
@@ -182,7 +195,7 @@ const AdminUsers: React.FC = () => {
                 options={[
                   { value: 'all', label: 'Semua Status' },
                   { value: 'aktif', label: 'Aktif' },
-                  { value: 'tidak aktif', label: 'Tidak Aktif' },
+                  { value: 'non-aktif', label: 'Non Aktif' },
                   { value: 'pending', label: 'Pending' },
                 ]}
                 suffixIcon={<FilterOutlined />}
@@ -202,11 +215,23 @@ const AdminUsers: React.FC = () => {
             <Table
               columns={columns}
               dataSource={filtered}
+              rowKey="id"
+              loading={loading}
               rowSelection={{
                 type: 'checkbox',
-                onChange: (keys) => setSelectedRows(keys as string[]),
+                onChange: (keys) => setSelectedRows(keys),
               }}
-              pagination={{ pageSize: 8, showSizeChanger: false, showTotal: (total) => `Total ${total} pengguna` }}
+              pagination={{
+                total: total,
+                current: currentPage,
+                pageSize: perPage,
+                showSizeChanger: true,
+                onChange: (page, size) => {
+                  setCurrentPage(page);
+                  setPerPage(size);
+                },
+                showTotal: (t) => `Total ${t} pengguna`
+              }}
               className="weightless-table"
               scroll={{ x: 600 }}
             />

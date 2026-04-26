@@ -2,20 +2,18 @@ package controller
 
 import (
 	"net/http"
-	"server/app/helpers"
+	. "server/app/helpers"
 	"server/app/model"
 	"server/connection"
 	"strconv"
 
-	. "server/app/helpers"
-
 	"github.com/labstack/echo/v4"
 )
 
-// GetMapels godoc
-// @Summary      Get all Mapel (Paginated)
-// @Description  Get a paginated list of mata pelajaran
-// @Tags         Mapel
+// GetGrade godoc
+// @Summary      Get all Grade (Paginated)
+// @Description  Get a paginated list of Grade
+// @Tags         Grade
 // @Accept       json
 // @Produce      json
 // @Param        page    query     int     false  "Page number" default(1)
@@ -25,13 +23,13 @@ import (
 // @Success      200  {object}  Response{data=helpers.ResponsePaginate}
 // @Failure      500  {object}  Response
 // @Param secret-to-apps header string true "API secret key" default(Z9ToSwagger1413999)
-// @Router       /api/mapel [get]
-func GetMapels(c echo.Context) error {
-	data := &helpers.Paginate{
-		Model: &model.Mapel{},
+// @Router       /api/grade [get]
+func GetGrade(c echo.Context) error {
+	data := &Paginate{
+		Model: &model.Grade{},
 	}
 	db := connection.DB
-	query := db.Model(&model.Mapel{})
+	query := db.Model(&model.Grade{})
 
 	title := c.QueryParam("title")
 	if title != "" {
@@ -42,91 +40,91 @@ func GetMapels(c echo.Context) error {
 	return c.JSON(http.StatusOK, Response{Status: true, Message: "Success get data", Data: result})
 }
 
-// GetMapelByID godoc
-// @Summary      Get Mapel by ID
-// @Description  Get specific mata pelajaran by its ID
-// @Tags         Mapel
+// GetGradeByID godoc
+// @Summary      Get Grade by ID
+// @Description  Get specific Grade by its ID
+// @Tags         Grade
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        id   path      int  true  "Mapel ID"
+// @Param        id   path      int  true  "Category ID"
 // @Success      200  {object}  Response
 // @Failure      404  {object}  Response
 // @Param secret-to-apps header string true "API secret key" default(Z9ToSwagger1413999)
-// @Router       /api/mapel/{id} [get]
-func GetMapelByID(c echo.Context) error {
+// @Router       /api/grade/{id} [get]
+func GetGradeByID(c echo.Context) error {
 	id := c.Param("id")
-	var mapel model.Mapel
-	if err := connection.DB.First(&mapel, id).Error; err != nil {
+	var Grade model.Grade
+	if err := connection.DB.First(&Grade, id).Error; err != nil {
 		return c.JSON(http.StatusNotFound, Response{Status: false, Message: "Data tidak ditemukan"})
 	}
-	return c.JSON(http.StatusOK, Response{Status: true, Message: "Success", Data: mapel})
+	return c.JSON(http.StatusOK, Response{Status: true, Message: "Success", Data: Grade})
 }
 
-// CreateMapel godoc
-// @Summary      Create new Mapel
-// @Description  Create a new mata pelajaran
-// @Tags         Mapel
+// CreateGrade godoc
+// @Summary      Create new Grade
+// @Description  Create a new Grade
+// @Tags         Grade
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        request body model.Mapel true "Mapel Payload"
+// @Param        request body model.Category true "Category Payload"
 // @Success      200  {object}  Response
 // @Failure      400  {object}  Response
 // @Param secret-to-apps header string true "API secret key" default(Z9ToSwagger1413999)
-// @Router       /api/mapel [post]
-func CreateMapel(c echo.Context) error {
-	mapel := new(model.Mapel)
-	if err := c.Bind(mapel); err != nil {
+// @Router       /api/grade [post]
+func CreateGrade(c echo.Context) error {
+	Grade := new(model.Grade)
+	if err := c.Bind(Grade); err != nil {
 		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: err.Error()})
 	}
-	if err := connection.DB.Create(&mapel).Error; err != nil {
+	if err := connection.DB.Create(&Grade).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Status: false, Message: "Gagal menyimpan data"})
 	}
-	return c.JSON(http.StatusCreated, Response{Status: true, Message: "Created successfully", Data: mapel})
+	return c.JSON(http.StatusCreated, Response{Status: true, Message: "Created successfully", Data: Grade})
 }
 
-// UpdateMapel godoc
-// @Summary      Update Mapel
-// @Description  Update mapel by ID
-// @Tags         Mapel
+// UpdateGrade godoc
+// @Summary      Update Grade
+// @Description  Update Grade by ID
+// @Tags         Grade
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        id   path      int  true  "Mapel ID"
-// @Param        request body model.Mapel true "Mapel Payload"
+// @Param        id   path      int  true  "Category ID"
+// @Param        request body model.Category true "Category Payload"
 // @Success      200  {object}  Response
 // @Failure      404  {object}  Response
 // @Param secret-to-apps header string true "API secret key" default(Z9ToSwagger1413999)
-// @Router       /api/mapel/{id} [put]
-func UpdateMapel(c echo.Context) error {
+// @Router       /api/grade/{id} [put]
+func UpdateGrade(c echo.Context) error {
 	id, _ := strconv.Atoi(c.Param("id"))
-	var mapel model.Mapel
-	if err := connection.DB.First(&mapel, id).Error; err != nil {
+	var Grade model.Grade
+	if err := connection.DB.First(&Grade, id).Error; err != nil {
 		return c.JSON(http.StatusNotFound, Response{Status: false, Message: "Data tidak ditemukan"})
 	}
-	if err := c.Bind(&mapel); err != nil {
+	if err := c.Bind(&Grade); err != nil {
 		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: err.Error()})
 	}
-	connection.DB.Save(&mapel)
-	return c.JSON(http.StatusOK, Response{Status: true, Message: "Updated successfully", Data: mapel})
+	connection.DB.Save(&Grade)
+	return c.JSON(http.StatusOK, Response{Status: true, Message: "Updated successfully", Data: Grade})
 }
 
-// DeleteMapel godoc
-// @Summary      Delete Mapel
-// @Description  Delete mapel by ID
-// @Tags         Mapel
+// DeleteGrade godoc
+// @Summary      Delete Grade
+// @Description  Delete Grade by ID
+// @Tags         Grade
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        id   path      int  true  "Mapel ID"
+// @Param        id   path      int  true  "Category ID"
 // @Success      200  {object}  Response
 // @Failure      404  {object}  Response
 // @Param secret-to-apps header string true "API secret key" default(Z9ToSwagger1413999)
-// @Router       /api/mapel/{id} [delete]
-func DeleteMapel(c echo.Context) error {
+// @Router       /api/grade/{id} [delete]
+func DeleteGrade(c echo.Context) error {
 	id := c.Param("id")
-	if err := connection.DB.Delete(&model.Mapel{}, id).Error; err != nil {
+	if err := connection.DB.Delete(&model.Grade{}, id).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Status: false, Message: "Gagal menghapus data"})
 	}
 	return c.JSON(http.StatusOK, Response{Status: true, Message: "Deleted successfully"})

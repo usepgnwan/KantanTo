@@ -22,6 +22,7 @@ import {
   BankOutlined,
   ReadOutlined,
   PercentageOutlined,
+  SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../context/ThemeContext';
 
@@ -70,6 +71,7 @@ const menuItems = [
     section: 'Sistem',
     items: [
       { path: '/admin/settings', label: 'Pengaturan', icon: <SettingOutlined /> },
+      { path: '/admin/roles', label: 'Manajemen Roles', icon: <SafetyCertificateOutlined /> },
     ],
   },
 ];

@@ -1,92 +1,144 @@
-import React, { useState } from 'react';
-import { Table, Button, Card, Typography, Modal, Form, Input, Space, Avatar, message, Breadcrumb } from 'antd';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Table, Button, Card, Typography, Modal, Form, Input, Space, Avatar, message, Breadcrumb, Popconfirm } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, ReadOutlined } from '@ant-design/icons';
 import AdminLayout from '../../layouts/AdminLayout';
+import { getMapels, createMapel, updateMapel, deleteMapel, Mapel } from '../../services/mapelService';
 
 const { Title, Text } = Typography;
 
-interface SubjectData {
-  key: string;
-  title: string;
-  description: string;
-  color: string;
-}
-
 const AdminSubjects: React.FC = () => {
-  const [data, setData] = useState<SubjectData[]>([
-    { key: '1', title: 'Matematika', description: 'Logika matematika, kalkulus, dan statistika', color: '#1890ff' },
-    { key: '2', title: 'Bahasa Indonesia', description: 'Pemahaman bacaan dan menulis', color: '#f5222d' },
-    { key: '3', title: 'Bahasa Inggris', description: 'Literacy and structure', color: '#52c41a' },
-    { key: '4', title: 'Fisika', description: 'Mekanika, termodinamika, dan optik', color: '#722ed1' },
-    { key: '5', title: 'Penalaran Umum', description: 'Logika deduktif dan induktif', color: '#faad14' },
-  ]);
+  const [data, setData] = useState<Mapel[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [form] = Form.useForm();
 
+  // Color generator based on title string (for consistent UX color mapping)
+  const getRandomColor = (title: string) => {
+    const colors = ['#1890ff', '#f5222d', '#52c41a', '#722ed1', '#faad14'];
+    let hash = 0;
+    for (let i = 0; i < title.length; i++) hash = title.charCodeAt(i) + ((hash << 5) - hash);
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await getMapels(currentPage, perPage, searchQuery);
+      setData(response.rows); // Membaca properti rows dari JSON
+      setTotal(response.total); // Membaca properti total dari JSON
+    } catch (error) {
+      message.error('Gagal mengambil data mata pelajaran');
+    } finally {
+      setLoading(false);
+    }
+  }, [currentPage, perPage, searchQuery]);
+
+  useEffect(() => {
+    // Debounce search query effect
+    const timeout = setTimeout(() => {
+      fetchData();
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [fetchData, searchQuery]);
+
   const handleAdd = () => {
-    setEditingKey(null);
+    setEditingId(null);
     form.resetFields();
     setIsModalOpen(true);
   };
 
-  const handleEdit = (record: SubjectData) => {
-    setEditingKey(record.key);
-    form.setFieldsValue(record);
+  const handleEdit = (record: Mapel) => {
+    setEditingId(record.id);
+    form.setFieldsValue({
+      title: record.title,
+      description: record.deskripsi,
+    });
     setIsModalOpen(true);
   };
 
-  const onFinish = (values: any) => {
-    if (editingKey) {
-      setData(data.map(item => item.key === editingKey ? { ...item, ...values } : item));
-      message.success('Mata pelajaran diperbarui');
-    } else {
-      setData([...data, { key: Date.now().toString(), ...values, color: '#1677ff' }]);
-      message.success('Mata pelajaran ditambahkan');
+  const onFinish = async (values: any) => {
+    const payload = { title: values.title, deskripsi: values.description };
+    try {
+      if (editingId) {
+        await updateMapel(editingId, payload);
+        message.success('Mata pelajaran diperbarui');
+      } else {
+        await createMapel(payload);
+        message.success('Mata pelajaran ditambahkan');
+      }
+      setIsModalOpen(false);
+      fetchData(); // refresh list
+    } catch (error) {
+      message.error('Gagal menyimpan perubahan');
     }
-    setIsModalOpen(false);
+  };
+
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteMapel(id);
+      message.success('Mata pelajaran dihapus');
+      // Jika hapus di page 2 dan data habis, table antd biasanya akan panggil onChange, tapi kita refresh saja.
+      fetchData();
+    } catch (error) {
+      message.error('Gagal menghapus data');
+    }
   };
 
   const columns = [
     {
       title: 'Mata Pelajaran',
       key: 'subject',
-      render: (_: any, record: SubjectData) => (
-        <Space size="middle">
-          <Avatar 
-            shape="square" 
-            size={40} 
-            style={{ backgroundColor: record.color + '20', color: record.color }}
-            className="rounded-xl font-black border-none"
-          >
-            {record.title[0]}
-          </Avatar>
-          <div>
-            <Text className="font-bold block text-on-surface">{record.title}</Text>
-            <Text className="text-[10px] text-on-surface/40 uppercase font-black tracking-widest">{record.key.length > 5 ? 'Custom' : 'Core System'}</Text>
-          </div>
-        </Space>
-      ),
+      render: (_: any, record: Mapel) => {
+        const color = getRandomColor(record.title);
+        return (
+          <Space size="middle">
+            <Avatar 
+              shape="square" 
+              size={40} 
+              style={{ backgroundColor: color + '20', color: color }}
+              className="rounded-xl font-black border-none"
+            >
+              {record.title ? record.title[0].toUpperCase() : '-'}
+            </Avatar>
+            <div>
+              <Text className="font-bold block text-on-surface">{record.title}</Text>
+              <Text className="text-[10px] text-on-surface/40 uppercase font-black tracking-widest">ID: {record.id}</Text>
+            </div>
+          </Space>
+        )
+      },
     },
     {
       title: 'Cakupan Materi',
-      dataIndex: 'description',
-      key: 'description',
-      render: (text: string) => <Text className="text-on-surface/60 text-xs">{text}</Text>,
+      dataIndex: 'deskripsi',
+      key: 'deskripsi',
+      render: (text: string) => <Text className="text-on-surface/60 text-xs">{text || 'Tidak ada deskripsi'}</Text>,
     },
     {
       title: 'Aksi',
       key: 'action',
       width: 120,
       align: 'right' as const,
-      render: (_: any, record: SubjectData) => (
+      render: (_: any, record: Mapel) => (
         <Space size="middle">
           <Button type="text" icon={<EditOutlined className="text-primary" />} onClick={() => handleEdit(record)} />
-          <Button type="text" danger icon={<DeleteOutlined />} onClick={() => {
-            setData(data.filter(i => i.key !== record.key));
-            message.success('Mata pelajaran dihapus');
-          }} />
+          <Popconfirm
+            title="Hapus Mapel"
+            description="Apakah Anda yakin ingin menghapus mapel ini secara permanen?"
+            onConfirm={() => handleDelete(record.id)}
+            okText="Hapus"
+            cancelText="Batal"
+            okButtonProps={{ danger: true }}
+            placement="bottomRight"
+          >
+            <Button type="text" danger icon={<DeleteOutlined />} />
+          </Popconfirm>
         </Space>
       ),
     },
@@ -115,6 +167,8 @@ const AdminSubjects: React.FC = () => {
                  placeholder="Filter mapel..." 
                  prefix={<SearchOutlined className="text-on-surface/20" />}
                  className="max-w-xs rounded-xl h-10 bg-surface-low border-none"
+                 value={searchQuery}
+                 onChange={(e) => setSearchQuery(e.target.value)}
                />
                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
             </div>
@@ -122,7 +176,18 @@ const AdminSubjects: React.FC = () => {
             <Table 
               columns={columns} 
               dataSource={data} 
-              pagination={{ pageSize: 10, hideOnSinglePage: true }}
+              rowKey="id"
+              loading={loading}
+              pagination={{ 
+                total: total,
+                current: currentPage,
+                pageSize: perPage,
+                onChange: (page, pageSize) => {
+                  setCurrentPage(page);
+                  setPerPage(pageSize);
+                },
+                showSizeChanger: true
+              }}
               className="kantan-table"
             />
           </Card>

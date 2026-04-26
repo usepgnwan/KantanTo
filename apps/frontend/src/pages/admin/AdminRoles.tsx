@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Button, Card, Typography, Modal, Form, Input, Space, Tag, message, Breadcrumb, Popconfirm } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, BankOutlined } from '@ant-design/icons';
+import { Table, Button, Card, Typography, Modal, Form, Input, Space, message, Breadcrumb, Popconfirm } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import AdminLayout from '../../layouts/AdminLayout';
-import { getGrades, createGrade, updateGrade, deleteGrade, Grade } from '../../services/gradeService';
+import { getRoles, createRole, updateRole, deleteRole, Role } from '../../services/roleService';
 
 const { Title, Text } = Typography;
 
-const AdminClasses: React.FC = () => {
-  const [data, setData] = useState<Grade[]>([]);
+const AdminRoles: React.FC = () => {
+  const [data, setData] = useState<Role[]>([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -21,18 +21,17 @@ const AdminClasses: React.FC = () => {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await getGrades(currentPage, perPage, searchQuery);
+      const response = await getRoles(currentPage, perPage, searchQuery);
       setData(response.rows);
       setTotal(response.total);
     } catch (error) {
-      message.error('Gagal mengambil data kelas');
+      message.error('Gagal mengambil data role');
     } finally {
       setLoading(false);
     }
   }, [currentPage, perPage, searchQuery]);
 
   useEffect(() => {
-    // Debounce search query effect
     const timeout = setTimeout(() => {
       fetchData();
     }, 500);
@@ -45,34 +44,33 @@ const AdminClasses: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleEdit = (record: Grade) => {
+  const handleEdit = (record: Role) => {
     setEditingId(record.id);
     form.setFieldsValue({
       title: record.title,
-      description: record.deskripsi,
     });
     setIsModalOpen(true);
   };
 
   const handleDelete = async (id: number) => {
     try {
-      await deleteGrade(id);
-      message.success('Tingkat kelas berhasil dihapus');
+      await deleteRole(id);
+      message.success('Role berhasil dihapus');
       fetchData();
     } catch (error) {
-      message.error('Gagal menghapus tingkat kelas');
+      message.error('Gagal menghapus role');
     }
   };
 
   const onFinish = async (values: any) => {
-    const payload = { title: values.title, deskripsi: values.description };
+    const payload = { title: values.title };
     try {
       if (editingId) {
-        await updateGrade(editingId, payload);
-        message.success('Data kelas diperbarui');
+        await updateRole(editingId, payload);
+        message.success('Data role diperbarui');
       } else {
-        await createGrade(payload);
-        message.success('Tingkat kelas baru ditambahkan');
+        await createRole(payload);
+        message.success('Role baru ditambahkan');
       }
       setIsModalOpen(false);
       fetchData();
@@ -83,38 +81,22 @@ const AdminClasses: React.FC = () => {
 
   const columns = [
     {
-      title: 'Tingkat Kelas',
+      title: 'Nama Role',
       dataIndex: 'title',
       key: 'title',
       render: (text: string) => <Text className="font-black text-on-surface text-base">{text}</Text>,
-    },
-    {
-      title: 'Deskripsi Cakupan',
-      dataIndex: 'deskripsi',
-      key: 'deskripsi',
-      render: (text: string) => <Text className="text-on-surface/50 text-xs italic">{text || '-'}</Text>,
-    },
-    {
-      title: 'Total Konten',
-      key: 'totalContent',
-      render: () => <Tag color="blue" className="rounded-lg border-none font-bold">0 Konten</Tag>,
-    },
-    {
-      title: 'Total Paket',
-      key: 'totalPackage',
-      render: () => <Tag color="cyan" className="rounded-lg border-none font-bold">0 Paket</Tag>,
     },
     {
       title: 'Aksi',
       key: 'action',
       width: 100,
       align: 'right' as const,
-      render: (_: any, record: Grade) => (
+      render: (_: any, record: Role) => (
         <Space size="small">
           <Button type="text" icon={<EditOutlined className="text-primary" />} onClick={() => handleEdit(record)} />
           <Popconfirm
-            title="Hapus Tingkat Kelas"
-            description="Tindakan ini tidak dapat dibatalkan, ingin menghapus?"
+            title="Hapus Role"
+            description="Tindakan ini tidak dapat dibatalkan. Hapus role ini?"
             onConfirm={() => handleDelete(record.id)}
             okText="Hapus"
             cancelText="Batal"
@@ -131,27 +113,27 @@ const AdminClasses: React.FC = () => {
   return (
     <AdminLayout>
       <div className="bg-surface-low/30 dark:bg-zinc-950 min-h-full py-10 transition-colors">
-        <div className="max-w-6xl mx-auto px-4 lg:px-8">
+        <div className="max-w-4xl mx-auto px-4 lg:px-8">
           
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 text-center sm:text-left">
             <div>
               <Breadcrumb 
-                items={[{ title: 'Master Data' }, { title: 'Tingkat Kelas' }]}
+                items={[{ title: 'Pengaturan Sistem' }, { title: 'Manajemen Role' }]}
                 className="mb-2 uppercase text-[10px] font-black tracking-widest opacity-40 justify-center sm:justify-start"
               />
               <Title level={2} className="!m-0 !font-manrope !font-black !text-2xl dark:text-zinc-100 flex items-center gap-3 justify-center sm:justify-start">
-                <BankOutlined className="text-primary" /> Management Kelas
+                <SafetyCertificateOutlined className="text-primary" /> Manajemen Role
               </Title>
             </div>
             <Button type="primary" size="large" icon={<PlusOutlined />} onClick={handleAdd} className="rounded-2xl h-12 px-8 font-black shadow-xl shadow-primary/20">
-              Buat Kelas
+              Buat Role Khusus
             </Button>
           </div>
 
           <Card className="rounded-[2.5rem] border-none shadow-sm overflow-hidden bg-white dark:bg-zinc-900 p-2 sm:p-6">
             <div className="mb-6 px-2 flex items-center justify-between">
                <Input 
-                 placeholder="Cari..." 
+                 placeholder="Cari Role..." 
                  prefix={<SearchOutlined className="text-on-surface/20" />}
                  className="max-w-xs rounded-xl h-11 bg-surface-low border-none shadow-none"
                  value={searchQuery}
@@ -182,7 +164,7 @@ const AdminClasses: React.FC = () => {
       </div>
 
       <Modal
-        title={<Title level={4} className="!m-0 !font-manrope !font-black">{editingId ? 'Edit Pengaturan Kelas' : 'Kelas Baru'}</Title>}
+        title={<Title level={4} className="!m-0 !font-manrope !font-black">{editingId ? 'Edit Akses Role' : 'Role Akses Baru'}</Title>}
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
@@ -190,15 +172,12 @@ const AdminClasses: React.FC = () => {
         centered
       >
         <Form form={form} layout="vertical" onFinish={onFinish} className="mt-6">
-          <Form.Item name="title" label={<Text className="font-bold text-xs uppercase opacity-50">Label Kelas</Text>} rules={[{ required: true }]}>
-            <Input placeholder="Cth: Kelas 12 SMA" className="h-11 rounded-xl" />
-          </Form.Item>
-          <Form.Item name="description" label={<Text className="font-bold text-xs uppercase opacity-50">Keterangan</Text>}>
-            <Input.TextArea rows={3} placeholder="Deskripsi singkat..." className="rounded-xl" />
+          <Form.Item name="title" label={<Text className="font-bold text-xs uppercase opacity-50">Nama Role</Text>} rules={[{ required: true }]}>
+            <Input placeholder="Cth: Student, Staff, dll" className="h-11 rounded-xl" />
           </Form.Item>
           <div className="flex gap-3 mt-8">
             <Button block className="h-11 rounded-xl font-bold" onClick={() => setIsModalOpen(false)}>Batal</Button>
-            <Button block type="primary" htmlType="submit" className="h-11 rounded-xl font-bold shadow-lg shadow-primary/20">Simpan</Button>
+            <Button block type="primary" htmlType="submit" className="h-11 rounded-xl font-bold shadow-lg shadow-primary/20">Simpan Detail</Button>
           </div>
         </Form>
       </Modal>
@@ -206,4 +185,4 @@ const AdminClasses: React.FC = () => {
   );
 };
 
-export default AdminClasses;
+export default AdminRoles;
