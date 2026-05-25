@@ -341,6 +341,12 @@ paths:
         name: slug
         required: true
         type: string
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
       responses:
         "200":
           description: OK

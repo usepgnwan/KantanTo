@@ -183,6 +183,14 @@ const docTemplate = `{
                         "name": "slug",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "Z9ToSwagger1413999",
+                        "description": "API secret key",
+                        "name": "secret-to-apps",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {

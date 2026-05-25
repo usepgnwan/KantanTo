@@ -154,7 +154,7 @@ const Navbar: React.FC = () => {
             ) : (
               <Space size="middle">
                 <Link to="/login" className="text-xs font-heavy uppercase tracking-widest text-on-surface/60 hover:text-primary transition-colors">Masuk</Link>
-                <Button type="primary" className="rounded-full px-8 h-10 font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20">Daftar</Button>
+                <Link to="/register" className="rounded-full px-8 h-10 font-bold uppercase tracking-widest text-[10px] p-3 text-white text-xs font-heavy bg-primary shadow-lg shadow-primary/20">Daftar</Link>
               </Space>
             )}
           </Space>
@@ -209,15 +209,15 @@ const Navbar: React.FC = () => {
         {isLoggedIn ? (
           <>
             <>
-            <Divider className="my-8" />
-            <div className="text-[10px] uppercase font-heavy tracking-widest text-on-surface/30 mb-4 px-2">Akun Saya</div>
-            <Menu
-              mode="vertical"
-              items={userMenuItems.filter((i: any) => i.type !== 'divider')}
-              onClick={() => setMobileVisible(false)}
-              className="border-none weightless-menu font-bold"
-            />
-          </>
+              <Divider className="my-8" />
+              <div className="text-[10px] uppercase font-heavy tracking-widest text-on-surface/30 mb-4 px-2">Akun Saya</div>
+              <Menu
+                mode="vertical"
+                items={userMenuItems.filter((i: any) => i.type !== 'divider')}
+                onClick={() => setMobileVisible(false)}
+                className="border-none weightless-menu font-bold"
+              />
+            </>
           </>
         ) : (
           <div className="mt-12 space-y-4">

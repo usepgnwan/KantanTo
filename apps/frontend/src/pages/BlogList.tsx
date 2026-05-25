@@ -44,8 +44,10 @@ const BlogPage: React.FC = () => {
 
   const thumbnailUrl = (path: string) => path ? `${backendUrl}${path}` : 'https://images.unsplash.com/photo-1434031211128-095490e7e7e9?auto=format&fit=crop&q=80&w=800';
 
-  // Non-headline posts (exclude headline from list to avoid duplicate)
-  const otherPosts = posts.filter(p => p.id !== headline?.id);
+  // Non-headline posts (exclude headline from list on first page to avoid duplicate)
+  const otherPosts = (currentPage === 1 && headline)
+    ? posts.filter(p => p.id !== headline.id)
+    : posts;
 
   return (
     <AppLayout>
@@ -77,8 +79,8 @@ const BlogPage: React.FC = () => {
             <div className="flex items-center justify-center h-64"><Spin size="large" /></div>
           ) : (
             <Row gutter={[48, 48]}>
-              {/* Featured / Headline */}
-              {headline && (
+              {/* Featured / Headline - Only show on Page 1 */}
+              {currentPage === 1 && headline && (
                 <Col xs={24}>
                   <Link to={`/blog/${headline.slug}`}>
                     <Card className="border-none group overflow-hidden rounded-[40px] shadow-2xl shadow-primary/5 bg-white p-0" bodyStyle={{ padding: 0 }}>

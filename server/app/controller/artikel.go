@@ -199,6 +199,7 @@ func GetArtikelByID(c echo.Context) error {
 // @Param        slug path string true "Artikel Slug"
 // @Success      200  {object}  Response
 // @Failure      404  {object}  Response
+// @Param secret-to-apps header string true "API secret key" default(Z9ToSwagger1413999)
 // @Router       /api/artikel/slug/{slug} [get]
 func GetArtikelBySlug(c echo.Context) error {
 	slug := c.Param("slug")

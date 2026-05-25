@@ -66,6 +66,11 @@ export const getArtikelById = async (id: number): Promise<Artikel> => {
   return response.data.data;
 };
 
+export const getArtikelBySlug = async (slug: string): Promise<Artikel> => {
+  const response = await api.get(`/artikel/slug/${slug}`);
+  return response.data.data;
+};
+
 export const createArtikel = async (formData: FormData): Promise<Artikel> => {
   const response = await api.post('/artikel', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },

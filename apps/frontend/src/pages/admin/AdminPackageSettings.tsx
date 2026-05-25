@@ -5,7 +5,7 @@ import KantanEditor from '../../components/atoms/KantanEditor';
 import {
   Tabs, Card, Form, Input, Button, Upload, Typography, Tag,
   Space, Divider, Modal, message, Switch, Tooltip, Row, Col,
-  Radio, Checkbox, Select, Badge, Empty,
+  Radio, Checkbox, Select, Badge, Empty, InputNumber,
 } from 'antd';
 import {
   ArrowLeftOutlined, ExperimentOutlined, FileSearchOutlined,
@@ -28,6 +28,7 @@ interface SubQuestion {
   discussion: string;
   options: string[];
   correct: number;
+  points: number;
 }
 
 interface Question {
@@ -39,6 +40,7 @@ interface Question {
   options: string[];
   correct: number | number[];
   discussionRefs: string[];
+  points: number;
   subQuestions?: SubQuestion[];
 }
 
@@ -80,7 +82,7 @@ const AdminPackageSettings: React.FC = () => {
 
   // ── STATE: Questions ──
   const [questions, setQuestions] = useState<Question[]>([
-    { id: '1', type: 'single', title: '', question: 'Contoh pertanyaan pertama...', discussion: '', options: ['', '', '', '', ''], correct: 0, discussionRefs: [] },
+    { id: '1', type: 'single', title: '', question: 'Contoh pertanyaan pertama...', discussion: '', options: ['', '', '', '', ''], correct: 0, discussionRefs: [], points: 1 },
   ]);
   const [activeQIndex, setActiveQIndex] = useState(0);
   const activeQ = questions[activeQIndex];
@@ -103,6 +105,7 @@ const AdminPackageSettings: React.FC = () => {
       options: ['', '', '', '', ''],
       correct: 0,
       discussionRefs: [],
+      points: 1,
     };
     setQuestions([...questions, newQ]);
     setActiveQIndex(questions.length);
@@ -113,7 +116,7 @@ const AdminPackageSettings: React.FC = () => {
   };
 
   const addSubQuestion = () => {
-    const sub: SubQuestion = { id: Date.now().toString(), question: '', discussion: '', options: ['', '', '', '', ''], correct: 0 };
+    const sub: SubQuestion = { id: Date.now().toString(), question: '', discussion: '', options: ['', '', '', '', ''], correct: 0, points: 1 };
     updateActiveQ({ subQuestions: [...(activeQ.subQuestions || []), sub] });
   };
 
@@ -187,6 +190,20 @@ const AdminPackageSettings: React.FC = () => {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <Tag className="rounded-xl bg-primary text-white border-none font-black px-4 py-1">Pertanyaan {index + 1}</Tag>
+          <div className="flex items-center gap-2 px-3 py-1 bg-on-surface/5 rounded-xl border border-on-surface/10">
+            <Text className="text-[10px] font-black uppercase text-on-surface/40">Poin</Text>
+            <InputNumber
+              size="small"
+              min={0}
+              value={sub.points}
+              onChange={val => {
+                const next = activeQ.subQuestions?.map(s => s.id === sub.id ? { ...s, points: Number(val) || 0 } : s);
+                updateActiveQ({ subQuestions: next });
+              }}
+              className="w-16 rounded-lg font-bold text-xs"
+              controls={false}
+            />
+          </div>
           <Text className="text-[10px] font-black uppercase text-on-surface/30 tracking-widest">Sub-Question Editor</Text>
         </div>
         <Button danger type="text" icon={<DeleteOutlined />} size="small" className="hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => {
@@ -325,7 +342,7 @@ const AdminPackageSettings: React.FC = () => {
             <Col xs={24} md={18}>
               <Card className="weightless-card border-none bg-white dark:bg-zinc-900 shadow-md rounded-[2.5rem] p-4 lg:p-8">
                 <Row gutter={20} className="mb-8">
-                  <Col span={12}>
+                  <Col span={8}>
                     <Text className="text-xs font-black uppercase tracking-widest text-on-surface/40 block mb-2">Tipe Soal</Text>
                     <Select
                       className="w-full rounded-xl"
@@ -334,22 +351,33 @@ const AdminPackageSettings: React.FC = () => {
                       onChange={val => updateActiveQ({
                         type: val as QuestionType,
                         correct: val === 'multiple' ? [] : 0,
-                        subQuestions: val === 'nested' ? [{ id: '1', question: '', discussion: '', options: ['', '', '', '', ''], correct: 0 }] : undefined
+                        subQuestions: val === 'nested' ? [{ id: '1', question: '', discussion: '', options: ['', '', '', '', ''], correct: 0, points: 1 }] : undefined
                       })}
                       options={[
-                        { value: 'single', label: 'Single Choice (Mutlak 1)' },
-                        { value: 'multiple', label: 'Multiple Choice (Checkbox)' },
-                        { value: 'nested', label: 'Scenario Based (Bersarang)' },
+                        { value: 'single', label: 'Single Choice' },
+                        { value: 'multiple', label: 'Multiple Choice' },
+                        { value: 'nested', label: 'Scenario Based' },
                       ]}
                     />
                   </Col>
-                  <Col span={12}>
+                  <Col span={8}>
+                    <Text className="text-xs font-black uppercase tracking-widest text-on-surface/40 block mb-2">Poin Soal</Text>
+                    <InputNumber
+                      className="w-full rounded-xl font-bold"
+                      style={{ height: 44, display: 'flex', alignItems: 'center' }}
+                      value={activeQ.points}
+                      min={0}
+                      onChange={val => updateActiveQ({ points: Number(val) || 0 })}
+                      placeholder="1"
+                    />
+                  </Col>
+                  <Col span={8}>
                     <Text className="text-xs font-black uppercase tracking-widest text-on-surface/40 block mb-2">Referensi Pembahasan</Text>
                     <Select
                       mode="multiple"
                       className="w-full rounded-xl"
                       style={{ height: 44 }}
-                      placeholder="Pilih materi terkait..."
+                      placeholder="Pilih materi..."
                       value={activeQ.discussionRefs}
                       onChange={v => updateActiveQ({ discussionRefs: v })}
                       options={materials.map(m => ({ label: m.title, value: m.id }))}

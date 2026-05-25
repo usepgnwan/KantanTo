@@ -1,43 +1,86 @@
 import React from 'react';
 import AppLayout from '../layouts/AppLayout';
-import { Typography, Breadcrumb, Avatar, Tag, Divider, Row, Col, Card, Space, Button } from 'antd';
+import { Typography, Breadcrumb, Avatar, Tag, Divider, Row, Col, Card, Space, Button, Spin } from 'antd';
 import { CalendarOutlined, ClockCircleOutlined, UserOutlined, ArrowLeftOutlined, ShareAltOutlined } from '@ant-design/icons';
 import { useParams, Link } from 'react-router-dom';
 
+import { getArtikelBySlug, Artikel } from '../services/artikelService';
+
 const { Title, Text, Paragraph } = Typography;
+
+const backendUrl = process.env.REACT_APP_LINK_BACKEND?.replace('/api', '') || 'http://127.0.0.1:3026';
+
+declare global { interface Window { katex?: any; renderMathInElement?: any; } }
+
+const renderKaTeX = (latex: string, displayMode = false): string => {
+  if (window.katex) {
+    try {
+      return window.katex.renderToString(latex, { displayMode, throwOnError: false });
+    } catch { return latex; }
+  }
+  return `<span class="font-mono bg-blue-50 text-blue-700 px-1 rounded text-sm">${displayMode ? '$$' : '$'}${latex}${displayMode ? '$$' : '$'}</span>`;
+};
+
+const renderContent = (raw: string): string => {
+  if (!raw) return '';
+  return raw
+    .replace(/\$\$([^$]+)\$\$/g, (_, latex) => `<div class="my-6 py-4 flex justify-center overflow-x-auto">${renderKaTeX(latex, true)}</div>`)
+    .replace(/\$([^$\n]+)\$/g, (_, latex) => renderKaTeX(latex, false))
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-on-surface dark:text-zinc-100">$1</strong>')
+    .replace(/_(.+?)_/g, '<em>$1</em>')
+    .replace(/^### (.+)$/gm, '<h3 class="text-xl font-black font-manrope mt-8 mb-3 text-on-surface dark:text-zinc-100">$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2 class="text-2xl font-black font-manrope mt-10 mb-4 text-on-surface dark:text-zinc-100">$2</h2>')
+    .replace(/^# (.+)$/gm, '<h1 class="text-3xl font-black font-manrope mt-12 mb-5 text-on-surface dark:text-zinc-100">$3</h1>')
+    .replace(/^- (.+)$/gm, '<li class="ml-6 mb-2 list-disc leading-relaxed">$1</li>')
+    .replace(/^(\d+)\. (.+)$/gm, '<li class="ml-6 mb-2 list-decimal leading-relaxed">$2</li>')
+    .replace(/`(.+?)`/g, '<code class="bg-surface-low dark:bg-zinc-800 px-2 py-0.5 rounded-md text-sm font-mono text-primary">$1</code>')
+    .replace(/\n{2,}/g, '</p><p class="mb-5 leading-loose">');
+};
 
 const BlogDetail: React.FC = () => {
    const { slug } = useParams<{ slug: string }>();
+   const [post, setPost] = React.useState<Artikel | null>(null);
+   const [loading, setLoading] = React.useState(true);
 
-   // Mock content for the blog post
-   const blogContent = {
-      title: 'Strategi Jitu Lolos SNBT 2024: Fokus pada Materi yang Sering Keluar',
-      date: '22 April 2026',
-      author: 'Admin Kantan',
-      category: 'Tips & Trik',
-      readTime: '5 min read',
-      image: 'https://images.unsplash.com/photo-1434031211128-095490e7e7e9?auto=format&fit=crop&q=80&w=1200',
-      content: `
-      <p>Menjelang SNBT 2024, banyak siswa merasa kewalahan dengan banyaknya materi yang harus dipelajari. Namun, tahukah kamu bahwa tidak semua materi memiliki bobot yang sama dalam penilaian?</p>
-      
-      <h2>1. Fokus pada Literasi dan Penalaran Umum</h2>
-      <p>Subtes penalaran umum sering kali menjadi penentu skor tinggi. Pelajari pola-pola logika, silogisme, dan analisis data grafik secara mendalam. Jangan hanya menghafal rumus, tapi pahami alur berpikirnya.</p>
-      
-      <blockquote>
-        "Keberhasilan bukan tentang seberapa banyak yang kamu pelajari, tapi seberapa tepat apa yang kamu pelajari dengan apa yang diujikan."
-      </blockquote>
+   React.useEffect(() => {
+      const fetchData = async () => {
+         if (!slug) return;
+         setLoading(true);
+         try {
+            const res = await getArtikelBySlug(slug);
+            setPost(res);
+         } catch {
+            // handle error
+         } finally {
+            setLoading(false);
+         }
+      };
+      fetchData();
+   }, [slug]);
 
-      <h2>2. Gunakan Sistem IRT (Item Response Theory) untuk Keuntunganmu</h2>
-      <p>Sistem IRT menghargai jawaban benar pada soal yang tingkat kesulitannya tinggi. Oleh karena itu, jangan abaikan soal sulit jika kamu punya waktu sisa. Pastikan juga ketepatan jawabanmu tinggi pada soal-soal kategori menengah.</p>
+   // Trigger KaTeX re-render on content change
+   React.useEffect(() => {
+      if (window.renderMathInElement && post) {
+         const el = document.getElementById('blog-detail-content');
+         if (el) {
+            window.renderMathInElement(el, {
+               delimiters: [
+                  { left: '$$', right: '$$', display: true },
+                  { left: '$', right: '$', display: false },
+               ],
+               throwOnError: false,
+            });
+         }
+      }
+   }, [post]);
 
-      <h2>3. Simulasi Mandiri Minimal Seminggu Sekali</h2>
-      <p>Latihan soal satuan tidak cukup. Kamu butuh simulasi full dengan manajemen waktu yang ketat. Ini akan melatih mental dan ketahanan fokusmu selama berjam-jam saat ujian sesungguhnya.</p>
-
-      <img src="https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?auto=format&fit=crop&q=80&w=800" alt="Study" style="border-radius: 2rem; margin: 2rem 0; width: 100%;" />
-
-      <p>Kesimpulannya, SNBT adalah tentang strategi. Dengan pembagian waktu yang tepat antara belajar materi dan simulasi soal, peluangmu masuk kampus impian akan terbuka lebar. Semangat!</p>
-    `
+   const formatDate = (dateStr: string) => {
+      try {
+         return new Date(dateStr).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+      } catch { return dateStr; }
    };
+
+   const thumbnailUrl = (path: string) => path ? `${backendUrl}${path}` : 'https://images.unsplash.com/photo-1434031211128-095490e7e7e9?auto=format&fit=crop&q=80&w=1200';
 
    return (
       <AppLayout>
@@ -54,60 +97,74 @@ const BlogDetail: React.FC = () => {
                   <ArrowLeftOutlined /> Kembali ke Blog
                </Link>
 
-               <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-                  <Space size="large" className="mb-6 flex-wrap">
-                     <Tag color="blue" className="rounded-full border-none px-4 font-bold uppercase tracking-widest text-[10px]">
-                        {blogContent.category}
-                     </Tag>
-                     <Space className="text-on-surface/40 text-xs font-medium">
-                        <CalendarOutlined /> {blogContent.date}
+               {loading ? (
+                  <div className="flex items-center justify-center h-64"><Spin size="large" /></div>
+               ) : post ? (
+                  <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                     <Space size="large" className="mb-6 flex-wrap">
+                        <Tag color="blue" className="rounded-full border-none px-4 font-bold uppercase tracking-widest text-[10px]">
+                           {post.category?.title || 'Umum'}
+                        </Tag>
+                        <Space className="text-on-surface/40 text-xs font-medium">
+                           <CalendarOutlined /> {formatDate(post.created_at)}
+                        </Space>
+                        <Space className="text-on-surface/40 text-xs font-medium">
+                           <ClockCircleOutlined /> 5 min read
+                        </Space>
                      </Space>
-                     <Space className="text-on-surface/40 text-xs font-medium">
-                        <ClockCircleOutlined /> {blogContent.readTime}
-                     </Space>
-                  </Space>
 
-                  <Title level={1} className="!text-4xl md:!text-5xl !font-black !font-manrope !leading-tight mb-10">
-                     {blogContent.title}
-                  </Title>
+                     <Title level={1} className="!text-4xl md:!text-5xl !font-black !font-manrope !leading-tight mb-10">
+                        {post.judul}
+                     </Title>
 
-                  <div className="flex items-center justify-between mb-12 py-6 border-y border-on-surface/5">
-                     <div className="flex items-center gap-4">
-                        <Avatar size={56} icon={<UserOutlined />} className="bg-primary/10 text-primary border-none" />
-                        <div>
-                           <Text className="block font-black text-lg">{blogContent.author}</Text>
-                           <Text className="text-xs text-on-surface/40 uppercase tracking-widest font-bold">Academic Writer</Text>
+                     <div className="flex items-center justify-between mb-12 py-6 border-y border-on-surface/5">
+                        <div className="flex items-center gap-4">
+                           <Avatar size={56} icon={<UserOutlined />} className="bg-primary/10 text-primary border-none">
+                              {(post.user?.name || 'A')[0]}
+                           </Avatar>
+                           <div>
+                              <Text className="block font-black text-lg">{post.user?.name || 'Admin'}</Text>
+                              <Text className="text-xs text-on-surface/40 uppercase tracking-widest font-bold">Academic Writer</Text>
+                           </div>
                         </div>
+                        <Button shape="circle" icon={<ShareAltOutlined />} className="border-on-surface/10" />
                      </div>
-                     <Button shape="circle" icon={<ShareAltOutlined />} className="border-on-surface/10" />
+
+                     <div className="rounded-[40px] overflow-hidden mb-16 shadow-2xl relative">
+                        <img src={thumbnailUrl(post.thumbnail)} className="w-full object-cover aspect-video md:aspect-[21/9]" alt="Banner" />
+                     </div>
+
+                     <div
+                        id="blog-detail-content"
+                        className="blog-content text-lg leading-[1.8] text-on-surface/80 dark:text-zinc-300"
+                        dangerouslySetInnerHTML={{ __html: `<p class="mb-5 leading-loose">${renderContent(post.konten)}</p>` }}
+                     />
+
+                     <Divider className="my-20" />
+
+                     {/* Author Bio Card */}
+                     <Card className="rounded-[2.5rem] bg-surface-low/30 border-none p-4 md:p-8">
+                        <Row gutter={[24, 24]} align="middle">
+                           <Col xs={24} md={4} className="text-center">
+                              <Avatar size={80} icon={<UserOutlined />} className="bg-primary/10 text-primary">
+                                 {(post.user?.name || 'A')[0]}
+                              </Avatar>
+                           </Col>
+                           <Col xs={24} md={20}>
+                              <Title level={4} className="!m-0 !font-manrope">Tentang {post.user?.name || 'Admin'}</Title>
+                              <Paragraph className="mt-2 text-on-surface/60 italic">
+                                 Berkomitmen untuk mencerdaskan kehidupan bangsa melalui konten edukasi yang berkualitas dan mudah dipahami oleh seluruh pejuang PTN di Indonesia.
+                              </Paragraph>
+                           </Col>
+                        </Row>
+                     </Card>
                   </div>
-
-                  <div className="rounded-[40px] overflow-hidden mb-16 shadow-2xl">
-                     <img src={blogContent.image} className="w-full object-cover" alt="Banner" />
+               ) : (
+                  <div className="text-center py-20">
+                     <Title level={3}>Artikel tidak ditemukan</Title>
+                     <Link to="/blog">Kembali ke Blog</Link>
                   </div>
-
-                  <div
-                     className="blog-content text-lg leading-[1.8] text-on-surface/80"
-                     dangerouslySetInnerHTML={{ __html: blogContent.content }}
-                  />
-
-                  <Divider className="my-20" />
-
-                  {/* Author Bio Card */}
-                  <Card className="rounded-[2.5rem] bg-surface-low/30 border-none p-4 md:p-8">
-                     <Row gutter={[24, 24]} align="middle">
-                        <Col xs={24} md={4} className="text-center">
-                           <Avatar size={80} icon={<UserOutlined />} className="bg-primary/10 text-primary" />
-                        </Col>
-                        <Col xs={24} md={20}>
-                           <Title level={4} className="!m-0 !font-manrope">Tentang {blogContent.author}</Title>
-                           <Paragraph className="mt-2 text-on-surface/60 italic">
-                              Berkomitmen untuk mencerdaskan kehidupan bangsa melalui konten edukasi yang berkualitas dan mudah dipahami oleh seluruh pejuang PTN di Indonesia.
-                           </Paragraph>
-                        </Col>
-                     </Row>
-                  </Card>
-               </div>
+               )}
             </div>
          </div>
 
