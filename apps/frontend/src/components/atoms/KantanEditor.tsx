@@ -1,12 +1,13 @@
-import React, { useState, useRef } from 'react';
-import { Input, Button, Tooltip, Modal, message, Typography, Switch } from 'antd';
-import {
-  BoldOutlined, ItalicOutlined, PictureOutlined, AlignCenterOutlined,
-  OrderedListOutlined, UnorderedListOutlined, CodeOutlined, FunctionOutlined,
-} from '@ant-design/icons';
-import type { TextAreaRef } from 'antd/es/input/TextArea';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Button, Modal, Switch, Typography } from 'antd';
+import { FunctionOutlined } from '@ant-design/icons';
+import Quill from 'quill';
+import QuillTableBetter from 'quill-table-better';
+import katex from 'katex';
+import 'quill/dist/quill.snow.css';
+import 'quill-table-better/dist/quill-table-better.css';
+import 'katex/dist/katex.min.css';
 
-const { TextArea } = Input;
 const { Text } = Typography;
 
 interface KantanEditorProps {
@@ -18,146 +19,218 @@ interface KantanEditorProps {
   className?: string;
 }
 
-const TB: React.FC<{ icon: React.ReactNode; label: string; onClick: () => void }> = ({ icon, label, onClick }) => (
-  <Tooltip title={label} mouseEnterDelay={0.5}>
-    <button
-      onClick={(e) => { e.preventDefault(); onClick(); }}
-      className="w-8 h-8 rounded-lg flex items-center justify-center text-sm text-on-surface/60 hover:bg-surface-low dark:hover:bg-zinc-700 hover:text-on-surface transition-all"
-    >
-      {icon}
-    </button>
-  </Tooltip>
-);
+const toolbarOptions = [
+  [{ header: [2, 3, 4, false] }],
+  ['bold', 'italic', 'underline', 'strike'],
+  [{ list: 'ordered' }, { list: 'bullet' }],
+  [{ align: [] }],
+  ['blockquote', 'code-block'],
+  ['link', 'image', 'formula'],
+  ['table-better'],
+  ['clean'],
+];
 
-const MathModal: React.FC<{ open: boolean; onInsert: (t: string, b: boolean) => void; onClose: () => void }> = ({ open, onInsert, onClose }) => {
+Quill.register({ 'modules/table-better': QuillTableBetter }, true);
+window.katex = katex;
+
+const isProbablyHtml = (value: string) => /<\/?[a-z][\s\S]*>/i.test(value);
+
+const MathModal: React.FC<{
+  open: boolean;
+  onClose: () => void;
+  onInsert: (latex: string, block: boolean) => void;
+}> = ({ open, onClose, onInsert }) => {
   const [latex, setLatex] = useState('');
-  const [isBlock, setIsBlock] = useState(false);
-  const tpls = [
-    { l: 'Pecahan', t: '\\frac{a}{b}' }, { l: 'Akar', t: '\\sqrt{x}' },
-    { l: 'Pangkat', t: 'x^{n}' }, { l: 'Sigma', t: '\\sum_{i=1}^{n} x_i' },
-    { l: 'Integral', t: '\\int_{a}^{b} f(x)\\,dx' }, { l: 'Limit', t: '\\lim_{x \\to \\infty} f(x)' },
+  const [block, setBlock] = useState(false);
+  const templates = [
+    { label: 'Pecahan', value: '\\frac{a}{b}' },
+    { label: 'Akar', value: '\\sqrt{x}' },
+    { label: 'Pangkat', value: 'x^{n}' },
+    { label: 'Sigma', value: '\\sum_{i=1}^{n} x_i' },
+    { label: 'Integral', value: '\\int_{a}^{b} f(x)\\,dx' },
+    { label: 'Limit', value: '\\lim_{x \\to \\infty} f(x)' },
+    { label: 'Fisika', value: 'F = m a' },
+    { label: 'Energi', value: 'E_k = \\frac{1}{2}mv^2' },
   ];
+
   return (
     <Modal
       open={open}
       onCancel={onClose}
-      width={480}
-      title={<span className="font-black font-manrope flex items-center gap-2"><FunctionOutlined className="text-primary" /> Sisipkan KaTeX</span>}
+      width={520}
+      title={<span className="font-black font-manrope flex items-center gap-2"><FunctionOutlined className="text-primary" /> Sisipkan Rumus LaTeX</span>}
       footer={[
-        <Button key="c" onClick={onClose}>Batal</Button>,
-        <Button key="i" type="primary" onClick={() => { if (latex.trim()) { onInsert(latex.trim(), isBlock); onClose(); setLatex(''); } }}>Sisipkan</Button>
+        <Button key="cancel" onClick={onClose}>Batal</Button>,
+        <Button
+          key="insert"
+          type="primary"
+          onClick={() => {
+            if (!latex.trim()) return;
+            onInsert(latex.trim(), block);
+            setLatex('');
+            setBlock(false);
+            onClose();
+          }}
+        >
+          Sisipkan
+        </Button>,
       ]}
     >
       <div className="space-y-4 py-2">
         <div className="flex flex-wrap gap-2">
-          {tpls.map(f => (
-            <button key={f.l} onClick={() => setLatex(f.t)} className="px-3 py-1 rounded-full bg-primary/10 text-primary font-bold text-[10px] hover:bg-primary/20 border border-primary/20">
-              {f.l}
+          {templates.map(item => (
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => setLatex(item.value)}
+              className="px-3 py-1 rounded-full bg-primary/10 text-primary font-bold text-[10px] hover:bg-primary/20 border border-primary/20"
+            >
+              {item.label}
             </button>
           ))}
         </div>
-        <TextArea
-          rows={3}
+        <textarea
+          rows={4}
           value={latex}
-          onChange={e => setLatex(e.target.value)}
-          placeholder="\frac{-b \pm \sqrt{b^2-4ac}}{2a}"
-          className="rounded-xl font-mono text-sm"
+          onChange={event => setLatex(event.target.value)}
+          placeholder="\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}"
+          className="w-full rounded-xl border border-on-surface/10 bg-white dark:bg-zinc-900 px-3 py-2 font-mono text-sm outline-none focus:border-primary/50"
         />
+        <div className="rounded-xl bg-surface-low/40 dark:bg-zinc-800 p-3 min-h-14 overflow-x-auto">
+          {latex.trim() ? (
+            <div
+              className={block ? 'text-center' : ''}
+              dangerouslySetInnerHTML={{
+                __html: katex.renderToString(latex, { displayMode: block, throwOnError: false }),
+              }}
+            />
+          ) : (
+            <Text className="text-xs text-on-surface/40 font-bold">Preview rumus akan muncul di sini.</Text>
+          )}
+        </div>
         <div className="flex items-center gap-3">
-          <Switch size="small" checked={isBlock} onChange={setIsBlock} />
-          <Text className="text-xs font-bold">Tampilan Block (Tengah)</Text>
+          <Switch size="small" checked={block} onChange={setBlock} />
+          <Text className="text-xs font-bold">Tampilan block/tengah</Text>
         </div>
       </div>
     </Modal>
   );
 };
 
-const KantanEditor: React.FC<KantanEditorProps> = ({ value, onChange, placeholder, rows = 6, label, className }) => {
-  const [mathModal, setMathModal] = useState(false);
-  const textareaRef = useRef<TextAreaRef>(null);
+const KantanEditor: React.FC<KantanEditorProps> = ({ value, onChange, placeholder, rows = 6, className }) => {
+  const editorRef = useRef<HTMLDivElement>(null);
+  const quillRef = useRef<Quill | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastHtmlRef = useRef(value || '');
+  const onChangeRef = useRef(onChange);
+  const [mathModalOpen, setMathModalOpen] = useState(false);
 
-  const insertAtCursor = (before: string, after = '') => {
-    const el = textareaRef.current?.resizableTextArea?.textArea;
-    if (!el) return;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const selection = value.substring(start, end);
-    const beforeText = value.substring(0, start);
-    const afterText = value.substring(end);
-    const newVal = beforeText + before + selection + after + afterText;
-    onChange(newVal);
-    setTimeout(() => {
-      el.focus();
-      el.setSelectionRange(start + before.length, end + before.length);
-    }, 10);
-  };
+  const editorMinHeight = useMemo(() => Math.max(rows * 28, 140), [rows]);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64 = event.target?.result as string;
-        // Kita gunakan format HTML img agar bisa resize lebih mudah jika user mau edit hardcode, 
-        // atau markdown standart. User minta bisa resize, kita kasih wrapper CSS atau width attribute.
-        insertAtCursor(`\n<img src="${base64}" width="300" alt="Gambar Upload" />\n`);
-        message.success('Gambar berhasil diunggah dan disisipkan');
-      };
-      reader.readAsDataURL(file);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
+  useEffect(() => {
+    if (!editorRef.current || quillRef.current) return;
+
+    const quill = new Quill(editorRef.current, {
+      theme: 'snow',
+      placeholder,
+      modules: {
+        table: false,
+        toolbar: {
+          container: toolbarOptions,
+          handlers: {
+            image: () => fileInputRef.current?.click(),
+            formula: () => setMathModalOpen(true),
+          },
+        },
+        'table-better': {
+          language: 'en_US',
+          menus: ['column', 'row', 'merge', 'table', 'cell', 'wrap', 'copy', 'delete'],
+          toolbarTable: true,
+        },
+        keyboard: {
+          bindings: QuillTableBetter.keyboardBindings,
+        },
+      },
+    });
+
+    quillRef.current = quill;
+
+    if (value) {
+      if (isProbablyHtml(value)) {
+        const delta = quill.clipboard.convert({ html: value });
+        quill.updateContents(delta, Quill.sources.SILENT);
+      } else {
+        quill.setText(value, Quill.sources.SILENT);
+      }
     }
+
+    quill.on('text-change', () => {
+      const html = quill.root.innerHTML;
+      const normalized = html === '<p><br></p>' ? '' : html;
+      lastHtmlRef.current = normalized;
+      onChangeRef.current(normalized);
+    });
+  }, [placeholder, value]);
+
+  useEffect(() => {
+    const quill = quillRef.current;
+    if (!quill) return;
+    const nextValue = value || '';
+    if (nextValue === lastHtmlRef.current) return;
+
+    lastHtmlRef.current = nextValue;
+    quill.setContents([], Quill.sources.SILENT);
+    if (!nextValue) return;
+
+    if (isProbablyHtml(nextValue)) {
+      const delta = quill.clipboard.convert({ html: nextValue });
+      quill.updateContents(delta, Quill.sources.SILENT);
+    } else {
+      quill.setText(nextValue, Quill.sources.SILENT);
+    }
+  }, [value]);
+
+  const insertImage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !quillRef.current) return;
+
+    const reader = new FileReader();
+    reader.onload = loadEvent => {
+      const range = quillRef.current?.getSelection(true);
+      quillRef.current?.insertEmbed(range?.index || 0, 'image', loadEvent.target?.result, Quill.sources.USER);
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
   };
 
-  const toolbar = [
-    { icon: <BoldOutlined />, label: 'Bold', act: () => insertAtCursor('**', '**') },
-    { icon: <ItalicOutlined />, label: 'Italic', act: () => insertAtCursor('_', '_') },
-    { icon: <PictureOutlined />, label: 'Unggah Gambar', act: () => fileInputRef.current?.click() },
-    { icon: <AlignCenterOutlined />, label: 'Heading ##', act: () => insertAtCursor('\n## ') },
-    { icon: <OrderedListOutlined />, label: 'Numbered list', act: () => insertAtCursor('\n1. ') },
-    { icon: <UnorderedListOutlined />, label: 'Bullet list', act: () => insertAtCursor('\n- ') },
-    { icon: <CodeOutlined />, label: 'Inline kode', act: () => insertAtCursor('`', '`') },
-    { icon: <FunctionOutlined />, label: 'Rumus LaTeX', act: () => setMathModal(true) },
-  ];
+  const insertFormula = (latex: string, block: boolean) => {
+    const quill = quillRef.current;
+    if (!quill) return;
+
+    const range = quill.getSelection(true);
+    const index = range?.index || quill.getLength();
+    if (block) {
+      quill.insertText(index, '\n', Quill.sources.USER);
+      quill.insertEmbed(index + 1, 'formula', latex, Quill.sources.USER);
+      quill.insertText(index + 2, '\n', Quill.sources.USER);
+      quill.setSelection(index + 3, 0, Quill.sources.SILENT);
+      return;
+    }
+
+    quill.insertEmbed(index, 'formula', latex, Quill.sources.USER);
+    quill.insertText(index + 1, ' ', Quill.sources.USER);
+    quill.setSelection(index + 2, 0, Quill.sources.SILENT);
+  };
 
   return (
-    <div className={`flex flex-col border border-on-surface/10 rounded-2xl overflow-hidden bg-white dark:bg-zinc-900 transition-all focus-within:border-primary/40 focus-within:ring-4 focus-within:ring-primary/5 ${className}`}>
-      {/* Hidden File Input */}
-      <input
-        type="file"
-        accept="image/*"
-        ref={fileInputRef}
-        className="hidden"
-        onChange={handleFileUpload}
-      />
-
-      {/* Toolbar */}
-      <div className="px-3 py-2 bg-surface-low/50 dark:bg-zinc-800 border-b border-on-surface/5 flex items-center justify-between">
-        <div className="flex items-center gap-0.5">
-          {toolbar.map((t, idx) => (
-            <TB key={idx} icon={t.icon} label={t.label} onClick={t.act} />
-          ))}
-        </div>
-        {label && <Text className="text-[10px] uppercase font-black tracking-widest text-on-surface/30 px-2">{label}</Text>}
-      </div>
-
-      {/* TextArea */}
-      <TextArea
-        ref={textareaRef}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        rows={rows}
-        className="border-none shadow-none focus:shadow-none p-4 text-base font-medium font-sans resize-none dark:bg-zinc-900 dark:text-zinc-100 placeholder:text-on-surface/30"
-      />
-
-      <MathModal
-        open={mathModal}
-        onClose={() => setMathModal(false)}
-        onInsert={(latex, isBlock) => {
-          const tag = isBlock ? `\n\n$$${latex}$$\n\n` : `$${latex}$`;
-          insertAtCursor(tag);
-        }}
-      />
+    <div className={`kantan-quill rounded-lg overflow-hidden bg-white dark:bg-zinc-900 border border-on-surface/10 focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/5 ${className || ''}`}>
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={insertImage} />
+      <div ref={editorRef} style={{ minHeight: editorMinHeight }} />
+      <MathModal open={mathModalOpen} onClose={() => setMathModalOpen(false)} onInsert={insertFormula} />
     </div>
   );
 };

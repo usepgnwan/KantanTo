@@ -37,4 +37,6 @@ func InitRouting(e *echo.Echo) {
 	RouteUser(api)
 	RouteAuth(api)
 	RouteArtikel(api)
+	RoutePackage(api)
+	RouteExam(api)
 }

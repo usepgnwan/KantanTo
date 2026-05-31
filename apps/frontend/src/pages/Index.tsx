@@ -1,17 +1,18 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import AppLayout from '../layouts/AppLayout';
 import HeroSection from '../components/organisms/HeroSection';
 import CustomerReviews from '../components/organisms/CustomerReviews';
 import ContactForm from '../components/organisms/ContactForm';
-import { Typography, Row, Col, Card, Tag, Space, Button } from 'antd';
+import { Typography, Row, Col, Card, Tag, Space, Button, Empty, Spin } from 'antd';
 import { 
   RocketOutlined, 
   SafetyCertificateOutlined, 
   LineChartOutlined,
   UserOutlined,
-  ClockCircleOutlined,
   CheckCircleFilled
 } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { getPackages, PackageListItem } from '../services/packageService';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -33,38 +34,36 @@ const features = [
   }
 ];
 
-const packages = [
-  {
-    title: "Saintek Pro",
-    tag: "POPULER",
-    price: "75.000",
-    students: "850 Siswa",
-    features: ["7 Paket Soal", "Sistem IRT", "Video Pembahasan"]
-  },
-  {
-    title: "Soshum Pro",
-    tag: "BEST SELLER",
-    price: "75.000",
-    students: "920 Siswa",
-    features: ["7 Paket Soal", "Sistem IRT", "Video Pembahasan"]
-  },
-  {
-    title: "Campuran",
-    tag: "HEMAT",
-    price: "120.000",
-    students: "450 Siswa",
-    features: ["14 Paket Soal", "Sistem IRT", "Video Pembahasan"]
-  },
-  {
-    title: "Lite Pass",
-    tag: "STARTUP",
-    price: "25.000",
-    students: "1.2k Siswa",
-    features: ["2 Paket Soal", "Sistem IRT", "Kunci Jawaban"]
-  }
-];
-
 const IndexPage: React.FC = () => {
+  const navigate = useNavigate();
+  const [packages, setPackages] = useState<PackageListItem[]>([]);
+  const [loadingPackages, setLoadingPackages] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    getPackages()
+      .then((data) => {
+        if (mounted) {
+          setPackages(data.filter((pkg) => pkg.status === 'published'));
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setPackages([]);
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setLoadingPackages(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <AppLayout>
       <HeroSection />
@@ -110,50 +109,73 @@ const IndexPage: React.FC = () => {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Row gutter={[24, 24]}>
-            {packages.map((pkg, index) => (
-              <Col xs={24} sm={12} lg={6} key={index}>
-                <Card 
-                  className="h-full weightless-card border-none hover:shadow-2xl transition-all"
-                  cover={
-                    <div className="h-24 bg-primary/5 flex items-center justify-center relative overflow-hidden">
-                       <Tag color="blue" className="m-0 absolute top-4 left-4 font-bold border-none">{pkg.tag}</Tag>
-                       <div className="absolute top-0 right-0 w-16 h-16 bg-primary opacity-5 rounded-bl-full" />
-                    </div>
-                  }
-                >
-                  <Space direction="vertical" className="w-full" size="small">
-                    <Title level={4} className="m-0">{pkg.title}</Title>
-                    <div className="flex items-center space-x-2 text-surface-on/60 text-xs">
-                      <UserOutlined />
-                      <span>{pkg.students} Berlangganan</span>
-                    </div>
-                    
-                    <div className="py-4">
-                      <Text className="text-xs text-surface-on/40 line-through">Rp 150.000</Text>
-                      <div className="flex items-end space-x-1">
-                        <Text className="text-xl font-bold text-primary">Rp {pkg.price}</Text>
-                        <Text className="text-xs text-surface-on/60 mb-1">/Paket</Text>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 mb-6">
-                      {pkg.features.map((f, i) => (
-                        <div key={i} className="flex items-center space-x-2">
-                           <CheckCircleFilled className="text-primary/40 text-xs" />
-                           <Text className="text-xs text-surface-on/70">{f}</Text>
+          <Spin spinning={loadingPackages}>
+            {packages.length > 0 ? (
+              <Row gutter={[24, 24]}>
+                {packages.slice(0, 4).map((pkg) => (
+                  <Col xs={24} sm={12} lg={6} key={pkg.slug}>
+                    <Card
+                      className="h-full weightless-card border-none hover:shadow-2xl transition-all"
+                      cover={
+                        <div className="h-24 bg-primary/5 flex items-center justify-center relative overflow-hidden">
+                          <Tag color="blue" className="m-0 absolute top-4 left-4 font-bold border-none">
+                            PUBLISHED
+                          </Tag>
+                          <div className="absolute top-0 right-0 w-16 h-16 bg-primary opacity-5 rounded-bl-full" />
                         </div>
-                      ))}
-                    </div>
+                      }
+                    >
+                      <Space direction="vertical" className="w-full" size="small">
+                        <Title level={4} className="m-0">{pkg.title}</Title>
+                        <div className="flex items-center space-x-2 text-surface-on/60 text-xs">
+                          <UserOutlined />
+                          <span>{pkg.category || 'Tryout'} Berlangganan</span>
+                        </div>
 
-                    <Button type="primary" block className="h-10 rounded-xl font-bold">
-                       Pilih Paket
-                    </Button>
-                  </Space>
-                </Card>
-              </Col>
-            ))}
-          </Row>
+                        <div className="py-4">
+                          <Text className="text-xs text-surface-on/40 line-through">
+                            Rp {Number(pkg.price * 2).toLocaleString('id-ID')}
+                          </Text>
+                          <div className="flex items-end space-x-1">
+                            <Text className="text-xl font-bold text-primary">
+                              {pkg.price === 0 ? 'Gratis' : `Rp ${Number(pkg.price).toLocaleString('id-ID')}`}
+                            </Text>
+                            <Text className="text-xs text-surface-on/60 mb-1">/Paket</Text>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2 mb-6">
+                          {[
+                            `${pkg.questions_count} Soal`,
+                            `${pkg.materials_count} Materi`,
+                            `${pkg.videos_count} Video Pembahasan`,
+                          ].map((feature) => (
+                            <div key={feature} className="flex items-center space-x-2">
+                              <CheckCircleFilled className="text-primary/40 text-xs" />
+                              <Text className="text-xs text-surface-on/70">{feature}</Text>
+                            </div>
+                          ))}
+                        </div>
+
+                        <Button
+                          type="primary"
+                          block
+                          className="h-10 rounded-xl font-bold"
+                          onClick={() => navigate(`/paket/${pkg.slug}`)}
+                        >
+                          Pilih Paket
+                        </Button>
+                      </Space>
+                    </Card>
+                  </Col>
+                ))}
+              </Row>
+            ) : (
+              <Card className="border-none glass rounded-3xl py-12">
+                <Empty description="Belum ada paket published" />
+              </Card>
+            )}
+          </Spin>
         </div>
       </section>
 

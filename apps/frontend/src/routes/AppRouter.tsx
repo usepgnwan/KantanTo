@@ -13,18 +13,28 @@ const AdminGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return <>{children}</>;
 };
 
-// Guard: ensures only Students (roleId=2) or logged-out users can access non-admin routes
-// (if logged in as admin, redirect to admin dashboard)
-const StudentGuard: React.FC<{ children: React.ReactNode; requireAuth?: boolean }> = ({ children, requireAuth = false }) => {
+// Guard: protects logged-in pages and keeps auth pages out of active sessions.
+const StudentGuard: React.FC<{ children: React.ReactNode; requireAuth?: boolean; guestOnly?: boolean; allowAdmin?: boolean }> = ({
+  children,
+  requireAuth = false,
+  guestOnly = false,
+  allowAdmin = false,
+}) => {
   const { isLoggedIn, isAdmin } = useAuth();
-  if (isLoggedIn && isAdmin()) return <Navigate to="/admin/dashboard" replace />;
-  if (requireAuth && !isLoggedIn) return <Navigate to="/login" replace />;
+  if (guestOnly && isLoggedIn) return <Navigate to={isAdmin() ? '/admin/dashboard' : '/dashboard'} replace />;
+  
+  if (requireAuth) {
+    if (!isLoggedIn) return <Navigate to="/login" replace />;
+    if (isAdmin() && !allowAdmin) return <Navigate to="/admin/dashboard" replace />;
+  }
+  
   return <>{children}</>;
 };
 
 const renderRoutes = (items: MenuItem[]) => {
   return items.map((item) => {
     const isAdminRoute = item.path.startsWith('/admin');
+    const isGuestOnlyRoute = item.path === '/login' || item.path === '/register';
     // Routes that require login for students
     const requiresAuth = !item.guest && !isAdminRoute;
 
@@ -35,7 +45,7 @@ const renderRoutes = (items: MenuItem[]) => {
             <item.component />
           </AdminGuard>
         ) : (
-          <StudentGuard requireAuth={requiresAuth}>
+          <StudentGuard requireAuth={requiresAuth} guestOnly={isGuestOnlyRoute} allowAdmin={item.allowAdmin}>
             <item.component />
           </StudentGuard>
         )}

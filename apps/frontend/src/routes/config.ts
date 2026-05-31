@@ -6,6 +6,8 @@ const LoginPage = React.lazy(() => import('../pages/Login'));
 const RegisterPage = React.lazy(() => import('../pages/Register'));
 const Packages = React.lazy(() => import('../pages/Packages'));
 const PackageDetail = React.lazy(() => import('../pages/PackageDetail'));
+const PackageMaterials = React.lazy(() => import('../pages/PackageMaterials'));
+const PackageMaterialDetail = React.lazy(() => import('../pages/PackageMaterialDetail'));
 const History = React.lazy(() => import('../pages/History'));
 const Cart = React.lazy(() => import('../pages/Cart'));
 const Checkout = React.lazy(() => import('../pages/Checkout'));
@@ -32,6 +34,7 @@ const AdminCategories = React.lazy(() => import('../pages/admin/AdminCategories'
 const AdminClasses = React.lazy(() => import('../pages/admin/AdminClasses'));
 const AdminSubjects = React.lazy(() => import('../pages/admin/AdminSubjects'));
 const AdminRoles = React.lazy(() => import('../pages/admin/AdminRoles'));
+const AdminExamHistory = React.lazy(() => import('../pages/admin/AdminExamHistory'));
 const NotFound = React.lazy(() => import('../pages/NotFound'));
 
 export interface MenuItem {
@@ -44,6 +47,7 @@ export interface MenuItem {
   children?: MenuItem[];
   hidden?: boolean;
   guest?: boolean;
+  allowAdmin?: boolean;
 }
 
 export const menuConfig: MenuItem[] = [
@@ -82,6 +86,22 @@ export const menuConfig: MenuItem[] = [
     path: '/paket/:slug',
     name: 'Detail Paket',
     component: PackageDetail,
+    hidden: true,
+    guest: true,
+  },
+  {
+    id: 'paket-materials',
+    path: '/paket/:slug/materi',
+    name: 'Materi Paket',
+    component: PackageMaterials,
+    hidden: true,
+    guest: true,
+  },
+  {
+    id: 'paket-material-detail',
+    path: '/paket/:slug/materi/:materialSlug',
+    name: 'Detail Materi Paket',
+    component: PackageMaterialDetail,
     hidden: true,
     guest: true,
   },
@@ -128,6 +148,7 @@ export const menuConfig: MenuItem[] = [
     name: 'Review Tryout',
     component: Review,
     hidden: true,
+    allowAdmin: true,
   },
   {
     id: 'latihan',
@@ -178,7 +199,7 @@ export const menuConfig: MenuItem[] = [
     name: 'Ujian',
     component: ExamSimulation,
     hidden: true,
-    guest: true,
+    allowAdmin: true,
   },
   {
     id: 'admin-dashboard',
@@ -262,6 +283,13 @@ export const menuConfig: MenuItem[] = [
     path: '/admin/master/classes',
     name: 'Kelola Kelas',
     component: AdminClasses,
+    hidden: true,
+  },
+  {
+    id: 'admin-exam-history',
+    path: '/admin/exam-history',
+    name: 'Riwayat Ujian',
+    component: AdminExamHistory,
     hidden: true,
   },
   {

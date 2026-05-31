@@ -37,9 +37,63 @@ func ConnectDB() {
 	log.Println("Database connection successful")
 
 	// Automigrate
-	err = DB.AutoMigrate(&model.Mapel{}, &model.Category{}, &model.Grade{}, &model.Setting{}, &model.Role{}, &model.User{}, &model.Artikel{})
+	err = DB.AutoMigrate(
+		&model.Mapel{},
+		&model.Category{},
+		&model.Grade{},
+		&model.Setting{},
+		&model.Role{},
+		&model.User{},
+		&model.Artikel{},
+		&model.Package{},
+		&model.PackageQuestion{},
+		&model.PackageSubQuestion{},
+		&model.PackageMaterial{},
+		&model.PackageVideo{},
+		&model.ExamSession{},
+		&model.ExamAnswer{},
+	)
 	if err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
+	migratePackageContentIDs()
 	log.Println("Database migration completed")
+}
+
+func migratePackageContentIDs() {
+	migrations := []struct {
+		table string
+	}{
+		{table: "package_questions"},
+		{table: "package_materials"},
+		{table: "package_videos"},
+	}
+
+	for _, migration := range migrations {
+		if !columnExists(migration.table, "package_slug") || !columnExists(migration.table, "package_id") {
+			continue
+		}
+
+		if err := DB.Exec(
+			fmt.Sprintf(
+				"UPDATE %s AS child SET package_id = packages.id FROM packages WHERE child.package_slug = packages.slug AND (child.package_id IS NULL OR child.package_id = 0)",
+				migration.table,
+			),
+		).Error; err != nil {
+			log.Printf("Failed to migrate %s.package_id from package_slug: %v", migration.table, err)
+		}
+	}
+}
+
+func columnExists(tableName, columnName string) bool {
+	var count int64
+	if err := DB.Raw(
+		"SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?",
+		tableName,
+		columnName,
+	).Scan(&count).Error; err != nil {
+		log.Printf("Failed to inspect column %s.%s: %v", tableName, columnName, err)
+		return false
+	}
+	return count > 0
 }

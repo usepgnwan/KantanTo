@@ -1,109 +1,225 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
 import {
   Card, Table, Button, Tag, Typography, Space, Modal,
   Form, Input, InputNumber, Dropdown, message, Avatar,
-  Col, Row, Select, Upload,
+  Col, Row, Select, Upload, Spin,
 } from 'antd';
 import type { TableColumnsType, MenuProps } from 'antd';
 import {
   PlusOutlined, SettingOutlined, DeleteOutlined, MoreOutlined,
   TagsOutlined, EditOutlined, EyeOutlined, ClockCircleOutlined,
-  PictureOutlined,
+  PictureOutlined, ReloadOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import {
+  getPackages,
+  createPackage,
+  updatePackage,
+  deletePackage,
+  PackageListItem,
+} from '../../services/packageService';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
-interface Package {
+// Local UI shape — wraps the API item with a stable `key`
+interface PackageRow extends PackageListItem {
   key: string;
-  id: string;
-  title: string;
-  description: string;
-  price: number;
-  category: string;
-  thumbnail?: string;
-  classes: string[];
-  subjects: string[];
-  duration: number; // in minutes
-  questionsCount: number;
-  materialsCount: number;
-  videosCount: number;
-  status: 'published' | 'draft' | 'deleted';
 }
 
-const initialPackages: Package[] = [
-  { 
-    key: '1', id: 'saintek-pro', title: 'Saintek Pro', 
-    description: 'Paket intensif untuk jalur Saintek dengan 500+ soal terseleksi.', 
-    price: 75000, 
-    category: 'Saintek', 
-    classes: ['Kelas 12', 'Alumni'],
-    subjects: ['Matematika IPA', 'Fisika', 'Kimia'],
-    duration: 120, questionsCount: 120, materialsCount: 8, videosCount: 4, status: 'published' 
-  },
-  { 
-    key: '2', id: 'soshum-mastery', title: 'Soshum Mastery', 
-    description: 'Kuasai seluruh materi Soshum dengan pembahasan eksklusif.', 
-    price: 85000, 
-    category: 'Soshum', 
-    classes: ['Kelas 12'],
-    subjects: ['Sejarah', 'Geografi', 'Sosiologi'],
-    duration: 120, questionsCount: 98, materialsCount: 6, videosCount: 3, status: 'published' 
-  },
-  { 
-    key: '3', id: 'tryout-akbar', title: 'Tryout Akbar', 
-    description: 'Simulasi ujian massal dengan soal prediktif terkini.', 
-    price: 25000, 
-    category: 'Tryout', 
-    classes: ['Kelas 10', 'Kelas 11', 'Kelas 12', 'Alumni'],
-    subjects: ['TPS', 'Literasi'],
-    duration: 195, questionsCount: 150, materialsCount: 2, videosCount: 1, status: 'published' 
-  },
-];
+const toRow = (pkg: PackageListItem): PackageRow => ({
+  ...pkg,
+  key: pkg.slug,
+  classes: Array.isArray(pkg.classes) ? pkg.classes : [],
+  subjects: Array.isArray(pkg.subjects) ? pkg.subjects : [],
+  questions_count: Number(pkg.questions_count) || 0,
+  materials_count: Number(pkg.materials_count) || 0,
+  videos_count: Number(pkg.videos_count) || 0,
+});
 
 const AdminPackageForm: React.FC = () => {
-  const [packages, setPackages] = useState<Package[]>(initialPackages);
+  const [packages, setPackages] = useState<PackageRow[]>([]);
+  const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<Package | null>(null);
+  const [editTarget, setEditTarget] = useState<PackageRow | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
   const navigate = useNavigate();
 
-  const openCreate = () => { setEditTarget(null); form.resetFields(); setModalOpen(true); };
-  const openEdit = (pkg: Package) => { setEditTarget(pkg); form.setFieldsValue(pkg); setModalOpen(true); };
-
-  const handleSubmit = async () => {
-    const vals = await form.validateFields();
-    if (editTarget) {
-      setPackages(packages.map(p => p.key === editTarget.key ? { ...p, ...vals } : p));
-      message.success('Paket berhasil diperbarui');
-    } else {
-      const newPkg: Package = {
-        key: String(Date.now()),
-        id: vals.title.toLowerCase().replace(/\s+/g, '-'),
-        questionsCount: 0, materialsCount: 0, videosCount: 0,
-        status: 'draft',
-        ...vals,
-      };
-      setPackages([...packages, newPkg]);
-      message.success('Paket baru berhasil dibuat');
+  // ── Fetch ────────────────────────────────────────────────────────────────
+  const fetchPackages = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await getPackages();
+      setPackages(data.map(toRow));
+    } catch (err: any) {
+      message.error('Gagal memuat daftar paket');
+    } finally {
+      setLoading(false);
     }
-    setModalOpen(false);
+  }, []);
+
+  useEffect(() => { fetchPackages(); }, [fetchPackages]);
+
+  // ── Modal helpers ─────────────────────────────────────────────────────────
+  const openCreate = () => {
+    setEditTarget(null);
+    form.resetFields();
+    form.setFieldsValue({ status: 'draft', classes: [], subjects: [], duration: 120, price: 0 });
+    setModalOpen(true);
   };
 
-  const rowActions = (pkg: Package): MenuProps['items'] => [
-    { key: 'edit', label: 'Edit Info Paket', icon: <EditOutlined />, onClick: () => openEdit(pkg) },
-    { key: 'settings', label: 'Kelola Soal & Materi', icon: <SettingOutlined />, onClick: () => navigate(`/admin/packages/${pkg.id}`) },
-    { key: 'preview', label: 'Lihat di Halaman Siswa', icon: <EyeOutlined />, onClick: () => window.open(`/paket/${pkg.id}`, '_blank') },
+  const openEdit = (pkg: PackageRow) => {
+    setEditTarget(pkg);
+    form.setFieldsValue({
+      title: pkg.title,
+      description: pkg.description,
+      category: pkg.category,
+      status: pkg.status,
+      classes: pkg.classes,
+      subjects: pkg.subjects,
+      duration: pkg.duration,
+      price: pkg.price,
+    });
+    setModalOpen(true);
+  };
+
+  // ── Submit ────────────────────────────────────────────────────────────────
+  const handleSubmit = async () => {
+    const vals = await form.validateFields();
+    setSubmitting(true);
+    try {
+      if (editTarget) {
+        // Update existing
+        const updated = await updatePackage(editTarget.slug, {
+          slug: editTarget.slug,
+          title: vals.title,
+          description: vals.description,
+          price: vals.price ?? 0,
+          category: vals.category ?? '',
+          classes: vals.classes ?? [],
+          subjects: vals.subjects ?? [],
+          duration: vals.duration ?? 0,
+          status: vals.status ?? 'draft',
+          thumbnail: editTarget.thumbnail,
+        });
+        setPackages(prev =>
+          prev.map(p => p.slug === editTarget.slug ? toRow(updated) : p)
+        );
+        message.success('Paket berhasil diperbarui');
+      } else {
+        // Create new — auto-generate slug from title
+        const slugBase = vals.title
+          .toLowerCase()
+          .trim()
+          .replace(/\s+/g, '-')
+          .replace(/[^a-z0-9-]/g, '')
+          .replace(/-+/g, '-')
+          .replace(/^-|-$/g, '');
+        const candidateSlug = slugBase || 'paket';
+        const slug = packages.some(pkg => pkg.slug === candidateSlug)
+          ? `${candidateSlug}-${Date.now()}`
+          : candidateSlug;
+        const created = await createPackage({
+          slug,
+          title: vals.title,
+          description: vals.description,
+          price: vals.price ?? 0,
+          category: vals.category ?? '',
+          classes: vals.classes ?? [],
+          subjects: vals.subjects ?? [],
+          duration: vals.duration ?? 0,
+          status: vals.status ?? 'draft',
+          thumbnail: '',
+        });
+        setPackages(prev => [...prev, toRow(created)]);
+        message.success('Paket baru berhasil dibuat');
+      }
+      setModalOpen(false);
+    } catch (err: any) {
+      message.error(err.response?.data?.message || 'Terjadi kesalahan');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ── Row actions ───────────────────────────────────────────────────────────
+  const handleStatusChange = async (pkg: PackageRow, newStatus: PackageListItem['status']) => {
+    try {
+      const updated = await updatePackage(pkg.slug, {
+        slug: pkg.slug,
+        title: pkg.title,
+        description: pkg.description,
+        price: pkg.price,
+        category: pkg.category,
+        classes: pkg.classes,
+        subjects: pkg.subjects,
+        duration: pkg.duration,
+        status: newStatus,
+        thumbnail: pkg.thumbnail,
+      });
+      setPackages(prev => prev.map(p => p.slug === pkg.slug ? toRow(updated) : p));
+    } catch {
+      message.error('Gagal mengubah status');
+    }
+  };
+
+  const handlePermanentDelete = async (pkg: PackageRow) => {
+    try {
+      await deletePackage(pkg.slug);
+      setPackages(prev => prev.filter(p => p.slug !== pkg.slug));
+      message.error('Paket dihapus selamanya');
+    } catch {
+      message.error('Gagal menghapus paket');
+    }
+  };
+
+  const rowActions = (pkg: PackageRow): MenuProps['items'] => [
+    {
+      key: 'edit',
+      label: 'Edit Info Paket',
+      icon: <EditOutlined />,
+      onClick: () => openEdit(pkg),
+    },
+    {
+      key: 'settings',
+      label: 'Kelola Soal & Materi',
+      icon: <SettingOutlined />,
+      onClick: () => navigate(`/admin/packages/${pkg.slug}`),
+    },
+    {
+      key: 'preview',
+      label: 'Lihat di Halaman Siswa',
+      icon: <EyeOutlined />,
+      onClick: () => window.open(`/paket/${pkg.slug}`, '_blank'),
+    },
     { type: 'divider' },
-    pkg.status === 'deleted' 
-      ? { key: 'restore', label: 'Pulihkan Paket', icon: <PlusOutlined />, onClick: () => { setPackages(packages.map(p => p.key === pkg.key ? { ...p, status: 'draft' } : p)); message.success('Paket dipulihkan ke Draft'); } }
-      : { key: 'delete', label: 'Hapus (Pindah ke Trash)', icon: <DeleteOutlined />, danger: true, onClick: () => { setPackages(packages.map(p => p.key === pkg.key ? { ...p, status: 'deleted' } : p)); message.warning('Paket dipindah ke status Deleted'); } },
-    { key: 'perm-delete', label: 'Hapus Permanen', icon: <DeleteOutlined />, danger: true, onClick: () => { setPackages(packages.filter(p => p.key !== pkg.key)); message.error('Paket dihapus selamanya'); } },
+    pkg.status === 'deleted'
+      ? {
+          key: 'restore',
+          label: 'Pulihkan Paket',
+          icon: <PlusOutlined />,
+          onClick: () => { handleStatusChange(pkg, 'draft'); message.success('Paket dipulihkan ke Draft'); },
+        }
+      : {
+          key: 'delete',
+          label: 'Hapus (Pindah ke Trash)',
+          icon: <DeleteOutlined />,
+          danger: true,
+          onClick: () => { handleStatusChange(pkg, 'deleted'); message.warning('Paket dipindah ke status Deleted'); },
+        },
+    {
+      key: 'perm-delete',
+      label: 'Hapus Permanen',
+      icon: <DeleteOutlined />,
+      danger: true,
+      onClick: () => handlePermanentDelete(pkg),
+    },
   ];
 
-  const columns: TableColumnsType<Package> = [
+  // ── Table columns ─────────────────────────────────────────────────────────
+  const columns: TableColumnsType<PackageRow> = [
     {
       title: 'Paket',
       dataIndex: 'title',
@@ -115,7 +231,7 @@ const AdminPackageForm: React.FC = () => {
             className="bg-primary/10 text-primary shrink-0 text-lg font-black rounded-xl"
             shape="square"
           >
-            {title[0]}
+            {title?.[0] ?? '?'}
           </Avatar>
           <div>
             <span className="font-bold block text-on-surface dark:text-zinc-100">{title}</span>
@@ -129,12 +245,20 @@ const AdminPackageForm: React.FC = () => {
       key: 'attributes',
       render: (_, record) => (
         <div className="flex flex-col gap-1">
-          <Tag className="rounded-lg bg-primary/10 text-primary border-none font-bold text-[9px] px-2 w-fit">{record.category}</Tag>
+          {record.category && (
+            <Tag className="rounded-lg bg-primary/10 text-primary border-none font-bold text-[9px] px-2 w-fit">
+              {record.category}
+            </Tag>
+          )}
           <Space size={2} wrap>
-            {record.classes.map(c => <Tag key={c} className="rounded-lg bg-on-surface/5 text-on-surface/40 border-none font-bold text-[9px] px-2 m-0">{c}</Tag>)}
+            {record.classes.map(c => (
+              <Tag key={c} className="rounded-lg bg-on-surface/5 text-on-surface/40 border-none font-bold text-[9px] px-2 m-0">{c}</Tag>
+            ))}
           </Space>
-           <Space size={2} wrap>
-            {record.subjects.map(s => <Tag key={s} className="rounded-lg bg-blue-500/10 text-blue-500 border-none font-bold text-[9px] px-2 m-0">{s}</Tag>)}
+          <Space size={2} wrap>
+            {record.subjects.map(s => (
+              <Tag key={s} className="rounded-lg bg-blue-500/10 text-blue-500 border-none font-bold text-[9px] px-2 m-0">{s}</Tag>
+            ))}
           </Space>
         </div>
       ),
@@ -157,7 +281,7 @@ const AdminPackageForm: React.FC = () => {
       align: 'right',
       render: (price) => (
         <span className="font-black text-primary">
-          {price === 0 ? 'Gratis' : `Rp ${price.toLocaleString('id-ID')}`}
+          {price === 0 ? 'Gratis' : `Rp ${Number(price).toLocaleString('id-ID')}`}
         </span>
       ),
       sorter: (a, b) => a.price - b.price,
@@ -168,13 +292,13 @@ const AdminPackageForm: React.FC = () => {
       render: (_, r) => (
         <Space size={4} wrap>
           <Tag className="rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-none font-bold text-[10px] px-2">
-            {r.questionsCount} soal
+            {r.questions_count} soal
           </Tag>
           <Tag className="rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-none font-bold text-[10px] px-2">
-            {r.materialsCount} materi
+            {r.materials_count} materi
           </Tag>
           <Tag className="rounded-full bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400 border-none font-bold text-[10px] px-2">
-            {r.videosCount} video
+            {r.videos_count} video
           </Tag>
         </Space>
       ),
@@ -188,11 +312,7 @@ const AdminPackageForm: React.FC = () => {
         let label = 'Draft';
         if (status === 'published') { color = 'green'; label = 'Published'; }
         if (status === 'deleted') { color = 'red'; label = 'Deleted'; }
-        return (
-          <Tag color={color} className="rounded-full font-bold px-3">
-            {label}
-          </Tag>
-        );
+        return <Tag color={color} className="rounded-full font-bold px-3">{label}</Tag>;
       },
     },
     {
@@ -206,7 +326,7 @@ const AdminPackageForm: React.FC = () => {
             icon={<SettingOutlined />}
             size="small"
             className="rounded-xl font-bold h-8 px-3"
-            onClick={() => navigate(`/admin/packages/${record.id}`)}
+            onClick={() => navigate(`/admin/packages/${record.slug}`)}
           >
             Kelola
           </Button>
@@ -218,6 +338,7 @@ const AdminPackageForm: React.FC = () => {
     },
   ];
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <AdminLayout>
       <div className="bg-surface-low/30 dark:bg-zinc-950 py-10 min-h-full font-sans transition-colors duration-300">
@@ -230,15 +351,25 @@ const AdminPackageForm: React.FC = () => {
               <Title level={1} className="!text-3xl !font-manrope !font-black !m-0 dark:text-zinc-100">Daftar Paket</Title>
               <Text className="text-on-surface/50 dark:text-zinc-400 text-sm">Kelola katalog paket, durasi, dan akses pengerjaan siswa</Text>
             </div>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              size="large"
-              onClick={openCreate}
-              className="mt-4 sm:mt-0 h-11 rounded-2xl font-bold shadow-lg shadow-primary/20"
-            >
-              Tambah Paket
-            </Button>
+            <Space className="mt-4 sm:mt-0">
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={fetchPackages}
+                loading={loading}
+                className="h-11 rounded-2xl font-bold"
+              >
+                Refresh
+              </Button>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                size="large"
+                onClick={openCreate}
+                className="h-11 rounded-2xl font-bold shadow-lg shadow-primary/20"
+              >
+                Tambah Paket
+              </Button>
+            </Space>
           </div>
 
           {/* Stats row */}
@@ -258,13 +389,16 @@ const AdminPackageForm: React.FC = () => {
 
           {/* Table */}
           <Card className="weightless-card border-none bg-white dark:bg-zinc-900 shadow-md p-0 overflow-hidden">
-            <Table
-              columns={columns}
-              dataSource={packages}
-              pagination={{ pageSize: 10, showTotal: (t) => `Total ${t} paket` }}
-              scroll={{ x: 800 }}
-              className="weightless-table"
-            />
+            <Spin spinning={loading}>
+              <Table
+                columns={columns}
+                dataSource={packages}
+                pagination={{ pageSize: 10, showTotal: (t) => `Total ${t} paket` }}
+                scroll={{ x: 800 }}
+                className="weightless-table"
+                locale={{ emptyText: 'Belum ada paket. Klik "Tambah Paket" untuk memulai.' }}
+              />
+            </Spin>
           </Card>
         </div>
       </div>
@@ -274,6 +408,7 @@ const AdminPackageForm: React.FC = () => {
         open={modalOpen}
         onCancel={() => setModalOpen(false)}
         onOk={handleSubmit}
+        confirmLoading={submitting}
         title={
           <div className="flex items-center gap-2 font-manrope font-black text-lg py-2">
             <TagsOutlined className="text-primary" />
@@ -331,12 +466,14 @@ const AdminPackageForm: React.FC = () => {
               <Form.Item label={<span className="font-bold text-sm">Thumbnail Paket</span>}>
                 <Upload.Dragger
                   accept="image/*"
+                  beforeUpload={() => false}
+                  maxCount={1}
                   multiple={false}
                   className="rounded-2xl"
                 >
                   <div className="py-4">
                     <PictureOutlined className="text-2xl text-primary/40 block mb-2" />
-                    <Text className="text-xs font-bold block">Upload Gambar Sampulan</Text>
+                    <Text className="text-xs font-bold block">Upload Gambar Sampul</Text>
                     <Text className="text-[10px] text-on-surface/40">Rasio 4:3 disarankan</Text>
                   </div>
                 </Upload.Dragger>

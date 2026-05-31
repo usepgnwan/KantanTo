@@ -1,0 +1,16 @@
+2026/05/28 10:24:28 Database connection successful
+2026/05/28 10:24:29 Database migration completed
+2026/05/28 10:24:29 Starting Server on port :3026
+
+   ____    __
+  / __/___/ /  ___
+ / _// __/ _ \/ _ \
+/___/\__/_//_/\___/ v4.15.0
+High performance, minimalist Go web framework
+https://echo.labstack.com
+____________________________________O/_______
+                                    O\
+⇨ http server started on [::]:3026
+
+2026/05/28 11:16:09 [32m/Users/ranioktaviani/Downloads/PROJECT USEP/Apps To/server/app/controller/package.go:76 [33mSLOW SQL >= 200ms
+[0m[31;1m[630.812ms] [33m[rows:1][35m SELECT * FROM "packages" ORDER BY id asc[0m

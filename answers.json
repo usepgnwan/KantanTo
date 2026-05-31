@@ -1,0 +1,81 @@
+[
+  {
+    "id": 1,
+    "question_id": 2,
+    "sub_question_id": null,
+    "selected_options": [],
+    "is_correct": false,
+    "points_earned": 0,
+    "max_points": 1,
+    "question_text": "<p>Dari pernyataan-pernyataan di bawah ini, manakah yang merupakan sifat-sifat dari bangun datar <strong>Belah Ketupat</strong>? </p>",
+    "question_title": "",
+    "question_type": "multiple",
+    "options": [
+      "<p>Semua sisinya sama panjang</p>",
+      "<p>Kedua diagonalnya sama panjang</p>",
+      "<p>Kedua diagonalnya saling tegak lurus</p>",
+      "<p>Memiliki 4 sumbu simetri</p>",
+      ""
+    ],
+    "correct_answers": [
+      0,
+      2
+    ],
+    "discussion": "<p>Manakah yang merupakan sifat-sifat dari bangun datar Belah Ketupat?</p><h3><strong>Analisis Opsi Jawaban:</strong></h3><ol><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><strong>Pernyataan A: Semua sisinya sama panjang (BENAR)</strong> Ini adalah definisi utama dari belah ketupat. Semua dari ke-4 sisinya memiliki panjang yang sama (mirip seperti persegi).</li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><strong>Pernyataan B: Kedua diagonalnya sama panjang (SALAH)</strong> Pada belah ketupat, diagonal 1 ($d_1$) dan diagonal 2 ($d_2$) umumnya memiliki panjang yang berbeda. Jika diagonalnya sama panjang, bangun tersebut akan menjadi persegi.</li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><strong>Pernyataan C: Kedua diagonalnya saling tegak lurus (BENAR)</strong> Kedua diagonal belah ketupat selalu berpotongan di tengah-tengah dan membentuk sudut siku-siku ($90^\\circ$).</li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><strong>Pernyataan D: Memiliki 4 sumbu simetri (SALAH)</strong> Belah ketupat hanya memiliki <strong>2 sumbu simetri</strong>, yaitu tepat pada kedua garis diagonalnya.</li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><strong>Kunci Jawaban:</strong> <strong>A dan C</strong></li></ol><h2><br></h2><p><br></p>"
+  },
+  {
+    "id": 2,
+    "question_id": 3,
+    "sub_question_id": 3,
+    "selected_options": [],
+    "is_correct": false,
+    "points_earned": 0,
+    "max_points": 0,
+    "question_text": "",
+    "question_title": "",
+    "question_type": "",
+    "options": null,
+    "correct_answers": null,
+    "discussion": "",
+    "parent_question": "<p>Di sebuah toko buku, Andi membeli 3 buah buku tulis dan 2 pensil dengan harga total Rp17.000,00. Di toko yang sama, Budi membeli 2 buah buku tulis dan 4 pensil dengan harga total Rp14.000,00.</p>"
+  },
+  {
+    "id": 3,
+    "question_id": 3,
+    "sub_question_id": 4,
+    "selected_options": [],
+    "is_correct": false,
+    "points_earned": 0,
+    "max_points": 0,
+    "question_text": "",
+    "question_title": "",
+    "question_type": "",
+    "options": null,
+    "correct_answers": null,
+    "discussion": "",
+    "parent_question": "<p>Di sebuah toko buku, Andi membeli 3 buah buku tulis dan 2 pensil dengan harga total Rp17.000,00. Di toko yang sama, Budi membeli 2 buah buku tulis dan 4 pensil dengan harga total Rp14.000,00.</p>"
+  },
+  {
+    "id": 4,
+    "question_id": 1,
+    "sub_question_id": null,
+    "selected_options": [
+      1
+    ],
+    "is_correct": false,
+    "points_earned": 0,
+    "max_points": 1,
+    "question_text": "<p>Jika $3x + 7 = 22$, berapakah nilai dari $x$?</p>",
+    "question_title": "",
+    "question_type": "single",
+    "options": [
+      "<p>1</p>",
+      "<p>2</p>",
+      "",
+      "<p>3</p>",
+      "<p>1</p>"
+    ],
+    "correct_answers": null,
+    "discussion": "<h3><strong>Langkah Penyelesaian:</strong></h3><p>Untuk mencari nilai $x$, kita perlu mengisolasi variabel $x$ di salah satu ruas (kiri):</p><ol><li data-list=\"ordered\"><span class=\"ql-ui\" contenteditable=\"false\"></span><strong>Pindahkan konstanta</strong> $+7$ dari ruas kiri ke ruas kanan (tanda berubah menjadi negatif):</li><li data-list=\"ordered\"><span class=\"ql-ui\" contenteditable=\"false\"></span>$$3x = 22 - 7$$</li><li data-list=\"ordered\"><span class=\"ql-ui\" contenteditable=\"false\"></span>$$3x = 15$$</li><li data-list=\"ordered\"><span class=\"ql-ui\" contenteditable=\"false\"></span><strong>Bagi kedua ruas</strong> dengan angka $3$ untuk mendapatkan nilai $x$:</li><li data-list=\"ordered\"><span class=\"ql-ui\" contenteditable=\"false\"></span>$$x = \\frac{15}{3}$$</li><li data-list=\"ordered\"><span class=\"ql-ui\" contenteditable=\"false\"></span>$$x = 5$$</li><li data-list=\"bullet\"><span class=\"ql-ui\" contenteditable=\"false\"></span><strong>Kunci Jawaban:</strong> <strong>C. 5</strong></li></ol><p><br></p>"
+  }
+]

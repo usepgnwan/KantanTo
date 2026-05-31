@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import AppLayout from '../layouts/AppLayout';
-import { Typography, Row, Col, Card, Tag, Table, Button, Badge, Space } from 'antd';
+import { Typography, Row, Col, Card, Tag, Table, Button, Badge, Space, message } from 'antd';
 import {
   HistoryOutlined,
   BarChartOutlined,
@@ -13,78 +13,50 @@ import {
 import { useNavigate } from 'react-router-dom';
 import PageLoader from '../components/atoms/PageLoader';
 import Paragraph from 'antd/es/typography/Paragraph';
-// import Paragraph from 'antd/es/skeleton/Paragraph';
+import { useAuth } from '../context/AuthContext';
+import { getAdminExamSessions } from '../services/packageService';
 
 const { Title, Text } = Typography;
 
 const HistoryPage: React.FC = () => {
   const navigate = useNavigate();
+  const { payload } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<any[]>([]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const data = [
-    {
-      key: '1',
-      date: '2024-03-15',
-      title: 'Tryout Akbar Nasional #1',
-      score: 725,
-      status: 'Selesai',
-      category: 'Saintek',
-    },
-    {
-      key: '2',
-      date: '2024-03-10',
-      title: 'Latihan Mandiri - Penalaran Umum',
-      score: 680,
-      status: 'Selesai',
-      category: 'TPS',
-    },
-    {
-      key: '3',
-      date: '2024-03-05',
-      title: 'Tryout Intensif Mingguan',
-      score: 650,
-      status: 'Selesai',
-      category: 'Saintek',
-    },
-    {
-      key: '4',
-      date: '2024-02-28',
-      title: 'Simulasi UTBK Mandiri',
-      score: 710,
-      status: 'Selesai',
-      category: 'Soshum',
-    },
-  ];
+    if (!payload?.user_id) return;
+    setLoading(true);
+    getAdminExamSessions(false, 1, 100, '', payload.user_id)
+      .then((res) => {
+        setData(res.items || []);
+      })
+      .catch(() => message.error('Gagal memuat riwayat ujian'))
+      .finally(() => setLoading(false));
+  }, [payload?.user_id]);
 
   const columns = [
     {
       title: 'Tryout',
-      dataIndex: 'title',
-      key: 'title',
-      render: (text: string, record: any) => (
+      dataIndex: 'package',
+      key: 'package',
+      render: (pkg: any) => (
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 bg-primary/5 rounded-xl flex items-center justify-center">
             <FileTextOutlined className="text-primary" />
           </div>
           <div>
-            <div className="font-bold text-on-surface">{text}</div>
-            <div className="text-[10px] text-on-surface/40 uppercase tracking-widest font-heavy">{record.category}</div>
+            <div className="font-bold text-on-surface">{pkg?.title || 'Unknown'}</div>
+            <div className="text-[10px] text-on-surface/40 uppercase tracking-widest font-heavy">{pkg?.category || 'Umum'}</div>
           </div>
         </div>
       ),
     },
     {
       title: 'Tanggal',
-      dataIndex: 'date',
-      key: 'date',
-      render: (text: string) => <Text className="font-medium text-on-surface/60">{new Date(text).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</Text>,
+      dataIndex: 'created_at',
+      key: 'created_at',
+      render: (text: string) => <Text className="font-medium text-on-surface/60">{new Date(text).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</Text>,
     },
     {
       title: 'Skor Akhir',
@@ -92,18 +64,16 @@ const HistoryPage: React.FC = () => {
       key: 'score',
       render: (score: number) => (
         <div className="flex items-center gap-2">
-          <span className="text-lg font-black text-primary">{score}</span>
-          <span className="text-[10px] text-on-surface/40">/ 1000</span>
+          <span className="text-lg font-black text-primary">{score || 0}</span>
         </div>
       ),
     },
     {
       title: 'Status',
-      dataIndex: 'status',
       key: 'status',
-      render: (status: string) => (
+      render: () => (
         <Badge
-          count={status}
+          count="Selesai"
           style={{ backgroundColor: '#10b981', fontWeight: 'bold', fontSize: '10px' }}
           className="rounded-full"
         />
@@ -116,7 +86,7 @@ const HistoryPage: React.FC = () => {
         <Button
           type="text"
           icon={<ArrowRightOutlined />}
-          onClick={() => navigate(`/riwayat/${record.key}/review`)}
+          onClick={() => navigate(`/riwayat/${record.id}/review`)}
           className="hover:text-primary font-bold flex items-center gap-2"
         >
           Lihat Detail
@@ -172,7 +142,7 @@ const HistoryPage: React.FC = () => {
                     </div>
                     <div className="space-y-1">
                       <Text className="text-white/60 text-xs font-bold uppercase tracking-widest">Skor Tertinggi</Text>
-                      <div className="text-4xl font-black">725</div>
+                      <div className="text-4xl font-black">{data.length > 0 ? Math.max(...data.map(d => d.score || 0)) : 0}</div>
                     </div>
                     <div className="pt-2">
                       <Button ghost className="rounded-xl border-white/30 text-white font-bold h-10">Bandingkan</Button>
@@ -190,19 +160,19 @@ const HistoryPage: React.FC = () => {
                         <CheckCircleOutlined className="text-green-500" />
                         <Text className="font-bold">Selesai</Text>
                       </Space>
-                      <Text className="font-black">12</Text>
+                      <Text className="font-black">{data.length}</Text>
                     </div>
                     <div className="flex justify-between items-center">
                       <Space align="center" size="middle">
                         <ClockCircleOutlined className="text-yellow-500" />
                         <Text className="font-bold">Berjalan</Text>
                       </Space>
-                      <Text className="font-black">1</Text>
+                      <Text className="font-black">0</Text>
                     </div>
                     <div className="h-px bg-on-surface/5" />
                     <div className="pt-2">
                       <Text className="text-xs text-on-surface/40 leading-relaxed block">
-                        Kamu telah menyelesaikan <b>85%</b> dari total paket yang kamu miliki. Tetap semangat!
+                        Kamu telah menyelesaikan <b>{data.length}</b> simulasi ujian. Tetap semangat!
                       </Text>
                     </div>
                   </div>

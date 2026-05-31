@@ -1,15 +1,22 @@
 import React from 'react';
 import { Row, Col, Button, Typography, Card } from 'antd';
+import { LockOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
 
-const QuestionGrid: React.FC = () => {
-  const questions = Array.from({ length: 15 }, (_, i) => i + 1);
+interface QuestionGridProps {
+  count?: number;
+  duration?: number;
+  answersLocked?: boolean;
+}
+
+const QuestionGrid: React.FC<QuestionGridProps> = ({ count = 15, duration = 45, answersLocked = true }) => {
+  const questions = Array.from({ length: Math.max(count, 0) }, (_, i) => i + 1);
 
   return (
     <div className="py-6">
       <div className="mb-6">
-        <Text className="text-surface-on/60">Estimasi waktu pengerjaan: <span className="font-bold text-surface-on">45 Menit</span></Text>
+        <Text className="text-surface-on/60">Estimasi waktu pengerjaan: <span className="font-bold text-surface-on">{duration} Menit</span></Text>
       </div>
       <Row gutter={[16, 16]}>
         {questions.map((num) => (
@@ -23,7 +30,10 @@ const QuestionGrid: React.FC = () => {
         ))}
       </Row>
       <Card className="mt-8 border-none bg-primary/5 rounded-2xl italic text-center p-2">
-        <Text className="text-sm text-primary">Daftar soal di atas adalah preview materi yang akan Anda kerjakan dalam tryout ini.</Text>
+        <Text className="text-sm text-primary">
+          {answersLocked && <LockOutlined className="mr-2" />}
+          Daftar soal hanya preview. Kunci jawaban dan pembahasan lengkap terbuka setelah memiliki paket.
+        </Text>
       </Card>
     </div>
   );

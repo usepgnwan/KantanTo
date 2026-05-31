@@ -1,119 +1,223 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AppLayout from '../layouts/AppLayout';
-import { Row, Col, Card, Typography, Tag, Button, Progress, Space, Divider } from 'antd';
-import { 
-  CheckCircleFilled, 
-  CloseCircleFilled, 
-  MinusCircleFilled,
+import { Row, Col, Card, Typography, Tag, Button, Progress, Space, Divider, Spin, message } from 'antd';
+import {
+  CheckCircleFilled,
+  CloseCircleFilled,
   ArrowLeftOutlined,
   BulbOutlined,
   WarningOutlined,
-  BookOutlined,
   RightOutlined,
-  LeftOutlined
+  LeftOutlined,
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
+import { getExamSession } from '../services/packageService';
+import { useAuth } from '../context/AuthContext';
+import { renderLatex } from '../utils/latex';
 
 const { Title, Text, Paragraph } = Typography;
 
+interface AnswerDetail {
+  id: number;
+  question_id: number;
+  sub_question_id: number | null;
+  selected_options: number[];
+  is_correct: boolean;
+  points_earned: number;
+  max_points: number;
+  question_text: string;
+  question_title: string;
+  question_type: string;
+  options: string[];
+  correct_answers: number[];
+  discussion: string;
+  parent_question?: string;
+  parent_title?: string;
+}
+
+interface GroupedQuestion {
+  question_id: number;
+  type: string;
+  title: string;
+  question_text: string;
+  answers: AnswerDetail[];
+}
+
 const Review: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [selectedQuestion, setSelectedQuestion] = useState<number | null>(1);
+  const { payload, isAdmin } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState<any>(null);
+  const [answers, setAnswers] = useState<AnswerDetail[]>([]);
+  const [groupedQuestions, setGroupedQuestions] = useState<GroupedQuestion[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState<number>(0);
 
-  // Mock data based on the Stitch design requirements
-  const stats = {
-    total: 40,
-    benar: 30,
-    salah: 10,
-    kosong: 0,
-    score: 750
-  };
+  useEffect(() => {
+    if (!id) return;
+    setLoading(true);
+    getExamSession(id)
+      .then((data) => {
+        if (!isAdmin() && payload?.user_id !== data.user?.id) {
+          message.error('Anda tidak memiliki akses ke riwayat ujian ini');
+          navigate('/riwayat');
+          return;
+        }
 
-  // Generate mock answer map
-  const answerMap = Array.from({ length: 40 }, (_, i) => ({
-    id: i + 1,
-    status: i < 30 ? 'correct' : i < 40 ? 'incorrect' : 'empty', // 30 correct, 10 incorrect
-  }));
+        setSession(data);
+        const raw: AnswerDetail[] = (data.answers || []).map((a: any, idx: number) => ({
+          ...a,
+          selected_options: a.selected_options || [],
+          options: a.options || [],
+          correct_answers: a.correct_answers || [],
+        }));
+        setAnswers(raw);
 
-  const getStatusColor = (status: string) => {
-    switch(status) {
-      case 'correct': return 'bg-green-500 text-white border-green-500';
-      case 'incorrect': return 'bg-red-500 text-white border-red-500';
-      case 'empty': return 'bg-gray-200 text-gray-500 border-gray-300';
-      default: return 'bg-white border-gray-200';
-    }
-  };
+        // Group by question_id so nested questions appear on the same page
+        const groups: GroupedQuestion[] = [];
+        const map = new Map<number, GroupedQuestion>();
 
-  const currentQuestionData = {
-    text: "Diketahui sebuah segitiga ABC dengan panjang sisi AB=8, BC=10. Jika sudut B adalah 60 derajat, berapakah luas segitiga tersebut?",
-    options: ["20√3", "40", "20", "40√3", "10√3"],
-    userAnswer: "40", // User answered incorrectly
-    correctAnswer: "20√3",
-    explanation: "Pertanyaan ini membutuhkan pemahaman mendalam tentang trigonometri dasar. Gunakan rumus luas segitiga L = 1/2 * a * b * sin(C). Substitusikan nilai: 1/2 * 8 * 10 * sin(60). Nilai sin(60) adalah 1/2 √3. Maka hasilnya adalah 20√3 unit persegi. Kesalahan umum terletak pada ketidaktelitian menggunakan nilai sinus sudut."
+        raw.forEach(a => {
+          if (a.parent_question) { // It's a sub-question (nested)
+            if (!map.has(a.question_id)) {
+              const g: GroupedQuestion = {
+                question_id: a.question_id,
+                type: 'nested',
+                title: a.parent_title || 'Skenario',
+                question_text: a.parent_question,
+                answers: []
+              };
+              map.set(a.question_id, g);
+              groups.push(g);
+            }
+            map.get(a.question_id)!.answers.push(a);
+          } else { // Single or multiple
+            groups.push({
+              question_id: a.question_id,
+              type: a.question_type || 'single',
+              title: a.question_title || '',
+              question_text: a.question_text,
+              answers: [a]
+            });
+          }
+        });
+        setGroupedQuestions(groups);
+      })
+      .catch(() => message.error('Gagal memuat detail hasil ujian'))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="min-h-screen flex items-center justify-center bg-surface">
+          <Spin size="large" tip="Memuat riwayat ujian..." />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!session || answers.length === 0 || groupedQuestions.length === 0) {
+    return (
+      <AppLayout>
+        <div className="min-h-screen flex items-center justify-center bg-surface">
+          <Card className="text-center rounded-2xl border-none">
+            <WarningOutlined className="text-4xl text-red-500 mb-4" />
+            <Title level={4}>Data Tidak Ditemukan</Title>
+            <Paragraph className="text-on-surface/60">Sesi ujian ini tidak memiliki data jawaban.</Paragraph>
+            <Button onClick={() => navigate(-1)}>Kembali</Button>
+          </Card>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  const total = answers.length;
+  const benar = answers.filter(a => a.is_correct).length;
+  const kosong = answers.filter(a => a.selected_options.length === 0).length;
+  const salah = total - benar - kosong;
+  const score = session.score || 0;
+  
+  const currentGroup = groupedQuestions[selectedIndex];
+
+  const getGroupStatusColor = (group: GroupedQuestion) => {
+    if (group.answers.length === 0) return 'bg-gray-200 text-gray-500';
+    const allEmpty = group.answers.every(a => a.selected_options.length === 0);
+    if (allEmpty) return 'bg-gray-200 text-gray-500';
+    const allCorrect = group.answers.every(a => a.is_correct);
+    if (allCorrect) return 'bg-green-500 text-white';
+    const anyCorrect = group.answers.some(a => a.is_correct);
+    if (anyCorrect) return 'bg-yellow-400 text-white'; // Mixed: some correct, some wrong
+    return 'bg-red-500 text-white';
   };
 
   return (
     <AppLayout>
       <div className="bg-surface-low/30 min-h-screen py-8 lg:py-12 transition-colors duration-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
-          {/* Header Bar */}
+
+          {/* Header */}
           <div className="flex items-center gap-4 mb-8">
-            <Button 
-              type="text" 
-              icon={<ArrowLeftOutlined />} 
+            <Button
+              type="text"
+              icon={<ArrowLeftOutlined />}
               onClick={() => navigate(-1)}
               className="text-on-surface/60 hover:text-primary transition-colors h-10 w-10 flex items-center justify-center rounded-full bg-surface-low hover:bg-primary/10"
             />
             <div>
               <Text className="text-[10px] sm:text-xs font-heavy uppercase tracking-[0.2em] text-on-surface/40 leading-none mb-1 block">
-                Riwayat Tryout
+                {session.is_testing ? 'Ujian Testing Admin' : 'Riwayat Tryout'}
               </Text>
-              <Title level={2} className="!m-0 !font-black !font-manrope !text-2xl sm:!text-3xl">Review Hasil Simulasi</Title>
+              <Title level={2} className="!m-0 !font-black !font-manrope !text-2xl sm:!text-3xl">
+                Review Hasil Simulasi
+                {session.package?.title && <span className="text-primary ml-2 text-lg font-bold">— {session.package.title}</span>}
+              </Title>
             </div>
           </div>
 
           <Row gutter={[32, 32]}>
-            {/* Left Column: Stats & Map */}
+            {/* Left: Stats & Map */}
             <Col xs={24} lg={8}>
-              <div className="space-y-6">
-                
-                {/* Score Summary */}
+              <div className="space-y-6 lg:sticky lg:top-24">
+
+                {/* Score Card */}
                 <Card className="weightless-card border-none bg-gradient-to-br from-primary/5 to-transparent relative overflow-hidden">
-                   <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full -translate-x-[-20%] -translate-y-[20%]" />
-                   <div className="relative z-10 text-center py-4">
-                     <Text className="text-sm font-bold text-on-surface/60 block mb-2 uppercase tracking-widest">Skor Akhir</Text>
-                     <div className="text-5xl font-black text-primary font-manrope">{stats.score}</div>
-                   </div>
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full -translate-x-[-20%] -translate-y-[20%]" />
+                  <div className="relative z-10 text-center py-4">
+                    <Text className="text-sm font-bold text-on-surface/60 block mb-2 uppercase tracking-widest">Skor Akhir</Text>
+                    <div className="text-5xl font-black text-primary font-manrope">{score}</div>
+                    {session.user?.nama && (
+                      <Text className="text-xs text-on-surface/40 block mt-2">{session.user.nama}</Text>
+                    )}
+                  </div>
                 </Card>
 
                 {/* Accuracy Stats */}
                 <Card className="weightless-card border-none" title={<span className="font-black font-manrope">Statistik Akurasi</span>}>
                   <div className="grid grid-cols-3 gap-4 text-center">
                     <div className="bg-surface-low p-3 rounded-2xl">
-                      <div className="text-2xl font-black text-on-surface">{stats.total}</div>
+                      <div className="text-2xl font-black text-on-surface">{total}</div>
                       <div className="text-[10px] uppercase font-bold text-on-surface/40 tracking-wider">Total</div>
                     </div>
                     <div className="bg-green-50 p-3 rounded-2xl">
-                      <div className="text-2xl font-black text-green-600">{stats.benar}</div>
+                      <div className="text-2xl font-black text-green-600">{benar}</div>
                       <div className="text-[10px] uppercase font-bold text-green-600/60 tracking-wider">Benar</div>
                     </div>
                     <div className="bg-red-50 p-3 rounded-2xl">
-                      <div className="text-2xl font-black text-red-600">{stats.salah}</div>
+                      <div className="text-2xl font-black text-red-600">{salah}</div>
                       <div className="text-[10px] uppercase font-bold text-red-600/60 tracking-wider">Salah</div>
                     </div>
                   </div>
-                  
                   <div className="mt-6">
                     <div className="flex justify-between text-xs font-bold text-on-surface/60 mb-2">
                       <span>Prosentase Akurasi</span>
-                      <span>{Math.round((stats.benar / stats.total) * 100)}%</span>
+                      <span>{total > 0 ? Math.round((benar / total) * 100) : 0}%</span>
                     </div>
-                    <Progress 
-                      percent={Math.round((stats.benar / stats.total) * 100)} 
+                    <Progress
+                      percent={total > 0 ? Math.round((benar / total) * 100) : 0}
                       showInfo={false}
-                      strokeColor="#10b981" // green-500
-                      trailColor="#fca5a5" // red-300
+                      strokeColor="#10b981"
+                      trailColor="#fca5a5"
                       strokeWidth={8}
                     />
                   </div>
@@ -121,181 +225,259 @@ const Review: React.FC = () => {
 
                 {/* Answer Map */}
                 <Card className="weightless-card border-none" title={<span className="font-black font-manrope">Peta Jawaban</span>}>
-                  <div className="flex items-center gap-4 mb-4 text-xs">
+                  <div className="flex items-center gap-3 mb-4 flex-wrap text-xs">
                     <span className="flex items-center gap-1.5"><CheckCircleFilled className="text-green-500" /> Benar</span>
                     <span className="flex items-center gap-1.5"><CloseCircleFilled className="text-red-500" /> Salah</span>
+                    <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-yellow-400 rounded-full" /> Sebagian</span>
+                    <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-gray-200 rounded-full" /> Kosong</span>
                   </div>
                   <div className="grid grid-cols-5 sm:grid-cols-8 lg:grid-cols-5 gap-2">
-                    {answerMap.map((ans) => (
-                      <button
-                        key={ans.id}
-                        onClick={() => setSelectedQuestion(ans.id)}
-                        className={`
-                          w-full aspect-square rounded-xl flex items-center justify-center font-bold text-sm transition-all
-                          ${getStatusColor(ans.status)}
-                          ${selectedQuestion === ans.id ? 'ring-4 ring-primary/30 scale-110 shadow-lg' : 'hover:opacity-80'}
-                        `}
-                      >
-                        {ans.id}
-                      </button>
-                    ))}
+                    {groupedQuestions.map((group, idx) => {
+                      const isCurrent = selectedIndex === idx;
+                      const allEmpty = group.answers.every(a => a.selected_options.length === 0);
+                      const allCorrect = !allEmpty && group.answers.every(a => a.is_correct);
+                      const anyCorrect = !allEmpty && !allCorrect && group.answers.some(a => a.is_correct);
+                      const tooltip = allEmpty ? 'Tidak dijawab' : allCorrect ? 'Semua benar' : anyCorrect ? 'Sebagian benar' : 'Salah';
+                      return (
+                        <button
+                          key={group.question_id}
+                          onClick={() => setSelectedIndex(idx)}
+                          title={`Soal ${idx + 1}: ${tooltip}`}
+                          className={`
+                            w-full aspect-square rounded-xl flex items-center justify-center font-bold text-sm transition-all
+                            ${getGroupStatusColor(group)}
+                            ${isCurrent ? 'ring-4 ring-primary/30 scale-110 shadow-lg' : 'hover:opacity-80 hover:scale-105'}
+                          `}
+                        >
+                          {idx + 1}
+                        </button>
+                      );
+                    })}
                   </div>
                 </Card>
 
               </div>
             </Col>
 
-            {/* Right Column: Question Review */}
+            {/* Right: Question Detail */}
             <Col xs={24} lg={16}>
-              <Card className="weightless-card border-none h-full p-2 lg:p-6">
-                {selectedQuestion ? (
-                  <div className="animate-fade-in">
-                    <div className="flex items-center justify-between border-b border-on-surface/5 pb-6 mb-6">
-                      <Space align="center" size="middle">
-                        <Tag className="rounded-full px-4 py-1 text-sm font-black border-none bg-surface-low text-on-surface">
-                          Soal #{selectedQuestion}
-                        </Tag>
-                        {answerMap[selectedQuestion - 1]?.status === 'correct' ? (
-                          <Tag color="success" className="rounded-full border-none px-3 font-bold flex items-center gap-1">
-                            <CheckCircleFilled /> Benar
-                          </Tag>
-                        ) : (
-                          <Tag color="error" className="rounded-full border-none px-3 font-bold flex items-center gap-1">
-                            <CloseCircleFilled /> Salah
-                          </Tag>
+              <Card className="weightless-card border-none h-full p-4 lg:p-8">
+                <div className="animate-fade-in flex flex-col h-full">
+                  
+                  {/* General Header for the Question Group */}
+                  <div className="flex items-center justify-between border-b border-on-surface/5 pb-6 mb-6">
+                    <Space align="center" size="middle">
+                      <Tag className="rounded-full px-4 py-1 text-sm font-black border-none bg-surface-low text-on-surface">
+                        Bagian #{selectedIndex + 1}
+                      </Tag>
+                      {currentGroup.type === 'nested' && (
+                        <Tag color="blue" className="rounded-full border-none font-bold px-3">Skenario</Tag>
+                      )}
+                      {currentGroup.type === 'multiple' && (
+                        <Tag color="blue" className="rounded-full border-none font-bold px-3">Pilih lebih dari satu</Tag>
+                      )}
+                    </Space>
+                  </div>
+
+                  {/* Scenario Text (if nested) */}
+                  {currentGroup.type === 'nested' && (
+                      <div className="bg-surface-lowest rounded-[2rem] p-6 lg:p-8 shadow-sm border border-surface-container mb-8">
+                        {currentGroup.title && (
+                          <Tag color="blue" className="mb-4 rounded-full border-none font-bold px-3">{currentGroup.title}</Tag>
                         )}
-                      </Space>
-                      
-                      <Button type="text" className="text-primary font-bold">Laporkan Soal</Button>
-                    </div>
-
-                    <div className="space-y-8">
-                      {/* Question Text */}
-                      <div>
-                        <Paragraph className="text-lg leading-relaxed text-on-surface">
-                          {currentQuestionData.text}
-                        </Paragraph>
+                        <Title level={4} className="!font-manrope !font-black !text-xl mt-0">Skenario Kasus</Title>
+                        <div
+                          className="prose prose-lg prose-p:text-on-surface/90 prose-p:leading-loose max-w-none text-on-surface font-medium"
+                          dangerouslySetInnerHTML={{ __html: renderLatex(currentGroup.question_text) }}
+                        />
                       </div>
+                  )}
 
-                      {/* Options Review */}
-                      <div className="space-y-3">
-                        <Text className="text-xs font-bold uppercase tracking-widest text-on-surface/40">Pilihan Jawaban</Text>
-                        {currentQuestionData.options.map((opt, idx) => {
-                          const isCorrectOption = opt === currentQuestionData.correctAnswer;
-                          const isUserOption = opt === currentQuestionData.userAnswer;
-                          
-                          let containerClass = "border border-on-surface/10 bg-white text-on-surface/80";
-                          let icon = null;
+                  <div className="space-y-12">
+                    {/* Render each sub-question (or the single question) */}
+                    {currentGroup.answers.map((current, ansIdx) => (
+                      <div key={current.id} className="relative">
+                        
+                        {/* Sub-question Header (Points and Status) */}
+                        <div className="flex flex-wrap items-center gap-3 mb-4">
+                          {currentGroup.type === 'nested' && (
+                            <Tag className="rounded-full px-4 py-1 text-sm font-black border-none bg-surface-low text-on-surface">
+                              Soal #{ansIdx + 1}
+                            </Tag>
+                          )}
+                          {current.selected_options.length === 0 ? (
+                            <Tag className="rounded-full border-none px-3 font-bold text-gray-500 bg-gray-100">Tidak Dijawab</Tag>
+                          ) : current.is_correct ? (
+                            <Tag color="success" className="rounded-full border-none px-3 font-bold flex items-center gap-1">
+                              <CheckCircleFilled /> Benar
+                            </Tag>
+                          ) : (
+                            <Tag color="error" className="rounded-full border-none px-3 font-bold flex items-center gap-1">
+                              <CloseCircleFilled /> Salah
+                            </Tag>
+                          )}
+                          <Tag className="rounded-full border border-surface-container bg-white px-3 font-bold text-on-surface/60">
+                            {current.points_earned % 1 === 0 ? current.points_earned : current.points_earned.toFixed(2)} / {current.max_points} poin
+                          </Tag>
+                        </div>
 
-                          if (isCorrectOption) {
-                            containerClass = "border-green-500 bg-green-50/50 text-green-700 ring-1 ring-green-500";
-                            icon = <CheckCircleFilled className="text-green-500 text-lg" />;
-                          } else if (isUserOption && !isCorrectOption) {
-                            containerClass = "border-red-500 bg-red-50/50 text-red-700 ring-1 ring-red-500";
-                            icon = <CloseCircleFilled className="text-red-500 text-lg" />;
-                          }
+                        {/* Question Text */}
+                        <div className="bg-white rounded-3xl p-6 shadow-sm border border-surface-container mb-4">
+                          <Paragraph className="text-base leading-relaxed text-on-surface m-0">
+                            <span dangerouslySetInnerHTML={{ __html: renderLatex(current.question_text) }} />
+                          </Paragraph>
+                        </div>
 
-                          const label = String.fromCharCode(65 + idx); // A, B, C...
-
-                          return (
-                            <div key={idx} className={`p-4 rounded-2xl flex items-center justify-between transition-all ${containerClass}`}>
-                              <div className="flex items-center gap-4">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-black/5`}>
-                                  {label}
-                                </div>
-                                <Text className="font-semibold">{opt}</Text>
-                              </div>
-                              {icon}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Detailed Explanation */}
-                      <div className="bg-blue-50/50 border border-blue-100 rounded-[2rem] p-6 lg:p-8 relative mt-12">
-                        <div className="flex gap-4">
-                          <div className="shrink-0">
-                            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-500 text-xl">
-                              <BulbOutlined />
-                            </div>
-                          </div>
-                          <div className="w-full">
-                            <Title level={4} className="!text-blue-900 !font-black !font-manrope !mb-4 mt-1 tracking-tight">
-                              Pembahasan Mendalam
-                            </Title>
-                            
-                            <div className="border-l-4 border-blue-300 pl-4 mb-6">
-                              <Text className="text-blue-900/80 italic leading-relaxed text-sm block">
-                                "Kunci utama dari soal ini adalah ketelitian dalam menggunakan rumus dan memasukkan nilai ke dalam fungsi trigonometri dasar."
+                        {/* Kamu Memilih */}
+                        <div className="flex items-start gap-2 mb-5 px-1">
+                          <Text className="text-xs font-bold text-on-surface/40 uppercase tracking-wider shrink-0 mt-1">Kamu memilih:</Text>
+                          {current.selected_options.length > 0 ? (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {current.selected_options.sort((a, b) => a - b).map(optIdx => {
+                                const optLabel = String.fromCharCode(65 + optIdx);
+                                const isThisCorrect = (current.correct_answers || []).includes(optIdx);
+                                return (
+                                  <span
+                                    key={optIdx}
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-black ${
+                                      isThisCorrect ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                                    }`}
+                                  >
+                                    {optLabel} {isThisCorrect ? '✓' : '✗'}
+                                  </span>
+                                );
+                              })}
+                              <Text className={`text-sm font-bold ${current.is_correct ? 'text-green-600' : 'text-red-500'}`}>
+                                {current.is_correct ? '— Benar!' : '— Salah'}
                               </Text>
                             </div>
+                          ) : (
+                            <Text className="text-sm font-bold text-gray-400 italic">— Tidak dijawab</Text>
+                          )}
+                        </div>
 
-                            <Paragraph className="text-blue-900/80 leading-loose mb-8 text-base font-medium">
-                              {currentQuestionData.explanation}
-                            </Paragraph>
-                            
-                            {/* Related Material Banner */}
-                            <div className="bg-white rounded-2xl p-4 border border-blue-100 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow cursor-default">
-                              <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center text-orange-500 shrink-0">
-                                  <BookOutlined className="text-lg" />
+                        {/* Options */}
+                        <div className="space-y-3">
+                          <Text className="text-xs font-bold uppercase tracking-widest text-on-surface/40 pl-2">Pilihan Jawaban</Text>
+                          {current.options
+                            .map((opt, idx) => ({ opt, idx }))
+                            .filter(({ opt, idx }) => {
+                              // Never hide the correct answer even if the text is empty
+                              const isCorrect = (current.correct_answers || []).includes(idx);
+                              return isCorrect || (opt && opt.trim() !== '');
+                            })
+                            .map(({ opt, idx }) => {
+                              const isCorrect = (current.correct_answers || []).includes(idx);
+                              const isUserPick = (current.selected_options || []).includes(idx);
+                              const label = String.fromCharCode(65 + idx);
+
+                              let wrapCls = 'border border-surface-container bg-white';
+                              let labelCls = 'bg-surface-low text-on-surface/60';
+                              let textCls = 'text-on-surface/80';
+                              let icon = null;
+
+                              if (isCorrect && isUserPick) {
+                                // User picked correctly → full green
+                                wrapCls = 'border-green-500 bg-green-50 ring-1 ring-green-500 shadow-sm';
+                                labelCls = 'bg-green-500 text-white';
+                                textCls = 'text-green-800 font-semibold';
+                                icon = <CheckCircleFilled className="text-green-500 text-xl shrink-0" />;
+                              } else if (isCorrect) {
+                                // Correct but not picked → show green to reveal answer
+                                wrapCls = 'border-green-400 bg-green-50/60 ring-1 ring-green-400';
+                                labelCls = 'bg-green-400 text-white';
+                                textCls = 'text-green-800 font-semibold';
+                                icon = <CheckCircleFilled className="text-green-400 text-xl shrink-0" />;
+                              } else if (isUserPick && !isCorrect) {
+                                // User picked wrong → red
+                                wrapCls = 'border-red-500 bg-red-50/60 ring-1 ring-red-500 shadow-sm';
+                                labelCls = 'bg-red-500 text-white';
+                                textCls = 'text-red-800';
+                                icon = <CloseCircleFilled className="text-red-500 text-xl shrink-0" />;
+                              }
+
+                              return (
+                                <div key={idx} className={`p-4 lg:p-5 rounded-2xl flex items-center justify-between transition-all ${wrapCls}`}>
+                                  <div className="flex items-center gap-4">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-base shrink-0 transition-colors ${labelCls}`}>
+                                      {label}
+                                    </div>
+                                    {opt && opt.trim() !== '' ? (
+                                      <span
+                                        className={`text-base font-medium leading-relaxed ${textCls}`}
+                                        dangerouslySetInnerHTML={{ __html: renderLatex(opt) }}
+                                      />
+                                    ) : (
+                                      <span className={`text-base font-medium italic opacity-60 ${textCls}`}>
+                                        (Data opsi tidak tersedia)
+                                      </span>
+                                    )}
+                                  </div>
+                                  {icon}
                                 </div>
-                                <div>
-                                  <Text className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest block mb-0.5">Materi Terkait</Text>
-                                  <Text className="font-bold text-on-surface">Konsep Trigonometri Dasar</Text>
+                              );
+                            })}
+                        </div>
+
+                        {/* Discussion */}
+                        {current.discussion && (
+                          <div className="bg-blue-50/50 border border-blue-100 rounded-3xl p-6 lg:p-8 mt-6">
+                            <div className="flex gap-4">
+                              <div className="shrink-0">
+                                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-500 text-xl">
+                                  <BulbOutlined />
                                 </div>
                               </div>
-                              <Button 
-                                type="primary" 
-                                ghost 
-                                shape="round" 
-                                className="font-bold border-blue-200 text-blue-600 hover:bg-blue-50 ml-4 shrink-0"
-                                onClick={() => navigate('/materi/1')}
-                              >
-                                Pelajari <RightOutlined />
-                              </Button>
+                              <div className="w-full">
+                                <Title level={5} className="!text-blue-900 !font-black !font-manrope !mb-3 mt-1">
+                                  Pembahasan
+                                </Title>
+                                <Paragraph className="text-blue-900/80 leading-loose text-base font-medium mb-0">
+                                  <span dangerouslySetInnerHTML={{ __html: renderLatex(current.discussion) }} />
+                                </Paragraph>
+                              </div>
                             </div>
                           </div>
-                        </div>
+                        )}
+                        
+                        {/* Divider between subquestions (if multiple) */}
+                        {currentGroup.answers.length > 1 && ansIdx < currentGroup.answers.length - 1 && (
+                          <Divider className="border-on-surface/10 my-10" />
+                        )}
                       </div>
-
-                      <Divider className="border-on-surface/10 mt-10 mb-8" />
-                      
-                      {/* Refined Navigation */}
-                      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
-                        <Button 
-                          size="large"
-                          type="text"
-                          icon={<LeftOutlined />}
-                          disabled={selectedQuestion === 1}
-                          onClick={() => setSelectedQuestion(prev => (prev ? prev - 1 : 1))}
-                          className="w-full sm:w-auto h-12 rounded-xl font-bold bg-surface-low hover:bg-surface-low/80 text-on-surface/80"
-                        >
-                          Soal Sebelumnya
-                        </Button>
-                        <Button 
-                          size="large"
-                          type="primary"
-                          className="w-full sm:w-auto h-12 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
-                          disabled={selectedQuestion === stats.total}
-                          onClick={() => setSelectedQuestion(prev => (prev ? prev + 1 : 1))}
-                        >
-                          Soal Selanjutnya <RightOutlined />
-                        </Button>
-                      </div>
-
-                    </div>
+                    ))}
                   </div>
-                ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-on-surface/40 space-y-4 py-20">
-                    <WarningOutlined className="text-4xl" />
-                    <Text>Pilih soal dari peta jawaban untuk melihat detail pembahasan.</Text>
+
+                  <Divider className="border-on-surface/10 mt-10 mb-8" />
+
+                  {/* Navigation Footer */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-auto">
+                    <Button
+                      size="large"
+                      type="text"
+                      icon={<LeftOutlined />}
+                      disabled={selectedIndex === 0}
+                      onClick={() => setSelectedIndex(prev => Math.max(0, prev - 1))}
+                      className="w-full sm:w-auto h-12 rounded-xl font-bold bg-surface-low hover:bg-surface-low/80 text-on-surface/80"
+                    >
+                      Bagian Sebelumnya
+                    </Button>
+                    <Button
+                      size="large"
+                      type="primary"
+                      className="w-full sm:w-auto h-12 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+                      disabled={selectedIndex === groupedQuestions.length - 1}
+                      onClick={() => setSelectedIndex(prev => Math.min(groupedQuestions.length - 1, prev + 1))}
+                    >
+                      Bagian Selanjutnya <RightOutlined />
+                    </Button>
                   </div>
-                )}
+
+                </div>
               </Card>
             </Col>
-
           </Row>
+
         </div>
       </div>
     </AppLayout>

@@ -1,19 +1,28 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AdminLayout from '../../layouts/AdminLayout';
 import KantanEditor from '../../components/atoms/KantanEditor';
 import {
+  deletePackageMaterial,
+  deletePackageVideo,
+  getPackageMaterials,
+  getPackageQuestions,
+  getPackageVideos,
+  savePackageMaterial,
+  savePackageQuestion,
+  savePackageQuestions,
+  savePackageVideo,
+} from '../../services/packageService';
+import {
   Tabs, Card, Form, Input, Button, Upload, Typography, Tag,
-  Space, Divider, Modal, message, Switch, Tooltip, Row, Col,
+  Space, Divider, Modal, message, Switch, Row, Col,
   Radio, Checkbox, Select, Badge, Empty, InputNumber,
 } from 'antd';
 import {
   ArrowLeftOutlined, ExperimentOutlined, FileSearchOutlined,
-  VideoCameraOutlined, PlusOutlined, DeleteOutlined, CheckCircleOutlined,
-  FunctionOutlined, FilePdfOutlined, SaveOutlined, EyeOutlined,
-  OrderedListOutlined, UnorderedListOutlined, PictureOutlined,
-  CodeOutlined, AlignCenterOutlined, BookOutlined, FileTextOutlined,
-  CopyOutlined, MoreOutlined, ExclamationCircleOutlined,
+  VideoCameraOutlined, PlusOutlined, DeleteOutlined,
+  FilePdfOutlined, SaveOutlined, EyeOutlined,
+  CopyOutlined,
 } from '@ant-design/icons';
 import type { UploadFile } from 'antd';
 
@@ -21,9 +30,11 @@ const { Title, Text } = Typography;
 
 // ─── TYPES ──────────────────────────────────────────────────
 type QuestionType = 'single' | 'multiple' | 'nested';
+type ScoringMethod = 'all_or_nothing' | 'partial';
 
 interface SubQuestion {
   id: string;
+  type?: QuestionType;
   question: string;
   discussion: string;
   options: string[];
@@ -41,6 +52,7 @@ interface Question {
   correct: number | number[];
   discussionRefs: string[];
   points: number;
+  scoringMethod: ScoringMethod;
   subQuestions?: SubQuestion[];
 }
 
@@ -49,6 +61,16 @@ interface Material {
   title: string;
   category: string;
   content: string;
+  attachments?: string[];
+}
+
+interface VideoMaterial {
+  id: string;
+  title: string;
+  duration: string;
+  url: string;
+  description: string;
+  media_type?: string;
 }
 
 // ─── HELPERS ───────────────────
@@ -74,6 +96,23 @@ const renderContent = (raw: string): string =>
     .replace(/`(.+?)`/g, '<code class="bg-surface-low dark:bg-zinc-800 px-1.5 py-0.5 rounded text-sm font-mono text-primary">$1</code>')
     .replace(/\n{2,}/g, '</p><p class="mb-4 leading-loose">');
 
+const stripHtml = (value: string): string =>
+  value.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+
+const hasPreviewContent = (value?: string): boolean => Boolean(value && stripHtml(value).length > 0);
+
+const getCorrectIndexes = (correct: number | number[] | undefined): number[] => {
+  if (Array.isArray(correct)) return correct.map(Number).filter(Number.isFinite);
+  if (typeof correct === 'number' && Number.isFinite(correct)) return [correct];
+  return [];
+};
+
+const normalizeCorrectForType = (type: QuestionType, correct: number | number[] | undefined): number | number[] => {
+  const indexes = getCorrectIndexes(correct);
+  if (type === 'multiple') return indexes;
+  return indexes[0] ?? 0;
+};
+
 // ─── MAIN COMPONENT ──────────────────────────────────────────
 const AdminPackageSettings: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -82,10 +121,92 @@ const AdminPackageSettings: React.FC = () => {
 
   // ── STATE: Questions ──
   const [questions, setQuestions] = useState<Question[]>([
-    { id: '1', type: 'single', title: '', question: 'Contoh pertanyaan pertama...', discussion: '', options: ['', '', '', '', ''], correct: 0, discussionRefs: [], points: 1 },
+    { id: '1', type: 'single', title: '', question: 'Contoh pertanyaan pertama...', discussion: '', options: ['', '', '', '', ''], correct: 0, discussionRefs: [], points: 1, scoringMethod: 'all_or_nothing' },
   ]);
   const [activeQIndex, setActiveQIndex] = useState(0);
   const activeQ = questions[activeQIndex];
+
+  const getScenarioPoints = (question: Question) =>
+    (question.subQuestions || []).reduce((sum, sub) => sum + (Number(sub.points) || 0), 0);
+
+  const getEffectivePoints = (question: Question) =>
+    question.type === 'nested' ? getScenarioPoints(question) : question.points;
+
+  const serializeQuestion = (question: Question) => ({
+    id: question.id,
+    type: question.type,
+    title: question.title,
+    question: question.question,
+    discussion: question.discussion,
+    options: question.options,
+    correct: normalizeCorrectForType(question.type, question.correct),
+    discussion_refs: question.discussionRefs,
+    points: getEffectivePoints(question),
+    scoring_method: question.type === 'multiple' ? question.scoringMethod : 'all_or_nothing' as ScoringMethod,
+    sub_questions: (question.subQuestions || []).map(sub => ({
+      id: sub.id,
+      type: sub.type || 'single' as QuestionType,
+      question: sub.question,
+      discussion: sub.discussion,
+      options: sub.options,
+      correct: normalizeCorrectForType(sub.type || 'single', sub.correct),
+      points: sub.points,
+    })),
+  });
+
+  const deserializeQuestion = (question: any): Question => ({
+    id: question.id,
+    type: question.type,
+    title: question.title,
+    question: question.question,
+    discussion: question.discussion,
+    options: question.options,
+    correct: normalizeCorrectForType(question.type, question.correct),
+    discussionRefs: question.discussion_refs,
+    points: question.points,
+    scoringMethod: question.scoring_method || 'all_or_nothing',
+    subQuestions: (question.sub_questions || []).map((sub: any) => ({
+      ...sub,
+      type: sub.type || 'single',
+      correct: normalizeCorrectForType(sub.type || 'single', sub.correct),
+    })),
+  });
+
+  useEffect(() => {
+    if (!id) return;
+    getPackageQuestions(id)
+      .then(data => {
+        if (data.length > 0) {
+          setQuestions(data.map(deserializeQuestion));
+          setActiveQIndex(0);
+        }
+      })
+      .catch(() => {
+        message.warning('Belum bisa mengambil data soal dari backend. Editor memakai data lokal sementara.');
+      });
+
+    getPackageMaterials(id)
+      .then(data => {
+        if (data.length > 0) {
+          setMaterials(data);
+          setActiveMIndex(0);
+        }
+      })
+      .catch(() => {
+        message.warning('Belum bisa mengambil data materi dari backend. Editor memakai data lokal sementara.');
+      });
+
+    getPackageVideos(id)
+      .then(data => {
+        if (data.length > 0) {
+          setVideos(data);
+          setActiveVIndex(0);
+        }
+      })
+      .catch(() => {
+        message.warning('Belum bisa mengambil data video dari backend. Editor memakai data lokal sementara.');
+      });
+  }, [id]);
 
   // ── STATE: Materials ──
   // const [materials] = useState<Material[]>([
@@ -106,6 +227,7 @@ const AdminPackageSettings: React.FC = () => {
       correct: 0,
       discussionRefs: [],
       points: 1,
+      scoringMethod: 'all_or_nothing',
     };
     setQuestions([...questions, newQ]);
     setActiveQIndex(questions.length);
@@ -116,19 +238,63 @@ const AdminPackageSettings: React.FC = () => {
   };
 
   const addSubQuestion = () => {
-    const sub: SubQuestion = { id: Date.now().toString(), question: '', discussion: '', options: ['', '', '', '', ''], correct: 0, points: 1 };
+    const sub: SubQuestion = { id: Date.now().toString(), type: 'single', question: '', discussion: '', options: ['', '', '', '', ''], correct: 0, points: 1 };
     updateActiveQ({ subQuestions: [...(activeQ.subQuestions || []), sub] });
   };
 
-  const updateOption = (qId: string, optIndex: number, val: string) => {
-    updateActiveQ({ options: activeQ.options.map((o, i) => i === optIndex ? val : o) });
+  const saveActiveQuestion = async () => {
+    if (!id) return;
+    try {
+      const saved = await savePackageQuestion(id, serializeQuestion(activeQ));
+      updateActiveQ(deserializeQuestion(saved));
+      message.success(`Soal #${activeQIndex + 1} berhasil disimpan!`);
+    } catch {
+      message.error('Gagal menyimpan soal ke backend.');
+    }
+  };
+
+  const saveAllQuestions = async () => {
+    if (!id) return;
+    try {
+      const saved = await savePackageQuestions(id, questions.map(serializeQuestion));
+      setQuestions(saved.map(deserializeQuestion));
+      message.success('Semua soal berhasil disimpan ke backend.');
+    } catch {
+      message.error('Gagal menyimpan semua soal ke backend.');
+    }
+  };
+
+  const confirmRemoveQuestion = () => {
+    if (questions.length === 1) return;
+    Modal.confirm({
+      title: `Hapus Soal ${activeQIndex + 1}?`,
+      content: 'Yakin ingin menghapus soal ini? Perubahan akan tersimpan setelah kamu klik Simpan Semua.',
+      okText: 'Ya, hapus',
+      cancelText: 'Batal',
+      okButtonProps: { danger: true },
+      onOk: () => {
+        const next = questions.filter((_, i) => i !== activeQIndex);
+        setQuestions(next);
+        setActiveQIndex(Math.max(0, activeQIndex - 1));
+      },
+    });
+  };
+
+  const updateOption = (optIndex: number, val: string) => {
+    setQuestions(prev => prev.map((q, i) => {
+      if (i !== activeQIndex) return q;
+      return {
+        ...q,
+        options: q.options.map((option, optionIndex) => optionIndex === optIndex ? val : option),
+      };
+    }));
   };
 
   const toggleCorrect = (index: number) => {
     if (activeQ.type === 'single') {
       updateActiveQ({ correct: index });
     } else if (activeQ.type === 'multiple') {
-      const current = (activeQ.correct as number[]) || [];
+      const current = getCorrectIndexes(activeQ.correct);
       const next = current.includes(index) ? current.filter(i => i !== index) : [...current, index];
       updateActiveQ({ correct: next });
     }
@@ -158,39 +324,99 @@ const AdminPackageSettings: React.FC = () => {
     setMaterials(prev => prev.map((m, i) => i === activeMIndex ? { ...m, ...changes } : m));
   };
 
-  const removeMaterial = (index: number) => {
+  const saveActiveMaterial = async () => {
+    if (!id || !activeM) return;
+    try {
+      const saved = await savePackageMaterial(id, activeM);
+      setMaterials(prev => prev.map((m, i) => i === activeMIndex ? saved : m));
+      message.success('Materi pembahasan berhasil disimpan!');
+    } catch {
+      message.error('Gagal menyimpan materi ke backend.');
+    }
+  };
+
+  const removeMaterial = async (index: number) => {
+    const material = materials[index];
     const next = materials.filter((_, i) => i !== index);
     setMaterials(next);
     setActiveMIndex(Math.max(0, index - 1));
+    if (!id || !material) return;
+    try {
+      await deletePackageMaterial(id, material.id);
+    } catch {
+      message.error('Gagal menghapus materi dari backend.');
+    }
+  };
+
+  const confirmRemoveMaterial = (index: number) => {
+    const material = materials[index];
+    Modal.confirm({
+      title: 'Hapus Materi?',
+      content: `Yakin ingin menghapus "${material?.title || 'Materi ini'}"?`,
+      okText: 'Ya, hapus',
+      cancelText: 'Batal',
+      okButtonProps: { danger: true },
+      onOk: () => removeMaterial(index),
+    });
   };
 
   // ── TAB 3: Video State ──
-  const [videos, setVideos] = useState<{ id: number, title: string, duration: string, url: string, description: string }[]>([
-    { id: 1, title: 'Video Pengenalan', duration: '05:00', url: '', description: 'Tulis deskripsi video di sini...' }
+  const [videos, setVideos] = useState<VideoMaterial[]>([
+    { id: '1', title: 'Video Pengenalan', duration: '05:00', url: '', description: 'Tulis deskripsi video di sini...', media_type: 'video' }
   ]);
   const [activeVIndex, setActiveVIndex] = useState(0);
   const activeV = videos[activeVIndex];
   const addVideo = () => {
-    const newV = { id: Date.now(), title: 'Video Baru', duration: '', url: '', description: '' };
+    const newV = { id: Date.now().toString(), title: 'Video Baru', duration: '', url: '', description: '', media_type: 'video' };
     setVideos([...videos, newV]);
     setActiveVIndex(videos.length);
   };
   const updateActiveV = (changes: any) => {
     setVideos(prev => prev.map((v, i) => i === activeVIndex ? { ...v, ...changes } : v));
   };
-  const removeVideo = (index: number) => {
+  const saveActiveVideo = async () => {
+    if (!id || !activeV) return;
+    try {
+      const saved = await savePackageVideo(id, activeV);
+      setVideos(prev => prev.map((v, i) => i === activeVIndex ? saved : v));
+      message.success('Video berhasil diperbarui!');
+    } catch {
+      message.error('Gagal menyimpan video ke backend.');
+    }
+  };
+
+  const removeVideo = async (index: number) => {
+    const video = videos[index];
     const next = videos.filter((_, i) => i !== index);
     setVideos(next);
     setActiveVIndex(Math.max(0, index - 1));
+    if (!id || !video) return;
+    try {
+      await deletePackageVideo(id, video.id);
+    } catch {
+      message.error('Gagal menghapus video dari backend.');
+    }
+  };
+
+  const confirmRemoveVideo = (index: number) => {
+    const video = videos[index];
+    Modal.confirm({
+      title: 'Hapus Video?',
+      content: `Yakin ingin menghapus "${video?.title || 'Video ini'}"?`,
+      okText: 'Ya, hapus',
+      cancelText: 'Batal',
+      okButtonProps: { danger: true },
+      onOk: () => removeVideo(index),
+    });
   };
 
   // ── COMPONENT: Sub-Question Editor ──
   const SubQuestionEditor: React.FC<{ sub: SubQuestion, index: number }> = ({ sub, index }) => (
-    <div className="p-6 bg-white dark:bg-zinc-800/80 rounded-[2rem] border border-on-surface/5 mb-6 relative group shadow-sm">
+    <div className="p-5 bg-white dark:bg-zinc-800/80 rounded-xl border border-on-surface/5 mb-6 relative group shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <Tag className="rounded-xl bg-primary text-white border-none font-black px-4 py-1">Pertanyaan {index + 1}</Tag>
-          <div className="flex items-center gap-2 px-3 py-1 bg-on-surface/5 rounded-xl border border-on-surface/10">
+          <Tag className="rounded-lg bg-primary text-white border-none font-black px-4 py-1">Pertanyaan {index + 1}</Tag>
+          <div className="flex items-center gap-2 px-3 py-1 bg-on-surface/5 rounded-lg border border-on-surface/10">
             <Text className="text-[10px] font-black uppercase text-on-surface/40">Poin</Text>
             <InputNumber
               size="small"
@@ -204,7 +430,6 @@ const AdminPackageSettings: React.FC = () => {
               controls={false}
             />
           </div>
-          <Text className="text-[10px] font-black uppercase text-on-surface/30 tracking-widest">Sub-Question Editor</Text>
         </div>
         <Button danger type="text" icon={<DeleteOutlined />} size="small" className="hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => {
           updateActiveQ({ subQuestions: activeQ.subQuestions?.filter(s => s.id !== sub.id) });
@@ -223,7 +448,7 @@ const AdminPackageSettings: React.FC = () => {
           label={`Pertanyaan #${index + 1}`}
         />
         {sub.question && (
-          <div className="mt-3 p-3 rounded-xl bg-surface-low/20 dark:bg-zinc-900/30 border border-dashed border-on-surface/10">
+            <div className="mt-3 p-3 rounded-lg bg-surface-low/20 dark:bg-zinc-900/30 border border-dashed border-on-surface/10">
             <div className="prose prose-xs dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: renderContent(sub.question) }} />
           </div>
         )}
@@ -242,7 +467,7 @@ const AdminPackageSettings: React.FC = () => {
           label={`Pembahasan #${index + 1}`}
         />
         {sub.discussion && (
-          <div className="mt-3 p-3 rounded-xl bg-green-500/5 dark:bg-green-900/10 border border-dashed border-green-500/20">
+            <div className="mt-3 p-3 rounded-lg bg-green-500/5 dark:bg-green-900/10 border border-dashed border-green-500/20">
             <div className="prose prose-xs dark:prose-invert max-w-none text-green-700 dark:text-green-300" dangerouslySetInnerHTML={{ __html: renderContent(sub.discussion) }} />
           </div>
         )}
@@ -251,37 +476,31 @@ const AdminPackageSettings: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {sub.options.map((opt, oi) => (
           <div key={oi} className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-start gap-2">
               <div
                 onClick={() => {
                   const next = activeQ.subQuestions?.map(s => s.id === sub.id ? { ...s, correct: oi } : s);
                   updateActiveQ({ subQuestions: next });
                 }}
-                className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs cursor-pointer border-2 shadow-sm transition-all
+                className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs cursor-pointer border-2 shadow-sm transition-all shrink-0 mt-1
                   ${sub.correct === oi ? 'bg-green-500 border-green-500 text-white' : 'bg-white dark:bg-zinc-700 border-on-surface/10 text-on-surface/40'}`}
               >
                 {String.fromCharCode(65 + oi)}
               </div>
-              <Input
+              <KantanEditor
                 value={opt}
-                onChange={e => {
+                onChange={val => {
                   const next = activeQ.subQuestions?.map(s => s.id === sub.id ? {
-                    ...s, options: s.options.map((o, idx) => idx === oi ? e.target.value : o)
+                    ...s, options: s.options.map((o, idx) => idx === oi ? val : o)
                   } : s);
                   updateActiveQ({ subQuestions: next });
                 }}
-                placeholder={`Opsi ${String.fromCharCode(65 + oi)} (Bisa gunakan $ rumus $)`}
-                className="rounded-xl h-10 text-sm font-bold"
-                suffix={
-                  <Tooltip title="Klik untuk bantuan rumus">
-                    <FunctionOutlined className="text-on-surface/20 cursor-pointer hover:text-primary transition-colors" onClick={() => {
-                      message.info('Ketik rumus di antara tanda $ (contoh: $x^2$)');
-                    }} />
-                  </Tooltip>
-                }
+                placeholder={`Opsi ${String.fromCharCode(65 + oi)}`}
+                rows={2}
+                className="flex-1"
               />
             </div>
-            {opt.includes('$') && (
+            {(opt.includes('$') || opt.includes('<')) && (
               <div className="ml-10 px-3 py-1 bg-primary/5 rounded-lg border-l-2 border-primary/20 text-[11px] prose-tight" dangerouslySetInnerHTML={{ __html: renderContent(opt) }} />
             )}
           </div>
@@ -327,12 +546,7 @@ const AdminPackageSettings: React.FC = () => {
                     <Tag className="rounded-lg border-none bg-primary/10 text-primary font-bold capitalize m-0">{activeQ.type}</Tag>
                   </div>
                   <Button danger ghost block icon={<DeleteOutlined />} size="small" className="rounded-lg font-bold h-9"
-                    onClick={() => {
-                      if (questions.length === 1) return;
-                      const next = questions.filter((_, i) => i !== activeQIndex);
-                      setQuestions(next);
-                      setActiveQIndex(Math.max(0, activeQIndex - 1));
-                    }}>
+                    onClick={confirmRemoveQuestion}>
                     Hapus Soal {activeQIndex + 1}
                   </Button>
                 </div>
@@ -347,11 +561,13 @@ const AdminPackageSettings: React.FC = () => {
                     <Select
                       className="w-full rounded-xl"
                       style={{ height: 44 }}
-                      value={activeQ.type}
-                      onChange={val => updateActiveQ({
-                        type: val as QuestionType,
-                        correct: val === 'multiple' ? [] : 0,
-                        subQuestions: val === 'nested' ? [{ id: '1', question: '', discussion: '', options: ['', '', '', '', ''], correct: 0, points: 1 }] : undefined
+                        value={activeQ.type}
+                        onChange={val => updateActiveQ({
+                          type: val as QuestionType,
+                        correct: val === 'multiple' ? getCorrectIndexes(activeQ.correct) : normalizeCorrectForType(val as QuestionType, activeQ.correct),
+                        points: val === 'nested' ? getScenarioPoints(activeQ) : activeQ.points || 1,
+                        scoringMethod: val === 'multiple' ? activeQ.scoringMethod : 'all_or_nothing',
+                        subQuestions: val === 'nested' ? [{ id: '1', type: 'single', question: '', discussion: '', options: ['', '', '', '', ''], correct: 0, points: 1 }] : undefined
                       })}
                       options={[
                         { value: 'single', label: 'Single Choice' },
@@ -365,11 +581,28 @@ const AdminPackageSettings: React.FC = () => {
                     <InputNumber
                       className="w-full rounded-xl font-bold"
                       style={{ height: 44, display: 'flex', alignItems: 'center' }}
-                      value={activeQ.points}
+                      value={getEffectivePoints(activeQ)}
                       min={0}
+                      disabled={activeQ.type === 'nested'}
                       onChange={val => updateActiveQ({ points: Number(val) || 0 })}
+                      addonAfter={activeQ.type === 'nested' ? 'auto' : undefined}
                       placeholder="1"
                     />
+                    {activeQ.type === 'nested' && (
+                      <Text className="text-[10px] text-on-surface/40 font-bold mt-1 block">
+                        Total otomatis: {getScenarioPoints(activeQ)} poin dari sub-soal.
+                      </Text>
+                    )}
+                    {activeQ.type === 'multiple' && (
+                      <div className="mt-3 flex items-center justify-between rounded-xl bg-surface-low/50 dark:bg-zinc-800 px-3 py-2">
+                        <Text className="text-[10px] font-black uppercase text-on-surface/50">Gunakan Poin Parsial</Text>
+                        <Switch
+                          size="small"
+                          checked={activeQ.scoringMethod === 'partial'}
+                          onChange={checked => updateActiveQ({ scoringMethod: checked ? 'partial' : 'all_or_nothing' })}
+                        />
+                      </div>
+                    )}
                   </Col>
                   <Col span={8}>
                     <Text className="text-xs font-black uppercase tracking-widest text-on-surface/40 block mb-2">Referensi Pembahasan</Text>
@@ -414,12 +647,14 @@ const AdminPackageSettings: React.FC = () => {
                     rows={4}
                     label="Discussion Editor"
                   />
-                  {activeQ.discussion && (
-                    <div className="mt-4 p-4 rounded-2xl bg-green-500/5 dark:bg-green-900/10 border border-green-500/20">
-                      <Text className="text-[10px] font-black uppercase text-green-600/50 block mb-2">Live Preview Pembahasan</Text>
+                  <div className="mt-4 p-4 rounded-2xl bg-green-500/5 dark:bg-green-900/10 border border-green-500/20 min-h-[88px]">
+                    <Text className="text-[10px] font-black uppercase text-green-600/50 block mb-2">Preview Pembahasan</Text>
+                    {hasPreviewContent(activeQ.discussion) ? (
                       <div className="prose prose-sm dark:prose-invert max-w-none text-green-700 dark:text-green-300" dangerouslySetInnerHTML={{ __html: renderContent(activeQ.discussion) }} />
-                    </div>
-                  )}
+                    ) : (
+                      <Text className="text-xs text-on-surface/40 font-bold">Preview pembahasan akan muncul di sini.</Text>
+                    )}
+                  </div>
                 </div>
 
                 {activeQ.type !== 'nested' ? (
@@ -427,44 +662,40 @@ const AdminPackageSettings: React.FC = () => {
                     <Text className="text-xs font-black uppercase tracking-widest text-on-surface/40 block mb-2">Opsi Jawaban & Kunci</Text>
                     <div className="grid grid-cols-1 gap-4">
                       {activeQ.options.map((opt, i) => (
-                        <div key={i} className="flex items-center gap-4 group">
+                        <div key={i} className="flex items-start gap-4 group">
                           {activeQ.type === 'single' ? (
                             <Radio
                               checked={activeQ.correct === i}
                               onChange={() => toggleCorrect(i)}
-                              className="scale-125"
+                              className="scale-125 mt-3"
                             />
                           ) : (
                             <Checkbox
-                              checked={(activeQ.correct as number[]).includes(i)}
+                              checked={getCorrectIndexes(activeQ.correct).includes(i)}
                               onChange={() => toggleCorrect(i)}
-                              className="scale-125"
+                              className="scale-125 mt-3"
                             />
                           )}
-                          <div className={`flex-1 flex flex-col p-1 rounded-2xl border-2 transition-all 
-                            ${(activeQ.type === 'single' ? activeQ.correct === i : (activeQ.correct as number[]).includes(i))
+                          <div className={`flex-1 flex flex-col p-1 rounded-lg border-2 transition-all 
+                            ${(activeQ.type === 'single' ? activeQ.correct === i : getCorrectIndexes(activeQ.correct).includes(i))
                               ? 'bg-green-50/50 dark:bg-green-900/10 border-green-500/50'
                               : 'bg-surface-low/50 dark:bg-zinc-800 border-transparent hover:border-on-surface/5'}`}>
-                            <div className="flex items-center gap-3">
-                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shrink-0 border-2
-                                 ${(activeQ.type === 'single' ? activeQ.correct === i : (activeQ.correct as number[]).includes(i))
+                            <div className="flex items-start gap-3">
+                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-black text-sm shrink-0 border-2 mt-1
+                                 ${(activeQ.type === 'single' ? activeQ.correct === i : getCorrectIndexes(activeQ.correct).includes(i))
                                   ? 'bg-green-500 border-green-500 text-white'
                                   : 'bg-white dark:bg-zinc-700 border-on-surface/10 text-on-surface/40'}`}>
                                 {String.fromCharCode(65 + i)}
                               </div>
-                              <Input
+                              <KantanEditor
                                 value={opt}
-                                onChange={e => updateOption(activeQ.id, i, e.target.value)}
-                                placeholder={`Pilihan ${String.fromCharCode(65 + i)} (Gunakan $ rumus $)`}
-                                className="border-none bg-transparent h-10 text-base font-bold shadow-none focus:ring-0 flex-1"
-                                suffix={
-                                  <Tooltip title="Gunakan $ rumus $ untuk matematika">
-                                    <FunctionOutlined className="text-on-surface/20" />
-                                  </Tooltip>
-                                }
+                                onChange={val => updateOption(i, val)}
+                                placeholder={`Pilihan ${String.fromCharCode(65 + i)}`}
+                                rows={2}
+                                className="flex-1"
                               />
                             </div>
-                            {opt.includes('$') && (
+                            {(opt.includes('$') || opt.includes('<')) && (
                               <div className="mx-4 mb-2 p-2 bg-white/40 dark:bg-black/20 rounded-lg border border-primary/5 text-sm prose-sm" dangerouslySetInnerHTML={{ __html: renderContent(opt) }} />
                             )}
                           </div>
@@ -494,7 +725,7 @@ const AdminPackageSettings: React.FC = () => {
                     <Button icon={<EyeOutlined />} className="rounded-xl font-bold h-11 px-6">Pratinjau</Button>
                   </Space>
                   <Button type="primary" icon={<SaveOutlined />} size="large" className="rounded-2xl h-12 px-10 font-black shadow-xl shadow-primary/20"
-                    onClick={() => message.success(`Soal #${activeQIndex + 1} berhasil disimpan!`)}>
+                    onClick={saveActiveQuestion}>
                     Simpan Soal {activeQIndex + 1}
                   </Button>
                 </div>
@@ -536,7 +767,7 @@ const AdminPackageSettings: React.FC = () => {
                         </Text>
                       </div>
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button danger type="text" size="small" icon={<DeleteOutlined className="text-[10px]" />} onClick={(e) => { e.stopPropagation(); removeMaterial(i); }} />
+                        <Button danger type="text" size="small" icon={<DeleteOutlined className="text-[10px]" />} onClick={(e) => { e.stopPropagation(); confirmRemoveMaterial(i); }} />
                       </div>
                     </div>
                   ))}
@@ -637,7 +868,7 @@ const AdminPackageSettings: React.FC = () => {
                     )}
                   </Card>
 
-                  <Button type="primary" block size="large" className="h-14 rounded-2xl font-black shadow-xl shadow-primary/20 mt-8" onClick={() => message.success('Materi pembahasan berhasil disimpan!')}>
+                  <Button type="primary" block size="large" className="h-14 rounded-2xl font-black shadow-xl shadow-primary/20 mt-8" onClick={saveActiveMaterial}>
                     Simpan Materi: {activeM.title}
                   </Button>
                 </div>
@@ -696,7 +927,7 @@ const AdminPackageSettings: React.FC = () => {
                         </Text>
                       </div>
                       <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button danger type="text" size="small" icon={<DeleteOutlined className="text-[10px]" />} onClick={(e) => { e.stopPropagation(); removeVideo(i); }} />
+                        <Button danger type="text" size="small" icon={<DeleteOutlined className="text-[10px]" />} onClick={(e) => { e.stopPropagation(); confirmRemoveVideo(i); }} />
                       </div>
                     </div>
                   ))}
@@ -771,7 +1002,7 @@ const AdminPackageSettings: React.FC = () => {
                     )}
                   </div>
 
-                  <Button type="primary" block size="large" className="h-14 rounded-2xl font-black shadow-xl shadow-primary/20 mt-4" onClick={() => message.success('Video berhasil diperbarui!')}>
+                  <Button type="primary" block size="large" className="h-14 rounded-2xl font-black shadow-xl shadow-primary/20 mt-4" onClick={saveActiveVideo}>
                     Simpan Perubahan Video
                   </Button>
                 </div>
@@ -812,9 +1043,14 @@ const AdminPackageSettings: React.FC = () => {
               <Title level={2} className="!m-0 !font-manrope !font-black !text-2xl dark:text-zinc-100">{packageName}</Title>
             </div>
             <div className="ml-auto">
-              <Badge dot status="processing" offset={[-2, 5]}>
-                <Tag color="blue" className="rounded-lg font-bold border-none px-3 py-0.5">Auto-save aktif</Tag>
-              </Badge>
+              <Space>
+                <Badge dot status="processing" offset={[-2, 5]}>
+                  <Tag color="blue" className="rounded-lg font-bold border-none px-3 py-0.5">Backend aktif</Tag>
+                </Badge>
+                <Button type="primary" icon={<SaveOutlined />} onClick={saveAllQuestions} className="rounded-xl font-bold">
+                  Simpan Semua
+                </Button>
+              </Space>
             </div>
           </div>
 

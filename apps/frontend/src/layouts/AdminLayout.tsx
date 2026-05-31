@@ -57,6 +57,7 @@ const menuItems = [
     items: [
       { path: '/admin/users', label: 'Pengguna', icon: <TeamOutlined /> },
       { path: '/admin/orders', label: 'Pesanan', icon: <ShoppingCartOutlined /> },
+      { path: '/admin/exam-history', label: 'Riwayat Ujian', icon: <FileTextOutlined /> },
     ],
   },
   {

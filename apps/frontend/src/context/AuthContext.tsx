@@ -6,7 +6,7 @@ export interface JwtPayload {
   nama: string;
   phone: string;
   email: string;
-  roleid: number;
+  roleid: number | string;
   deskripsi_role: string;
   exp: number;
 }
@@ -49,6 +49,12 @@ function decodeToken(token: string): JwtPayload | null {
   }
 }
 
+const normalizeRoleId = (roleId: number | string | undefined | null): number | null => {
+  if (roleId === undefined || roleId === null) return null;
+  const normalized = Number(roleId);
+  return Number.isFinite(normalized) ? normalized : null;
+};
+
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
   const [payload, setPayload] = useState<JwtPayload | null>(() => {
@@ -85,8 +91,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setPayload(null);
   };
 
-  const isAdmin = () => payload?.roleid === 1;
-  const isStudent = () => payload?.roleid === 2;
+  const roleId = normalizeRoleId(payload?.roleid);
+  const isAdmin = () => roleId === 1;
+  const isStudent = () => roleId === 2;
 
   // Derive user from payload for backward compatibility
   const user: AuthUser | null = payload ? {
@@ -101,7 +108,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       token,
       payload,
       user,
-      roleId: payload?.roleid ?? null,
+      roleId,
       login,
       logout,
       isAdmin,

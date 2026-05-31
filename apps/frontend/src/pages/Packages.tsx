@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import AppLayout from '../layouts/AppLayout';
 import PackageCard, { PackageProps } from '../components/molecules/PackageCard';
 import PackageFilters from '../components/organisms/PackageFilters';
@@ -14,105 +14,88 @@ import {
   Empty, 
   Breadcrumb,
   Space,
-  Card
+  Card,
+  Spin
 } from 'antd';
 import { SearchOutlined, AppstoreOutlined } from '@ant-design/icons';
+import { getPackages, PackageListItem } from '../services/packageService';
 
 const { Title, Text, Paragraph } = Typography;
 
-// Mock data for packages
-const mockPackages: PackageProps[] = [
-  {
-    id: '1',
-    slug: 'saintek-pro',
-    title: 'Intensive SNBT 2024 - Saintek Pro',
-    image: 'https://images.unsplash.com/photo-1434031211128-095490e7e7e9?auto=format&fit=crop&q=80&w=800',
-    price: 75000,
-    originalPrice: 150000,
-    rating: 5,
-    studentCount: 850,
-    duration: '30 Hari',
-    category: 'Intensive Bootcamp',
-    classes: ['Kelas 12', 'Alumni'],
-    subjects: ['Matematika IPA', 'Fisika', 'Kimia'],
-    isPopular: true
-  },
-  {
-    id: '2',
-    slug: 'soshum-mastery',
-    title: 'Soshum Mastery - Full Package',
-    image: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&q=80&w=800',
-    price: 75000,
-    originalPrice: 150000,
-    rating: 4.8,
-    studentCount: 920,
-    duration: '30 Hari',
-    category: 'Intensive Bootcamp',
-    classes: ['Kelas 12'],
-    subjects: ['Sejarah', 'Geografi', 'Sosiologi'],
-  },
-  {
-    id: '3',
-    slug: 'mock-tryout-akbar',
-    title: 'Mock Tryout Akbar - Sistem IRT',
-    image: 'https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?auto=format&fit=crop&q=80&w=800',
-    price: 25000,
-    originalPrice: 50000,
-    rating: 4.9,
-    studentCount: 1200,
-    duration: '7 Hari',
-    category: 'Mock Exams',
-    classes: ['Kelas 10', 'Kelas 11', 'Kelas 12', 'Alumni'],
-    subjects: ['TPS', 'Literasi'],
-  },
-  {
-    id: '4',
-    slug: 'literasi-inggris',
-    title: 'Katalog Literasi Bahasa Inggris',
-    image: 'https://images.unsplash.com/photo-1544652478-6653e09f18a2?auto=format&fit=crop&q=80&w=800',
-    price: 45000,
-    originalPrice: 90000,
-    rating: 4.7,
-    studentCount: 450,
-    duration: '14 Hari',
-    category: 'Subject Mastery',
-    classes: ['Kelas 11', 'Kelas 12'],
-    subjects: ['Bahasa Inggris'],
-  },
-  {
-    id: '5',
-    slug: 'kuantitatif-specialist',
-    title: 'Pengetahuan Kuantitatif Specialist',
-    image: 'https://images.unsplash.com/photo-1509228468518-180dd482180c?auto=format&fit=crop&q=80&w=800',
-    price: 45000,
-    originalPrice: 85000,
-    rating: 4.9,
-    studentCount: 680,
-    duration: '14 Hari',
-    category: 'Subject Mastery',
-    classes: ['Kelas 12'],
-    subjects: ['Pengetahuan Kuantitatif'],
-    isPopular: true
-  },
-  {
-    id: '6',
-    slug: 'ultimate-rush-pass',
-    title: 'Ultimate 1-Day Rush Pass',
-    image: 'https://images.unsplash.com/photo-1454165833767-027ffea7e78b?auto=format&fit=crop&q=80&w=800',
-    price: 15000,
-    originalPrice: 30000,
-    rating: 4.5,
-    studentCount: 2100,
-    duration: '1 Hari',
-    category: 'Mock Exams',
-    classes: ['Alumni'],
-    subjects: ['All Subjects'],
-  }
-];
+const fallbackImage = 'https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?auto=format&fit=crop&q=80&w=800';
+
+const toPackageCard = (pkg: PackageListItem): PackageProps => ({
+  id: pkg.slug,
+  slug: pkg.slug,
+  title: pkg.title,
+  image: pkg.thumbnail || fallbackImage,
+  price: pkg.price,
+  originalPrice: pkg.price > 0 ? pkg.price * 2 : 0,
+  rating: 5,
+  studentCount: 0,
+  duration: pkg.duration > 0 ? `${pkg.duration} Menit` : 'Tryout',
+  category: pkg.category || 'Tryout',
+  classes: pkg.classes,
+  subjects: pkg.subjects,
+  isPopular: pkg.questions_count > 0,
+});
 
 const PackagesPage: React.FC = () => {
+  const [packages, setPackages] = useState<PackageProps[]>([]);
+  const [loadingPackages, setLoadingPackages] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('popular');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 6;
+  const filteredPackages = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const searched = query
+      ? packages.filter((pkg) =>
+          [pkg.title, pkg.category, ...pkg.classes, ...pkg.subjects]
+            .join(' ')
+            .toLowerCase()
+            .includes(query)
+        )
+      : packages;
+
+    return [...searched].sort((a, b) => {
+      if (sortBy === 'price-low') return a.price - b.price;
+      if (sortBy === 'price-high') return b.price - a.price;
+      if (sortBy === 'newest') return b.slug.localeCompare(a.slug);
+      return Number(b.isPopular) - Number(a.isPopular);
+    });
+  }, [packages, searchQuery, sortBy]);
+
+  const visiblePackages = filteredPackages.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  useEffect(() => {
+    let mounted = true;
+
+    getPackages()
+      .then((data) => {
+        if (mounted) {
+          setPackages(data.filter((pkg) => pkg.status === 'published').map(toPackageCard));
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setPackages([]);
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setLoadingPackages(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, sortBy]);
 
   return (
     <AppLayout>
@@ -142,9 +125,12 @@ const PackagesPage: React.FC = () => {
                 placeholder="Cari paket tryout..." 
                 prefix={<SearchOutlined className="text-surface-on/30" />}
                 className="h-12 w-full sm:w-64 rounded-xl border-none shadow-sm"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
               />
               <Select
-                defaultValue="popular"
+                value={sortBy}
+                onChange={setSortBy}
                 className="h-12 w-full sm:w-48"
                 style={{ borderRadius: '12px' }}
                 options={[
@@ -167,31 +153,33 @@ const PackagesPage: React.FC = () => {
             {/* Main Content */}
             <Col xs={24} lg={18} className="order-1 lg:order-2">
               <div className="min-h-[600px]">
-                {mockPackages.length > 0 ? (
-                  <>
-                    <Row gutter={[24, 24]}>
-                      {mockPackages.map((pkg) => (
-                        <Col xs={24} sm={12} xl={8} key={pkg.id}>
-                          <PackageCard {...pkg} />
-                        </Col>
-                      ))}
-                    </Row>
-                    
-                    <div className="mt-16 flex justify-center">
-                      <Pagination 
-                        current={currentPage} 
-                        total={18} 
-                        pageSize={pageSize}
-                        onChange={(page) => setCurrentPage(page)}
-                        className="weightless-pagination"
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <Card className="border-none glass rounded-3xl py-20">
-                    <Empty description="Tidak ada paket yang ditemukan" />
-                  </Card>
-                )}
+                <Spin spinning={loadingPackages}>
+                  {visiblePackages.length > 0 ? (
+                    <>
+                      <Row gutter={[24, 24]}>
+                        {visiblePackages.map((pkg) => (
+                          <Col xs={24} sm={12} xl={8} key={pkg.id}>
+                            <PackageCard {...pkg} />
+                          </Col>
+                        ))}
+                      </Row>
+
+                      <div className="mt-16 flex justify-center">
+                        <Pagination
+                          current={currentPage}
+                          total={filteredPackages.length}
+                          pageSize={pageSize}
+                          onChange={(page) => setCurrentPage(page)}
+                          className="weightless-pagination"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <Card className="border-none glass rounded-3xl py-20">
+                      <Empty description={loadingPackages ? 'Memuat paket...' : 'Tidak ada paket published yang ditemukan'} />
+                    </Card>
+                  )}
+                </Spin>
               </div>
             </Col>
           </Row>

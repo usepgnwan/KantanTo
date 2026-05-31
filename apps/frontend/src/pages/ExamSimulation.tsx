@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
-  Typography, Button, Card, Row, Col, Space, Tag, Modal, Drawer, Checkbox
+  Typography, Button, Card, Row, Col, Space, Tag, Modal, Drawer, Checkbox, Spin, message
 } from 'antd';
 import { 
   ClockCircleOutlined, 
@@ -10,114 +10,162 @@ import {
   RightOutlined,
   AppstoreOutlined,
   WarningOutlined,
-  CheckCircleFilled,
-  ExclamationCircleOutlined
+  ExclamationCircleOutlined,
+  FileTextOutlined
 } from '@ant-design/icons';
+import { getPackageQuestions, submitExam, PackageQuestionPayload, getPackageBySlug } from '../services/packageService';
+import { useAuth } from '../context/AuthContext';
+import { renderLatex } from '../utils/latex';
 
 const { Title, Paragraph, Text } = Typography;
 
 const ExamSimulation: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+  const { id: slug } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { payload, isAdmin } = useAuth();
 
-  // State Management
-  const [currentQuestion, setCurrentQuestion] = useState(1);
-  const [selectedOption, setSelectedOption] = useState<number | null>(null);
-  const [timeRemaining, setTimeRemaining] = useState(14 * 60 + 55); // 14:55
+  const [questions, setQuestions] = useState<PackageQuestionPayload[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(15 * 60); // Default 15 minutes, will be overridden by package duration
   const [isMapVisible, setIsMapVisible] = useState(false);
   const [isExitModalVisible, setIsExitModalVisible] = useState(false);
-  const totalQuestions = 40;
 
-  // Mock answers map (storing array of selected option indexes)
-  const [answers, setAnswers] = useState<Record<number, number[]>>({});
-  const [doubtfulQuestions, setDoubtfulQuestions] = useState<Record<number, boolean>>({});
+  // Map of questionId -> array of selected option indexes
+  // For nested questions, we'll store sub_question ID -> array of selected option indexes
+  const [answers, setAnswers] = useState<Record<string, number[]>>({});
+  const answersRef = React.useRef(answers);
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
+  const [doubtfulQuestions, setDoubtfulQuestions] = useState<Record<string, boolean>>({});
 
-  const mockQuestions = [
-    {
-      id: 1,
-      type: "single",
-      passage: [
-        "Perkembangan teknologi informasi yang begitu pesat telah mengubah wajah literasi di Indonesia. Jika dahulu literasi hanya dimaknai sebagai kemampuan membaca dan menulis di atas kertas, kini cakupannya meluas hingga ke ranah digital.",
-        "Namun, fenomena ini membawa tantangan baru berupa \"banjir informasi\" atau information overload. Masyarakat seringkali kesulitan membedakan antara opini subjektif, fakta ilmiah, dan berita bohong (hoaks).",
-        "Berdasarkan konteks tersebut, penguatan literasi kritis menjadi sangat krusial untuk membangun ekosistem digital yang sehat dan produktif."
-      ],
-      question: "Manakah simpulan yang paling tepat berdasarkan paragraf tersebut mengenai urgensi literasi kritis di era digital?",
-      options: [
-        'Masyarakat memilih untuk menghindari penggunaan internet', 
-        'Kemampuan memfilter hoaks adalah bentuk mitigasi krisis', 
-        'Literasi kertas tidak lagi relevan dengan perkembangan zaman', 
-        'Opini subjektif lebih cepat berkembang daripada fakta', 
-        'Information overload terjadi hanya karena media sosial'
-      ]
-    },
-    {
-      id: 2,
-      type: "multiple",
-      passage: [
-        "Literasi digital tidak sekadar tentang kemampuan menggunakan perangkat keras dan mencari informasi. Di era modern ini, elemen utama dari literasi digital mencakup kemampuan kognitif dan teknikal.",
-        "Hal ini termasuk kecakapan memilah informasi yang valid, memahami etika digital privasi data (netiket), serta kemampuan memproduksi konten bermakna secara aman.",
-        "Individu yang cakap digital bukan hanya konsumen pasif, tetapi dituntut menjadi prosumer (produsen dan konsumen) yang beretika."
-      ],
-      question: "Berdasarkan teks di atas, manakah hal-hal yang menunjukkan praktik literasi digital yang komprehensif? (Bisa pilih lebih dari satu)",
-      options: [
-        'Hampir setiap hari mencari informasi viral tanpa melakukan pengecekan sumber',
-        'Memverifikasi kebenaran sebuah berita kesehatan ke portal resmi sebelum membagikannya',
-        'Menggunakan kata sandi yang sama di semua platform untuk kemudahan akses',
-        'Membuat desain grafis positif yang mengedukasi pelestarian lingkungan di media sosial',
-        'Secara konsisten menjaga privasi data diri dengan mengatur preferensi keamanan di aplikasi navigasi'
-      ]
-    }
-  ];
-
-  const currentData = mockQuestions.find(q => q.id === currentQuestion) || mockQuestions[0];
+  useEffect(() => {
+    if (!slug) return;
+    setLoading(true);
+    
+    Promise.all([
+      getPackageQuestions(slug),
+      getPackageBySlug(slug)
+    ])
+      .then(([questionsData, packageData]) => {
+        setQuestions(questionsData);
+        if (packageData && packageData.duration > 0) {
+          setTimeRemaining(packageData.duration * 60);
+        }
+      })
+      .catch(() => message.error('Gagal memuat soal ujian'))
+      .finally(() => setLoading(false));
+  }, [slug]);
 
   // Countdown Timer Effect
   useEffect(() => {
+    if (loading || questions.length === 0) return;
     const timer = setInterval(() => {
-      setTimeRemaining((prev) => (prev > 0 ? prev - 1 : 0));
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          finishExam(true); // Auto submit on timeout
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [loading, questions]);
 
-  // Format Time Helper
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const handleSelectOption = (index: number) => {
+  const handleSelectOption = (qId: string, qType: string, optIndex: number) => {
     setAnswers(prev => {
-      const currentAnsArr = prev[currentQuestion] || [];
-      if (currentData.type === 'single') {
-        return { ...prev, [currentQuestion]: [index] };
+      const currentAnsArr = prev[qId] || [];
+      if (qType === 'single') {
+        return { ...prev, [qId]: [optIndex] };
       } else {
         // Toggle for multiple choice
-        if (currentAnsArr.includes(index)) {
-          return { ...prev, [currentQuestion]: currentAnsArr.filter(i => i !== index) };
+        if (currentAnsArr.includes(optIndex)) {
+          return { ...prev, [qId]: currentAnsArr.filter(i => i !== optIndex) };
         } else {
-          return { ...prev, [currentQuestion]: [...currentAnsArr, index] };
+          return { ...prev, [qId]: [...currentAnsArr, optIndex] };
         }
       }
     });
   };
 
-  const handleToggleDoubtful = (e: any) => {
-    setDoubtfulQuestions(prev => ({ ...prev, [currentQuestion]: e.target.checked }));
+  const handleToggleDoubtful = (qId: string, e: any) => {
+    setDoubtfulQuestions(prev => ({ ...prev, [qId]: e.target.checked }));
   };
 
-  const finishExam = () => {
+  const submitToBackend = async () => {
+    if (!slug || !payload) return;
+    setSubmitting(true);
+    
+    // Format answers from string map to number map for backend
+    const formattedAnswers: Record<number, number[]> = {};
+    Object.keys(answersRef.current).forEach(k => {
+      formattedAnswers[Number(k)] = answersRef.current[k];
+    });
+
+    try {
+      const res = await submitExam(slug, {
+        client_id: 'client', // Placeholder if needed
+        user_id: payload?.user_id ?? 0,
+        is_testing: isAdmin(),
+        answers: formattedAnswers
+      });
+      message.success('Ujian berhasil dikumpulkan');
+      navigate(`/riwayat/${res.session_id}/review`);
+    } catch (err) {
+      message.error('Gagal mengumpulkan jawaban');
+      setSubmitting(false);
+    }
+  };
+
+  const finishExam = (isTimeout = false) => {
+    if (isTimeout) {
+      message.warning('Waktu habis! Jawaban Anda akan otomatis dikumpulkan.');
+      submitToBackend();
+      return;
+    }
+
     Modal.confirm({
       title: 'Kumpulkan Jawaban?',
       icon: <ExclamationCircleOutlined />,
       content: 'Pastikan Anda telah mengisi seluruh jawaban dengan yakin. Apakah Anda ingin mengumpulkan sekarang?',
       okText: 'Kumpulkan Sekarang',
       cancelText: 'Kembali Ujian',
-      onOk() {
-        navigate('/riwayat/1/review'); // Route to review
-      },
+      onOk: submitToBackend,
     });
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface">
+        <Spin size="large" tip="Memuat soal ujian..." />
+      </div>
+    );
+  }
+
+  if (questions.length === 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface">
+        <Card className="text-center rounded-2xl shadow-sm max-w-md w-full p-8 border-none bg-surface-low">
+          <WarningOutlined className="text-red-500 text-4xl mb-4 block" />
+          <Title level={4}>Belum ada soal</Title>
+          <Paragraph className="text-on-surface/60 mb-6">Ujian ini belum memiliki soal yang dapat dikerjakan.</Paragraph>
+          <Button type="primary" onClick={() => navigate(-1)} className="rounded-full">Kembali</Button>
+        </Card>
+      </div>
+    );
+  }
+
+  const currentData = questions[currentQuestionIndex];
+  const totalQuestionsCount = questions.length;
 
   return (
     <div className="min-h-screen bg-surface flex flex-col font-sans transition-colors duration-500">
@@ -132,8 +180,8 @@ const ExamSimulation: React.FC = () => {
             onClick={() => setIsExitModalVisible(true)}
           />
           <div className="hidden sm:block">
-            <Text className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest block leading-tight">SNBT Prep</Text>
-            <Text className="font-bold text-on-surface block leading-tight">Literasi Bahasa</Text>
+            <Text className="text-[10px] font-bold text-on-surface/40 uppercase tracking-widest block leading-tight">Simulasi Ujian</Text>
+            <Text className="font-bold text-on-surface block leading-tight">Tryout {slug}</Text>
           </div>
         </div>
 
@@ -154,7 +202,7 @@ const ExamSimulation: React.FC = () => {
           >
             Peta Soal
           </Button>
-          <Button type="primary" onClick={finishExam} className="font-bold shadow-md shadow-primary/20 rounded-lg">
+          <Button type="primary" onClick={() => finishExam(false)} loading={submitting} className="font-bold shadow-md shadow-primary/20 rounded-lg">
             Selesai
           </Button>
         </div>
@@ -162,71 +210,144 @@ const ExamSimulation: React.FC = () => {
 
       {/* EXAM BODY */}
       <main className="flex-grow overflow-auto">
-        <div className="max-w-7xl mx-auto h-full flex flex-col lg:flex-row">
-          
-          {/* Left Column (Passage) */}
-          <div className="lg:w-1/2 p-6 lg:p-10 border-b lg:border-b-0 lg:border-r border-surface-container overflow-y-auto bg-white/50">
-            <Tag color="green" className="mb-4 rounded-full border-none font-bold px-3">Teks Kontemporer</Tag>
-            <Title level={3} className="!font-manrope !font-black !text-2xl mt-0">
-              Transformasi Literasi Digital
-            </Title>
-            <div className="prose prose-lg prose-p:text-on-surface/80 prose-p:leading-loose">
-              {currentData.passage.map((pg, i) => (
-                <Paragraph key={i}>{pg}</Paragraph>
-              ))}
+
+        {currentData.type === 'nested' ? (
+          /* ── SCENARIO / NESTED ── split layout */
+          <div className="max-w-7xl mx-auto h-full flex flex-col lg:flex-row">
+
+            {/* Left: Scenario passage */}
+            <div className="lg:w-1/2 p-6 lg:p-10 border-b lg:border-b-0 lg:border-r border-surface-container overflow-y-auto bg-white/50">
+              <Tag color="blue" className="mb-4 rounded-full border-none font-bold px-3">{currentData.title || 'Skenario'}</Tag>
+              <Title level={4} className="!font-manrope !font-black !text-xl mt-0">Skenario Kasus</Title>
+              <div
+                className="prose prose-lg prose-p:text-on-surface/80 prose-p:leading-loose"
+                dangerouslySetInnerHTML={{ __html: renderLatex(currentData.question) }}
+              />
+            </div>
+
+            {/* Right: Sub-questions */}
+            <div className="lg:w-1/2 p-6 lg:p-10 bg-white overflow-y-auto flex flex-col">
+              <div className="flex items-center justify-between mb-6">
+                <Tag className="rounded-full px-4 py-1 text-sm font-black border-none bg-surface-low text-on-surface">
+                  Soal #{currentQuestionIndex + 1} <span className="opacity-60">(Skenario)</span>
+                </Tag>
+                <Button type="text" className="text-on-surface/40 hover:text-primary font-bold text-xs uppercase" icon={<WarningOutlined />}>Lapor Soal</Button>
+              </div>
+
+              <div className="space-y-12">
+                {currentData.sub_questions?.map((sub, sIndex) => {
+                  const currentAnsArr = answers[sub.id] || [];
+                  return (
+                    <div key={sub.id} className="border-b border-surface-container pb-8 last:border-0">
+                      <Paragraph className="text-lg leading-relaxed text-on-surface font-medium mb-6">
+                        <span className="font-black mr-2">{sIndex + 1}.</span>
+                        <span dangerouslySetInnerHTML={{ __html: renderLatex(sub.question) }} />
+                      </Paragraph>
+                      <div className="space-y-3 mb-4">
+                        {sub.options.map((opt, idx) => ({ opt, idx })).filter(({ opt }) => opt && opt.trim() !== '').map(({ opt, idx }) => {
+                          const isSelected = currentAnsArr.includes(idx);
+                          const label = String.fromCharCode(65 + idx);
+                          return (
+                            <div
+                              key={idx}
+                              onClick={() => handleSelectOption(sub.id, sub.type || 'single', idx)}
+                              className={`p-4 rounded-xl flex items-center gap-4 cursor-pointer transition-all border ${isSelected ? 'border-primary bg-primary/5 shadow-[0_0_0_2px_rgba(0,83,221,0.2)]' : 'border-surface-container bg-surface-lowest hover:border-primary/50'}`}
+                            >
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold shrink-0 transition-colors ${isSelected ? 'bg-primary text-white' : 'bg-surface-low text-on-surface/60'}`}>
+                                {label}
+                              </div>
+                              <span
+                                className={`text-base font-medium ${isSelected ? 'text-primary' : 'text-on-surface/80'}`}
+                                dangerouslySetInnerHTML={{ __html: renderLatex(opt) }}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="bg-surface-low/30 border border-surface-container rounded-xl p-4 mt-auto">
+                <Checkbox
+                  checked={doubtfulQuestions[currentData.id] || false}
+                  onChange={(e) => handleToggleDoubtful(currentData.id, e)}
+                  className="font-bold text-on-surface/60 hover:text-on-surface"
+                >
+                  Ragu-ragu (Tandai untuk diperiksa kembali)
+                </Checkbox>
+              </div>
             </div>
           </div>
 
-          {/* Right Column (Question & Options) */}
-          <div className="lg:w-1/2 p-6 lg:p-10 bg-white overflow-y-auto flex flex-col">
-            
-            <div className="flex items-center justify-between mb-6">
-              <Tag className="rounded-full px-4 py-1 text-sm font-black border-none bg-surface-low text-on-surface">
-                Soal #{currentQuestion} {currentData.type === 'multiple' ? '(Multi Jawaban)' : ''}
-              </Tag>
+        ) : (
+          /* ── SINGLE / MULTIPLE ── full-width single column */
+          <div className="max-w-4xl mx-auto w-full px-4 sm:px-8 py-8 lg:py-12 flex flex-col gap-8">
+
+            {/* Question header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Tag className="rounded-full px-4 py-1 text-sm font-black border-none bg-surface-low text-on-surface">
+                  Soal #{currentQuestionIndex + 1}
+                </Tag>
+                {currentData.type === 'multiple' && (
+                  <Tag color="blue" className="rounded-full border-none font-bold px-3">Pilih lebih dari satu</Tag>
+                )}
+              </div>
               <Button type="text" className="text-on-surface/40 hover:text-primary font-bold text-xs uppercase" icon={<WarningOutlined />}>Lapor Soal</Button>
             </div>
 
-            <Paragraph className="text-xl leading-relaxed text-on-surface font-medium mb-10">
-              {currentData.question}
-            </Paragraph>
+            {/* Question text – full width, large */}
+            <div className="bg-white rounded-[2rem] p-6 lg:p-10 shadow-sm border border-surface-container">
+              {currentData.title && (
+                <Tag color="blue" className="mb-4 rounded-full border-none font-bold px-3">{currentData.title}</Tag>
+              )}
+              <div
+                className="prose prose-xl prose-p:text-on-surface/90 prose-p:leading-loose max-w-none text-on-surface text-lg font-medium"
+                dangerouslySetInnerHTML={{ __html: renderLatex(currentData.question) }}
+              />
+            </div>
 
-            <div className="space-y-4 mb-8">
-              {currentData.options.map((opt, idx) => {
-                const currentAnsArr = answers[currentQuestion] || [];
+            {/* Options – full width */}
+            <div className="space-y-4">
+              {currentData.options.map((opt, idx) => ({ opt, idx })).filter(({ opt }) => opt && opt.trim() !== '').map(({ opt, idx }) => {
+                const currentAnsArr = answers[currentData.id] || [];
                 const isSelected = currentAnsArr.includes(idx);
                 const label = String.fromCharCode(65 + idx);
-                
                 return (
-                  <div 
-                    key={idx} 
-                    onClick={() => handleSelectOption(idx)}
+                  <div
+                    key={idx}
+                    onClick={() => handleSelectOption(currentData.id, currentData.type, idx)}
                     className={`
-                      p-4 rounded-2xl flex items-center gap-4 cursor-pointer transition-all border 
-                      ${isSelected 
-                        ? 'border-primary bg-primary/5 shadow-[0_0_0_2px_rgba(0,83,221,0.2)]' 
-                        : 'border-surface-container bg-surface-lowest hover:border-primary/50'
+                      p-5 rounded-2xl flex items-center gap-5 cursor-pointer transition-all border-2
+                      ${isSelected
+                        ? 'border-primary bg-primary/5 shadow-[0_0_0_3px_rgba(0,83,221,0.15)]'
+                        : 'border-surface-container bg-white hover:border-primary/40 hover:bg-primary/[0.02]'
                       }
                     `}
                   >
                     <div className={`
-                      w-10 h-10 rounded-full flex items-center justify-center font-bold shrink-0 transition-colors
+                      w-11 h-11 flex items-center justify-center font-black text-base shrink-0 transition-colors
+                      ${currentData.type === 'multiple' ? 'rounded-lg' : 'rounded-full'}
                       ${isSelected ? 'bg-primary text-white' : 'bg-surface-low text-on-surface/60'}
                     `}>
-                      {label}
+                      {isSelected && currentData.type === 'multiple' ? '✓' : label}
                     </div>
-                    <Text className={`text-base font-medium ${isSelected ? 'text-primary' : 'text-on-surface/80'}`}>
-                      {opt}
-                    </Text>
+                    <span
+                      className={`text-base font-medium leading-relaxed ${isSelected ? 'text-primary' : 'text-on-surface/80'}`}
+                      dangerouslySetInnerHTML={{ __html: renderLatex(opt) }}
+                    />
                   </div>
                 );
               })}
             </div>
 
-            <div className="bg-surface-low/30 border border-surface-container rounded-xl p-4 mt-auto">
-              <Checkbox 
-                checked={doubtfulQuestions[currentQuestion] || false} 
-                onChange={handleToggleDoubtful}
+            {/* Ragu-ragu */}
+            <div className="bg-surface-low/30 border border-surface-container rounded-xl p-4">
+              <Checkbox
+                checked={doubtfulQuestions[currentData.id] || false}
+                onChange={(e) => handleToggleDoubtful(currentData.id, e)}
                 className="font-bold text-on-surface/60 hover:text-on-surface"
               >
                 Ragu-ragu (Tandai untuk diperiksa kembali)
@@ -234,9 +355,10 @@ const ExamSimulation: React.FC = () => {
             </div>
 
           </div>
+        )}
 
-        </div>
       </main>
+
 
       {/* EXAM FOOTER */}
       <footer className="bg-white border-t border-surface-container p-4 shrink-0 relative z-30">
@@ -245,8 +367,8 @@ const ExamSimulation: React.FC = () => {
             size="large"
             type="text"
             icon={<LeftOutlined />}
-            disabled={currentQuestion === 1}
-            onClick={() => setCurrentQuestion(prev => prev - 1)}
+            disabled={currentQuestionIndex === 0}
+            onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
             className="font-bold text-on-surface/80"
           >
             Kembali
@@ -267,8 +389,8 @@ const ExamSimulation: React.FC = () => {
             type="primary"
             icon={<RightOutlined />}
             iconPosition="end"
-            onClick={() => setCurrentQuestion(prev => prev < totalQuestions ? prev + 1 : prev)}
-            disabled={currentQuestion === totalQuestions}
+            onClick={() => setCurrentQuestionIndex(prev => prev < totalQuestionsCount - 1 ? prev + 1 : prev)}
+            disabled={currentQuestionIndex === totalQuestionsCount - 1}
             className="rounded-xl font-bold shadow-xl shadow-primary/20 h-12 px-6"
           >
             Selanjutnya
@@ -290,18 +412,25 @@ const ExamSimulation: React.FC = () => {
            <span className="flex items-center gap-1.5"><div className="w-3 h-3 border border-surface-container rounded-full"></div> Kosong</span>
         </div>
         <div className="grid grid-cols-5 gap-3">
-          {Array.from({ length: totalQuestions }).map((_, i) => {
+          {questions.map((q, i) => {
             const num = i + 1;
-            const currentAnsArr = answers[num] || [];
-            const isAnswered = currentAnsArr.length > 0;
-            const isDoubtful = doubtfulQuestions[num];
-            const isCurrent = currentQuestion === num;
+            
+            // Check if answered. For nested, must have at least one subquestion answered.
+            let isAnswered = false;
+            if (q.type === 'nested' && q.sub_questions) {
+              isAnswered = q.sub_questions.some(sq => (answers[sq.id] || []).length > 0);
+            } else {
+              isAnswered = (answers[q.id] || []).length > 0;
+            }
+
+            const isDoubtful = doubtfulQuestions[q.id];
+            const isCurrent = currentQuestionIndex === i;
             
             return (
               <button
-                key={num}
+                key={q.id}
                 onClick={() => {
-                  setCurrentQuestion(num);
+                  setCurrentQuestionIndex(i);
                   setIsMapVisible(false);
                 }}
                 className={`
@@ -341,8 +470,11 @@ const ExamSimulation: React.FC = () => {
             <Button size="large" className="rounded-xl font-bold" onClick={() => setIsExitModalVisible(false)}>
               Batal
             </Button>
-            <Button size="large" type="primary" danger className="rounded-xl font-bold shadow-lg shadow-red-500/20" onClick={() => navigate('/latihan')}>
-              Ya, Akhiri Ujian
+            <Button size="large" type="primary" danger className="rounded-xl font-bold shadow-lg shadow-red-500/20" onClick={() => {
+              setIsExitModalVisible(false);
+              finishExam(false);
+            }}>
+              Ya, Kumpulkan Ujian
             </Button>
           </Space>
         </div>
