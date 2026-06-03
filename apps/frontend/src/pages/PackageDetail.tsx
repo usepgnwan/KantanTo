@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons';
 import AppLayout from '../layouts/AppLayout';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 import PackageDetailHeader from '../components/organisms/PackageDetailHeader';
 import QuestionGrid from '../components/molecules/QuestionGrid';
 import ResourceCard from '../components/molecules/ResourceCard';
@@ -25,6 +26,7 @@ import {
   PackageQuestionPayload,
   PackageVideoPayload,
 } from '../services/packageService';
+import { getMyPackagesAPI } from '../services/myPackageService';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -39,10 +41,12 @@ const PackageDetailPage: React.FC = () => {
   const [videos, setVideos] = useState<PackageVideoPayload[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const { isAdmin } = useAuth();
+  const { isAdmin, isLoggedIn, user } = useAuth();
+  const { addToCart, isInCart } = useCart();
   const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [ownsPackage, setOwnsPackage] = useState(false);
 
-  const hasAccess = isPreviewMode;
+  const hasAccess = isPreviewMode || ownsPackage;
   const headerData = useMemo(() => ({
     title: packageData?.title || 'Paket tidak ditemukan',
     description: packageData?.description || '',
@@ -102,6 +106,39 @@ const PackageDetailPage: React.FC = () => {
       mounted = false;
     };
   }, [slug]);
+
+  useEffect(() => {
+    if (!slug || !user?.id) return;
+    
+    getMyPackagesAPI(user.id).then((myPackages) => {
+      const owned = myPackages.some(tx => tx.package?.slug === slug && tx.status === 'active');
+      setOwnsPackage(owned);
+    }).catch(console.error);
+  }, [slug, user]);
+
+  const handleAddToCart = () => {
+    if (!isLoggedIn) {
+      navigate('/login');
+      return;
+    }
+    
+    if (!packageData) return;
+    
+    if (!isInCart(packageData.slug)) {
+      addToCart({
+        id: packageData.slug,
+        slug: packageData.slug,
+        title: packageData.title,
+        variant: `${packageData.category} • ${packageData.duration} Menit`,
+        price: packageData.price,
+        image: packageData.thumbnail || fallbackVideoThumbnail,
+        quantity: 1,
+      });
+    }
+    navigate('/keranjang');
+  };
+
+  const alreadyInCart = packageData ? isInCart(packageData.slug) : false;
 
   const tabItems = [
     {
@@ -258,29 +295,38 @@ const PackageDetailPage: React.FC = () => {
                           </Paragraph>
                         </div>
 
-                        <div className="bg-surface-low p-6 rounded-2xl border border-surface-container">
-                          {packageData && packageData.price > 0 && (
-                            <Text className="text-xs text-surface-on/40 line-through">
-                              Rp {Number(packageData.price * 2).toLocaleString('id-ID')}
-                            </Text>
-                          )}
-                          <div className="flex items-baseline gap-2">
-                            <Title level={2} className="!m-0 !text-primary">
-                              {packageData?.price === 0 ? 'Gratis' : `Rp ${Number(packageData?.price || 0).toLocaleString('id-ID')}`}
-                            </Title>
-                            <Text className="text-xs text-surface-on/40">/ Lifetime</Text>
+                        {ownsPackage ? (
+                          <div className="bg-green-50 text-green-600 p-4 rounded-xl border border-green-200 text-center font-bold">
+                            Anda sudah memiliki paket ini.
                           </div>
-                        </div>
+                        ) : (
+                          <>
+                            <div className="bg-surface-low p-6 rounded-2xl border border-surface-container">
+                              {packageData && packageData.price > 0 && (
+                                <Text className="text-xs text-surface-on/40 line-through">
+                                  Rp {Number(packageData.price * 2).toLocaleString('id-ID')}
+                                </Text>
+                              )}
+                              <div className="flex items-baseline gap-2">
+                                <Title level={2} className="!m-0 !text-primary">
+                                  {packageData?.price === 0 ? 'Gratis' : `Rp ${Number(packageData?.price || 0).toLocaleString('id-ID')}`}
+                                </Title>
+                                <Text className="text-xs text-surface-on/40">/ Lifetime</Text>
+                              </div>
+                            </div>
 
-                        <Button
-                          type="primary"
-                          block
-                          size="large"
-                          className="h-14 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-primary/20"
-                          icon={<ShoppingOutlined />}
-                        >
-                          Beli Paket Sekarang
-                        </Button>
+                            <Button
+                              type={alreadyInCart ? "default" : "primary"}
+                              block
+                              size="large"
+                              className={`h-14 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl ${alreadyInCart ? 'border-primary text-primary' : 'shadow-primary/20'}`}
+                              icon={<ShoppingOutlined />}
+                              onClick={handleAddToCart}
+                            >
+                              {alreadyInCart ? 'Lihat Keranjang' : 'Beli Paket Sekarang'}
+                            </Button>
+                          </>
+                        )}
 
                         {isAdmin() && !isPreviewMode && (
                           <Button

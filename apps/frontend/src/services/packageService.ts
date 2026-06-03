@@ -14,6 +14,7 @@ const api = axios.create({
 // ─── Package List CRUD ───────────────────────────────────────────────────────
 
 export interface PackageListItem {
+  id: number;
   slug: string;
   title: string;
   description: string;
@@ -72,6 +73,7 @@ const normalizeStatus = (value: unknown): PackageListItem['status'] => {
 };
 
 const normalizePackage = (pkg: any): PackageListItem => ({
+  id: Number(pkg?.id) || 0,
   slug: String(pkg?.slug || ''),
   title: String(pkg?.title || ''),
   description: String(pkg?.description || ''),
@@ -151,6 +153,7 @@ export interface PackageQuestionPayload {
 
 export interface PackageMaterialPayload {
   id: string;
+  client_id?: string;
   title: string;
   category: string;
   content: string;
@@ -196,6 +199,7 @@ const normalizeQuestion = (question: any): PackageQuestionPayload => ({
 
 const normalizeMaterial = (material: any): PackageMaterialPayload => ({
   id: String(material.id),
+  client_id: material.client_id || '',
   title: material.title || '',
   category: material.category || 'Umum',
   content: material.content || '',

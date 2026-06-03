@@ -52,6 +52,10 @@ func ConnectDB() {
 		&model.PackageVideo{},
 		&model.ExamSession{},
 		&model.ExamAnswer{},
+		&model.Voucher{},
+		&model.VoucherUsage{},
+		&model.Transaction{},
+		&model.UserMaterialProgress{},
 	)
 	if err != nil {
 		log.Fatal("Failed to migrate database:", err)

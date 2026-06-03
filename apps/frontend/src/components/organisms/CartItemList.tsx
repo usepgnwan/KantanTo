@@ -6,12 +6,11 @@ import { Typography } from 'antd';
 const { Title } = Typography;
 
 interface CartItemListProps {
-  items: Omit<CartItemProps, 'onRemove' | 'onUpdateQuantity'>[];
+  items: Omit<CartItemProps, 'onRemove'>[];
   onRemove: (id: string) => void;
-  onUpdateQuantity: (id: string, delta: number) => void;
 }
 
-const CartItemList: React.FC<CartItemListProps> = ({ items, onRemove, onUpdateQuantity }) => {
+const CartItemList: React.FC<CartItemListProps> = ({ items, onRemove }) => {
   if (items.length === 0) {
     return <EmptyCart />;
   }
@@ -29,7 +28,6 @@ const CartItemList: React.FC<CartItemListProps> = ({ items, onRemove, onUpdateQu
             key={item.id}
             {...item}
             onRemove={onRemove}
-            onUpdateQuantity={onUpdateQuantity}
           />
         ))}
       </div>

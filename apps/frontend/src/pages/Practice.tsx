@@ -11,64 +11,47 @@ import {
   CheckCircleOutlined,
   RightOutlined,
   CloudDownloadOutlined,
-  ContainerOutlined
+  ContainerOutlined,
+  DownOutlined
 } from '@ant-design/icons';
+import { useAuth } from '../context/AuthContext';
+import { getMyPackagesAPI, MyTransaction } from '../services/myPackageService';
 
 const { Title, Text, Paragraph } = Typography;
 
 const Practice: React.FC = () => {
   const navigate = useNavigate();
-  const ownedPackages = [
-    {
-      id: 1,
-      title: 'Persiapan Intensif SNBT 2024',
-      progress: 65,
-      totalTopics: 12,
-      completedTopics: 8,
-      status: 'Active',
-      image: 'https://placehold.co/400x250?text=SNBT+2024'
-    },
-    {
-      id: 2,
-      title: 'Mastering TPS: Penalaran Umum',
-      progress: 30,
-      totalTopics: 8,
-      completedTopics: 2,
-      status: 'Active',
-      image: 'https://placehold.co/400x250?text=TPS+Mastery'
-    }
-  ];
+  const [myTransactions, setMyTransactions] = React.useState<MyTransaction[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const { user } = useAuth();
+  const [expandedPackage, setExpandedPackage] = React.useState<number | null>(null);
 
-  const practiceCategories = [
-    {
-      title: 'Penalaran Matematika',
-      desc: 'Materi mendalam tentang Aljabar, Geometri, dan Kalkulus dasar.',
-      count: '120 Soal',
-      icon: <ContainerOutlined className="text-blue-500" />,
-      color: 'blue'
-    },
-    {
-      title: 'Literasi Bahasa Indonesia',
-      desc: 'Analisis teks kompleks dan kaidah kebahasaan tingkat tinggi.',
-      count: '340 Soal',
-      icon: <BookOutlined className="text-green-500" />,
-      color: 'green'
-    },
-    {
-      title: 'Penalaran Kuantitatif',
-      desc: 'Uji logika matematika dan pemecahan masalah dengan data.',
-      count: '210 Soal',
-      icon: <FileTextOutlined className="text-purple-500" />,
-      color: 'purple'
-    },
-    {
-      title: 'Literasi Bahasa Inggris',
-      desc: 'Reading comprehension and advanced vocabulary patterns.',
-      count: '150 Soal',
-      icon: <BookOutlined className="text-orange-500" />,
-      color: 'orange'
+  React.useEffect(() => {
+    if (user?.id) {
+      setLoading(true);
+      getMyPackagesAPI(user.id).then(data => {
+        setMyTransactions(data || []);
+      }).catch(() => {
+        setMyTransactions([]);
+      }).finally(() => {
+        setLoading(false);
+      });
+    } else {
+      setLoading(false);
     }
-  ];
+  }, [user]);
+
+  const toggleExpand = (pkgId: number) => {
+    if (expandedPackage === pkgId) {
+      setExpandedPackage(null);
+    } else {
+      setExpandedPackage(pkgId);
+    }
+  };
+
+  const calculateProgress = (tx: MyTransaction) => {
+    return Math.floor(tx.progress || 0);
+  };
 
   const relatedMaterials = [
     { title: 'E-Book: Aljabar Modern', type: 'E-Book', detail: 'Ringkasan Cepat & Rumus Sakti', icon: <FileTextOutlined /> },
@@ -114,90 +97,107 @@ const Practice: React.FC = () => {
               <div className="mb-12">
                 <div className="flex items-center justify-between mb-6">
                   <Title level={3} className="!m-0 !font-black !font-manrope">Paket Saya</Title>
-                  <Button type="link" className="text-primary font-bold">Lihat Semua <RightOutlined /></Button>
                 </div>
-                <Row gutter={[24, 24]}>
-                  {ownedPackages.map((pkg) => (
-                    <Col xs={24} md={12} key={pkg.id}>
-                      <Card 
-                        hoverable
-                        onClick={() => navigate('/paket/soshum-mastery')}
-                        className="weightless-card border-none overflow-hidden group p-0"
-                        cover={
-                          <div className="relative h-48 overflow-hidden">
-                            <img alt={pkg.title} src={pkg.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                            <div className="absolute top-4 right-4">
-                              <Tag color="green" className="rounded-full border-none px-4 font-bold">Aktif</Tag>
-                            </div>
-                          </div>
-                        }
-                      >
-                        <div className="p-6">
-                          <Title level={4} className="!m-0 !font-black !font-manrope !text-lg mb-4">{pkg.title}</Title>
-                          <div className="space-y-4">
-                            <div>
-                              <div className="flex justify-between mb-2">
-                                <Text className="text-xs text-on-surface/40">Progres Belajar</Text>
-                                <Text className="text-xs font-bold text-primary">{pkg.progress}%</Text>
+                {loading ? (
+                  <div className="text-center py-10"><Text className="text-on-surface/40">Memuat paket...</Text></div>
+                ) : myTransactions.length === 0 ? (
+                  <Card className="weightless-card border-none p-10 text-center">
+                    <Title level={4} className="!m-0 !font-black text-on-surface/40">Belum Ada Paket</Title>
+                    <Paragraph className="text-on-surface/40 mt-2 mb-6">Kamu belum memiliki paket yang aktif. Yuk cari paket belajarmu sekarang!</Paragraph>
+                    <Button type="primary" onClick={() => navigate('/paket')} className="rounded-xl h-10 font-bold">Cari Paket</Button>
+                  </Card>
+                ) : (
+                  <Row gutter={[24, 24]}>
+                    {myTransactions.map((tx) => {
+                      const pkg = tx.package;
+                      if (!pkg) return null;
+                      const progress = calculateProgress(tx);
+                      const isExpanded = expandedPackage === pkg.id;
+                      
+                      return (
+                        <Col xs={24} md={12} key={tx.id}>
+                          <Card 
+                            hoverable
+                            className="weightless-card border-none overflow-hidden group p-0"
+                            cover={
+                              <div className="relative h-48 overflow-hidden cursor-pointer" onClick={() => navigate(`/paket/${pkg.slug}`)}>
+                                <img alt={pkg.title} src={pkg.thumbnail || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=800'} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                                <div className="absolute top-4 right-4">
+                                  <Tag color="green" className="rounded-full border-none px-4 font-bold uppercase tracking-widest">{tx.status}</Tag>
+                                </div>
                               </div>
-                              <Progress 
-                                percent={pkg.progress} 
-                                showInfo={false} 
-                                strokeColor="#0060ad" 
-                                trailColor="rgba(0, 96, 173, 0.05)"
-                                strokeWidth={6}
-                              />
-                            </div>
-                            <div className="flex items-center justify-between pt-2">
-                              <Space size="large" className="text-xs text-on-surface/60">
-                                <span className="flex items-center gap-1.5"><FileTextOutlined /> {pkg.totalTopics} Topik</span>
-                                <span className="flex items-center gap-1.5"><CheckCircleOutlined /> {pkg.completedTopics} Selesai</span>
-                              </Space>
-                              <Button type="primary" shape="circle" icon={<RightOutlined />} />
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-                    </Col>
-                  ))}
-                </Row>
-              </div>
+                            }
+                          >
+                            <div className="p-6">
+                              <Title level={4} className="!m-0 !font-black !font-manrope !text-lg mb-4">{pkg.title}</Title>
+                              <div className="space-y-4">
+                                <div>
+                                  <div className="flex justify-between mb-2">
+                                    <Text className="text-xs text-on-surface/40">Progres Belajar (Simulasi)</Text>
+                                    <Text className="text-xs font-bold text-primary">{progress}%</Text>
+                                  </div>
+                                  <Progress 
+                                    percent={progress} 
+                                    showInfo={false} 
+                                    strokeColor="#0060ad" 
+                                    trailColor="rgba(0, 96, 173, 0.05)"
+                                    strokeWidth={6}
+                                  />
+                                </div>
+                                <div className="flex items-center justify-between pt-2">
+                                  <Space size="large" className="text-xs text-on-surface/60">
+                                    <span className="flex items-center gap-1.5"><FileTextOutlined /> {(pkg.materials && pkg.materials.length) || 0} Materi</span>
+                                  </Space>
+                                  <Button 
+                                    type="default" 
+                                    shape="circle" 
+                                    icon={isExpanded ? <DownOutlined /> : <RightOutlined />} 
+                                    onClick={() => toggleExpand(pkg.id)}
+                                  />
+                                </div>
+                              </div>
 
-              {/* Practice Categories Section */}
-              <div>
-                <Title level={3} className="!mb-6 !font-black !font-manrope">Bank Soal Per Mapel</Title>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {practiceCategories.map((cat, idx) => (
-                    <Card key={idx} className="weightless-card border-none hover:translate-x-2 transition-all duration-300">
-                      <div className="flex gap-6">
-                        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shrink-0
-                          ${cat.color === 'blue' ? 'bg-blue-50' : ''}
-                          ${cat.color === 'green' ? 'bg-green-50' : ''}
-                          ${cat.color === 'purple' ? 'bg-purple-50' : ''}
-                          ${cat.color === 'orange' ? 'bg-orange-50' : ''}
-                        `}>
-                          {cat.icon}
-                        </div>
-                        <div className="flex-grow">
-                          <Title level={4} className="!m-0 !font-black !font-manrope !text-lg">{cat.title}</Title>
-                          <Paragraph className="text-xs text-on-surface/40 mt-1 mb-4">{cat.desc}</Paragraph>
-                          <div className="flex items-center justify-between">
-                            <Tag className="rounded-full border-none bg-surface-low px-4 font-bold text-[10px] uppercase tracking-widest text-on-surface/40">
-                              {cat.count}
-                            </Tag>
-                            <Button 
-                              type="text" 
-                              className="text-primary font-bold text-xs uppercase tracking-widest p-0"
-                              onClick={() => navigate('/materi/1')}
-                            >
-                              Mulai <RightOutlined />
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
+                              {/* Materials Dropdown */}
+                              {isExpanded && (
+                                <div className="mt-6 pt-4 border-t border-dashed border-on-surface/10">
+                                  <Text className="text-xs font-bold uppercase tracking-widest text-on-surface/40 mb-3 block">Daftar Materi</Text>
+                                  {pkg.materials && pkg.materials.length > 0 ? (
+                                    <List
+                                      size="small"
+                                      dataSource={pkg.materials}
+                                      renderItem={mat => (
+                                        <List.Item className="px-0 py-2 border-b border-on-surface/5 last:border-0 cursor-pointer hover:bg-surface-low rounded-lg transition-colors group">
+                                          <div className="flex items-start gap-3 px-2">
+                                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary mt-0.5 shrink-0 group-hover:bg-primary group-hover:text-white transition-colors">
+                                              {mat.category?.toLowerCase() === 'video' ? <PlayCircleOutlined /> : <FileTextOutlined />}
+                                            </div>
+                                            <div>
+                                              <Text className="text-sm font-bold block leading-tight">{mat.title}</Text>
+                                              <Text className="text-[10px] uppercase text-on-surface/40 tracking-widest">{mat.category}</Text>
+                                            </div>
+                                          </div>
+                                        </List.Item>
+                                      )}
+                                    />
+                                  ) : (
+                                    <Text className="text-xs text-on-surface/40 italic block text-center py-2">Belum ada materi untuk paket ini.</Text>
+                                  )}
+                                </div>
+                              )}
+                                  <div className="mt-6 pt-6 border-t border-surface-low">
+                                    <Space className="w-full" direction="vertical" size="middle">
+                                      <Button type="primary" block className="rounded-xl font-bold h-11 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-shadow" onClick={() => navigate(`/paket/${pkg.slug}/materi/${pkg.materials?.[0]?.client_id || 'm1'}`)}>Buka Modul Belajar</Button>
+                                      <Button block className="rounded-xl font-bold h-11 border-primary text-primary hover:bg-primary/5 transition-colors" onClick={() => navigate(`/exam/${pkg.slug}`)}>Mulai Simulasi Ujian</Button>
+                                      <Button block type="text" className="rounded-xl font-bold h-11 text-on-surface/60 hover:text-primary transition-colors" onClick={() => navigate(`/paket/${pkg.slug}`)}>Lihat Detail Paket</Button>
+                                    </Space>
+                                  </div>
+                            </div>
+                          </Card>
+                        </Col>
+                      );
+                    })}
+                  </Row>
+                )}
               </div>
 
             </Col>

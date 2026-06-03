@@ -7,9 +7,14 @@ const { useBreakpoint } = Grid;
 
 interface CheckoutFormProps {
   onComplete: (values: any) => void;
+  initialValues?: {
+    name?: string;
+    email?: string;
+    whatsapp?: string;
+  };
 }
 
-const CheckoutForm: React.FC<CheckoutFormProps> = ({ onComplete }) => {
+const CheckoutForm: React.FC<CheckoutFormProps> = ({ onComplete, initialValues }) => {
   const screens = useBreakpoint();
   const [form] = Form.useForm();
 
@@ -31,6 +36,7 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({ onComplete }) => {
         layout="vertical" 
         className="checkout-form"
         onFinish={handleSubmit}
+        initialValues={initialValues}
       >
         <Form.Item
           label={<span className="font-bold text-xs uppercase tracking-wider text-on-surface/50">Nama Lengkap</span>}

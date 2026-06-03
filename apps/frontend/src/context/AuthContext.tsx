@@ -13,6 +13,7 @@ export interface JwtPayload {
 
 // Backward-compatible User shape used by Navbar, Dashboard, Profile, etc.
 export interface AuthUser {
+  id: number;
   name: string;
   email: string;
   phone?: string;
@@ -97,6 +98,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Derive user from payload for backward compatibility
   const user: AuthUser | null = payload ? {
+    id: payload.user_id,
     name: payload.nama,
     email: payload.email,
     phone: payload.phone,

@@ -12,11 +12,15 @@ import {
   WarningOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
+import { useNavigate } from 'react-router-dom';
 
 const { Title, Text, Paragraph } = Typography;
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
+  const { items: cartItems, removeFromCart } = useCart();
+  const navigate = useNavigate();
 
   // Mock data based on Stitch design
   const stats = [
@@ -46,10 +50,7 @@ const Dashboard: React.FC = () => {
     { day: 'Sun', hours: 3.0, subject: 'Review' },
   ];
 
-  const cartItems = [
-    { id: 1, name: 'Saintek Pro Pass', price: '75.000', image: 'https://placehold.co/100x100?text=Saintek' },
-    { id: 2, name: 'TPS Killer Tricks', price: '45.000', image: 'https://placehold.co/100x100?text=TPS' },
-  ];
+
 
   const scheduleEvents = [
     { date: '2024-04-26', title: 'Tryout Mandiri 04', type: 'warning' },
@@ -213,15 +214,15 @@ const Dashboard: React.FC = () => {
                           <div key={item.id} className="flex items-center gap-3">
                             <Avatar shape="square" size={48} src={item.image} className="rounded-xl border border-on-surface/5" />
                             <div className="flex-grow">
-                              <Text className="text-xs font-black block leading-tight">{item.name}</Text>
-                              <Text className="text-[10px] text-primary font-bold">Rp {item.price}</Text>
+                              <Text className="text-xs font-black block leading-tight">{item.title}</Text>
+                              <Text className="text-[10px] text-primary font-bold">Rp {item.price.toLocaleString('id-ID')}</Text>
                             </div>
-                            <Button size="small" type="text" className="text-xs font-bold text-red-400">Hapus</Button>
+                            <Button size="small" type="text" className="text-xs font-bold text-red-400" onClick={() => removeFromCart(item.id)}>Hapus</Button>
                           </div>
                         ))}
                       </div>
                       
-                      <Button type="primary" block className="rounded-xl h-10 font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20">
+                      <Button type="primary" block className="rounded-xl h-10 font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20" onClick={() => navigate('/keranjang')}>
                         Checkout Sekarang
                       </Button>
                     </Card>

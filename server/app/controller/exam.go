@@ -255,7 +255,7 @@ func GetExamSession(c echo.Context) error {
 	id := c.Param("id")
 
 	var session model.ExamSession
-	if err := connection.DB.Preload("Package").Preload("Answers", func(db *gorm.DB) *gorm.DB {
+	if err := connection.DB.Preload("User").Preload("Package").Preload("Answers", func(db *gorm.DB) *gorm.DB {
 		return db.Order("id asc")
 	}).Where("id = ?", id).First(&session).Error; err != nil {
 		return c.JSON(http.StatusNotFound, map[string]interface{}{

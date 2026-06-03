@@ -12,9 +12,11 @@ interface SummaryItem {
 interface OrderSummarySimpleProps {
   items: SummaryItem[];
   total: number;
+  discount?: number;
+  voucherCode?: string;
 }
 
-const OrderSummarySimple: React.FC<OrderSummarySimpleProps> = ({ items, total }) => {
+const OrderSummarySimple: React.FC<OrderSummarySimpleProps> = ({ items, total, discount = 0, voucherCode }) => {
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat('id-ID', {
       style: 'currency',
@@ -35,9 +37,17 @@ const OrderSummarySimple: React.FC<OrderSummarySimpleProps> = ({ items, total })
         ))}
       </div>
 
-      <div className="mt-6 pt-6 border-t border-dashed border-on-surface/10 flex justify-between items-center">
-        <Text className="font-bold">Total Pembayaran</Text>
-        <Text className="text-xl font-bold text-primary">{formatCurrency(total)}</Text>
+      <div className="mt-6 pt-6 border-t border-dashed border-on-surface/10 space-y-3">
+        {voucherCode && discount > 0 && (
+          <div className="flex justify-between items-center">
+            <Text className="text-green-600 font-bold">Promo ({voucherCode})</Text>
+            <Text className="text-green-600 font-bold">-{formatCurrency(discount)}</Text>
+          </div>
+        )}
+        <div className="flex justify-between items-center">
+          <Text className="font-bold">Total Pembayaran</Text>
+          <Text className="text-xl font-bold text-primary">{formatCurrency(total)}</Text>
+        </div>
       </div>
     </div>
   );

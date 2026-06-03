@@ -4,40 +4,16 @@ import { Breadcrumb, Typography, Row, Col } from 'antd';
 import CartItemList from '../components/organisms/CartItemList';
 import CartSummary from '../components/organisms/CartSummary';
 import { useNavigate } from 'react-router-dom';
+import { useCart } from '../context/CartContext';
 
 const { Title, Paragraph } = Typography;
 
 const CartPage: React.FC = () => {
   const navigate = useNavigate();
-  const [items, setItems] = useState([
-    {
-      id: '1',
-      title: 'Intensive SNBT 2024 - Saintek Pro',
-      variant: 'Akses 30 Hari • 15 Sesi LIVE',
-      price: 75000,
-      image: 'https://images.unsplash.com/photo-1434031211128-095490e7e7e9?auto=format&fit=crop&q=80&w=800',
-      quantity: 1,
-    },
-    {
-      id: '2',
-      title: 'Mock Tryout Akbar - Sistem IRT',
-      variant: 'Sekali Pengerjaan • Pembahasan Lengkap',
-      price: 25000,
-      image: 'https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?auto=format&fit=crop&q=80&w=800',
-      quantity: 1,
-    },
-  ]);
+  const { items, removeFromCart, appliedVoucher, applyVoucher, removeVoucher } = useCart();
 
   const handleRemove = (id: string) => {
-    setItems(items.filter((item) => item.id !== id));
-  };
-
-  const handleUpdateQuantity = (id: string, delta: number) => {
-    setItems(
-      items.map((item) =>
-        item.id === id ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item
-      )
-    );
+    removeFromCart(id);
   };
 
   const subtotal = items.reduce((acc, item) => acc + item.price * item.quantity, 0);
@@ -66,7 +42,6 @@ const CartPage: React.FC = () => {
                 <CartItemList 
                   items={items} 
                   onRemove={handleRemove} 
-                  onUpdateQuantity={handleUpdateQuantity} 
                 />
               </Col>
               
@@ -74,7 +49,10 @@ const CartPage: React.FC = () => {
                 <CartSummary 
                   subtotal={subtotal} 
                   tax={tax} 
-                  total={total} 
+                  total={total}
+                  appliedVoucher={appliedVoucher}
+                  onApplyVoucher={applyVoucher}
+                  onRemoveVoucher={removeVoucher}
                   onCheckout={() => navigate('/checkout')} 
                 />
               </Col>
@@ -84,7 +62,6 @@ const CartPage: React.FC = () => {
               <CartItemList 
                 items={[]} 
                 onRemove={handleRemove} 
-                onUpdateQuantity={handleUpdateQuantity} 
               />
             </div>
           )}

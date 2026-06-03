@@ -7,6 +7,10 @@ import CheckoutForm from '../components/organisms/CheckoutForm';
 import PaymentSection from '../components/organisms/PaymentSection';
 import OrderSummarySimple from '../components/molecules/OrderSummarySimple';
 import PageLoader from '../components/atoms/PageLoader';
+import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
+import { checkoutAPI } from '../services/checkoutService';
+import { message } from 'antd';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -14,52 +18,86 @@ type CheckoutStep = 'form' | 'payment' | 'success';
 
 const CheckoutPage: React.FC = () => {
   const navigate = useNavigate();
+  const { isLoggedIn, user } = useAuth();
+  const { items: cartItems, clearCart, appliedVoucher } = useCart();
+  
   const [step, setStep] = useState<CheckoutStep>('form');
   const [orderNumber, setOrderNumber] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isLoggedIn) {
+      navigate('/login');
+      return;
+    }
     const timer = setTimeout(() => {
       setLoading(false);
     }, 1000);
     return () => clearTimeout(timer);
-  }, []);
+  }, [isLoggedIn, navigate]);
 
-  const checkoutItems = [
-    {
-      id: '1',
-      title: 'Intensive SNBT 2024 - Saintek Pro',
-      price: 75000,
-    },
-    {
-      id: '2',
-      title: 'Mock Tryout Akbar - Sistem IRT',
-      price: 25000,
-    },
-  ];
+  const subtotal = cartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  
+  let discount = 0;
+  if (appliedVoucher) {
+    if (appliedVoucher.type === 'percentage') {
+      discount = subtotal * (appliedVoucher.value / 100);
+    } else {
+      discount = appliedVoucher.value;
+    }
+  }
 
-  const subtotal = checkoutItems.reduce((acc, item) => acc + item.price, 0);
-  const tax = Math.round(subtotal * 0.11);
-  const total = subtotal + tax;
+  const newSubtotal = Math.max(0, subtotal - discount);
+  const tax = Math.round(newSubtotal * 0.11);
+  const total = newSubtotal + tax;
 
-  const handleFormComplete = (values: any) => {
+  const handleFormComplete = async (values: any) => {
+    if (!user || cartItems.length === 0) return;
+    
     setLoading(true);
-    setTimeout(() => {
-      const date = new Date();
-      const dateStr = date.toISOString().split('T')[0].replace(/-/g, '');
-      const random = Math.floor(1000 + Math.random() * 9000);
-      setOrderNumber(`KTN-${dateStr}-${random}`);
-      setStep('payment');
-      setLoading(false);
-    }, 1000);
+    if (total === 0) {
+      try {
+        const res = await checkoutAPI({
+          user_id: user.id,
+          package_slug: cartItems[0].id,
+          voucher_code: appliedVoucher?.code,
+        });
+        setOrderNumber(res.invoice_code); // Show invoice code on success page
+        clearCart();
+        setStep('success');
+      } catch (error: any) {
+        message.error(error.response?.data?.message || 'Gagal melakukan checkout');
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      setTimeout(() => {
+        setStep('payment');
+        setLoading(false);
+      }, 1000);
+    }
   };
 
-  const handlePaymentSuccess = () => {
+  const handlePaymentSuccess = async () => {
+    if (!user || cartItems.length === 0) return;
+    
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const res = await checkoutAPI({
+        user_id: user.id,
+        package_slug: cartItems[0].id,
+        voucher_code: appliedVoucher?.code,
+      });
+      // In real scenario, backend returns "pending payment", and a webhook from payment gateway marks it "active"
+      // But for simulation, we just show success and clear cart.
+      setOrderNumber(res.invoice_code);
+      clearCart();
       setStep('success');
+    } catch (error: any) {
+      message.error(error.response?.data?.message || 'Gagal memproses pembayaran');
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
 
   if (loading) return <PageLoader />;
@@ -164,7 +202,14 @@ const CheckoutPage: React.FC = () => {
             <Col xs={24} lg={15}>
               <div className="min-h-[500px]">
                 {step === 'form' ? (
-                  <CheckoutForm onComplete={handleFormComplete} />
+                  <CheckoutForm 
+                    onComplete={handleFormComplete} 
+                    initialValues={{
+                      name: user?.name,
+                      email: user?.email,
+                      whatsapp: user?.phone
+                    }}
+                  />
                 ) : (
                   <PaymentSection 
                     orderNumber={orderNumber} 
@@ -176,7 +221,12 @@ const CheckoutPage: React.FC = () => {
             
             <Col xs={24} lg={9}>
               <div className="space-y-6 sticky top-24">
-                <OrderSummarySimple items={checkoutItems} total={total} />
+                <OrderSummarySimple 
+                  items={cartItems} 
+                  total={total} 
+                  discount={discount} 
+                  voucherCode={appliedVoucher?.code} 
+                />
                 <div className="p-6 bg-primary/5 rounded-3xl border border-primary/10 flex gap-4 items-start">
                     <div className="p-2 bg-primary/10 rounded-xl">
                         <CheckCircleOutlined className="text-primary text-xl" />

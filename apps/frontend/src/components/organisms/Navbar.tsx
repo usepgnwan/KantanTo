@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Menu, Button, Space, Drawer, Avatar, Dropdown, Divider } from 'antd';
+import { Menu, Button, Space, Drawer, Avatar, Dropdown, Divider, Badge } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   MenuOutlined,
@@ -15,12 +15,14 @@ import {
 } from '@ant-design/icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../context/CartContext';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { menuConfig } from '../../routes/config';
 
 const Navbar: React.FC = () => {
   const { mode, toggleTheme } = useTheme();
   const { isLoggedIn, user, logout } = useAuth();
+  const { items: cartItems } = useCart();
   const [scrolled, setScrolled] = useState(false);
   const [mobileVisible, setMobileVisible] = useState(false);
   const location = useLocation();
@@ -132,9 +134,11 @@ const Navbar: React.FC = () => {
             />
 
             <Link to="/keranjang" className="relative group">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-low transition-colors">
-                <ShoppingOutlined className="text-xl opacity-60 group-hover:opacity-100 group-hover:text-primary transition-all" />
-              </div>
+              <Badge count={cartItems.length} size="small" offset={[-2, 6]}>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-low transition-colors">
+                  <ShoppingOutlined className="text-xl opacity-60 group-hover:opacity-100 group-hover:text-primary transition-all" />
+                </div>
+              </Badge>
             </Link>
 
             {isLoggedIn ? (
@@ -163,7 +167,9 @@ const Navbar: React.FC = () => {
         {/* Mobile Toggle */}
         <div className="md:hidden flex items-center space-x-4">
           <Link to="/keranjang" className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-surface-low transition-colors">
-            <ShoppingOutlined className="text-xl opacity-60" />
+            <Badge count={cartItems.length} size="small">
+              <ShoppingOutlined className="text-xl opacity-60" />
+            </Badge>
           </Link>
           <Button
             type="text"

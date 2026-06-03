@@ -1,7 +1,9 @@
 import React from 'react';
 import { Card, Tag, Typography, Button, Space, Rate } from 'antd';
 import { UserOutlined, ClockCircleOutlined, ThunderboltOutlined } from '@ant-design/icons';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useCart } from '../../context/CartContext';
+import { useAuth } from '../../context/AuthContext';
 
 const { Title, Text } = Typography;
 
@@ -22,6 +24,7 @@ export interface PackageProps {
 }
 
 const PackageCard: React.FC<PackageProps> = ({
+  id,
   title,
   slug,
   image,
@@ -35,6 +38,32 @@ const PackageCard: React.FC<PackageProps> = ({
   subjects,
   isPopular
 }) => {
+  const navigate = useNavigate();
+  const { addToCart, isInCart } = useCart();
+  const { isLoggedIn } = useAuth();
+
+  const handleAddToCart = () => {
+    if (!isLoggedIn) {
+      navigate('/login');
+      return;
+    }
+
+    if (!isInCart(id)) {
+      addToCart({
+        id,
+        slug,
+        title,
+        variant: `${category} • ${duration}`,
+        price,
+        image: image || 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=800',
+        quantity: 1,
+      });
+    }
+    navigate('/keranjang');
+  };
+
+  const alreadyInCart = isInCart(id);
+
   return (
     <Card
       hoverable
@@ -91,8 +120,13 @@ const PackageCard: React.FC<PackageProps> = ({
           </div>
           
           <Space className="w-full" direction="vertical">
-            <Button type="primary" block className="h-11 rounded-xl font-bold shadow-md shadow-primary/20">
-              Pilih Paket
+            <Button 
+              type={alreadyInCart ? "default" : "primary"} 
+              block 
+              className={`h-11 rounded-xl font-bold shadow-md ${alreadyInCart ? 'border-primary text-primary' : 'shadow-primary/20'}`}
+              onClick={handleAddToCart}
+            >
+              {alreadyInCart ? 'Lihat Keranjang' : 'Pilih Paket'}
             </Button>
             <Link to={`/paket/${slug}`} className="w-full">
               <Button block className="h-11 rounded-xl font-semibold border-surface-container hover:border-primary hover:text-primary">

@@ -13,8 +13,9 @@ type Package struct {
 	SubjectsJSON string    `gorm:"type:text;default:'[]'" json:"-"`
 	Duration     int       `gorm:"default:0" json:"duration"`
 	Status       string    `gorm:"default:'draft'" json:"status"`
-	Thumbnail    string    `gorm:"default:''" json:"thumbnail"`
-	CreatedAt    time.Time `json:"created_at"`
+	Thumbnail    string            `gorm:"default:''" json:"thumbnail"`
+	Materials    []PackageMaterial `gorm:"foreignKey:PackageID;constraint:OnDelete:CASCADE" json:"materials"`
+	CreatedAt    time.Time         `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 

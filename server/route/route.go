@@ -2,6 +2,7 @@ package route
 
 import (
 	"os"
+	"server/app/controller"
 	"server/app/middleware"
 
 	"github.com/labstack/echo/v4"
@@ -28,6 +29,10 @@ func InitRouting(e *echo.Echo) {
 	// Apply Header Authorization
 	api.Use(middleware.HeaderAuthorizationMiddleware)
 
+	api.POST("/checkout", controller.Checkout)
+	api.GET("/user/packages", controller.GetMyPackages)
+	api.POST("/user/progress", controller.MarkMaterialAsRead)
+
 	// Call separate route logic
 	RouteMapel(api)
 	RouteCategory(api)
@@ -39,4 +44,5 @@ func InitRouting(e *echo.Echo) {
 	RouteArtikel(api)
 	RoutePackage(api)
 	RouteExam(api)
+	RouteVoucher(api)
 }

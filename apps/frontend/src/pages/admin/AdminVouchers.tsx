@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getVouchers, createVoucher, updateVoucher, deleteVoucher, Voucher, VoucherUsage } from '../../services/voucherService';
 import AdminLayout from '../../layouts/AdminLayout';
 import {
   Card, Table, Button, Tag, Typography, Space, Modal,
@@ -21,31 +22,6 @@ import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
 
-interface Voucher {
-  key: string;
-  code: string;
-  type: 'fixed' | 'percentage';
-  value: number;
-  limit: number;
-  used: number;
-  expiryDate: string;
-  status: 'active' | 'expired' | 'finished';
-}
-
-interface VoucherUsage {
-  id: string;
-  orderId: string;
-  user: string;
-  package: string;
-  amount: number;
-  date: string;
-}
-
-const initialVouchers: Voucher[] = [
-  { key: '1', code: 'PROMOSI20', type: 'percentage', value: 20, limit: 100, used: 45, expiryDate: '2026-12-31', status: 'active' },
-  { key: '2', code: 'DISKONMABA', type: 'fixed', value: 15000, limit: 50, used: 50, expiryDate: '2026-05-20', status: 'finished' },
-  { key: '3', code: 'BOLOSBELAJAR', type: 'percentage', value: 15, limit: 200, used: 12, expiryDate: '2026-04-01', status: 'expired' },
-];
 
 const mockUsage: Record<string, VoucherUsage[]> = {
   '1': [
@@ -58,12 +34,35 @@ const mockUsage: Record<string, VoucherUsage[]> = {
 };
 
 const AdminVouchers: React.FC = () => {
-  const [vouchers, setVouchers] = useState<Voucher[]>(initialVouchers);
+  const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Voucher | null>(null);
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
   const [form] = Form.useForm();
+
+  const getVoucherStatus = (v: Voucher): 'active' | 'expired' | 'finished' => {
+    if (v.used >= v.limit) return 'finished';
+    if (dayjs(v.expiryDate).isBefore(dayjs(), 'day')) return 'expired';
+    return 'active';
+  };
+
+  const fetchVouchers = async () => {
+    setLoading(true);
+    try {
+      const data = await getVouchers();
+      setVouchers(data);
+    } catch (error) {
+      message.error('Gagal memuat data voucher');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchVouchers();
+  }, []);
 
   const openCreate = () => {
     setEditTarget(null);
@@ -81,26 +80,37 @@ const AdminVouchers: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    const vals = await form.validateFields();
-    const formattedVals = {
-      ...vals,
-      expiryDate: vals.expiryDate.format('YYYY-MM-DD'),
-    };
-
-    if (editTarget) {
-      setVouchers(vouchers.map(v => v.key === editTarget.key ? { ...v, ...formattedVals } : v));
-      message.success('Voucher diperbarui');
-    } else {
-      const newV: Voucher = {
-        key: String(Date.now()),
-        used: 0,
-        status: 'active',
-        ...formattedVals,
+    try {
+      const vals = await form.validateFields();
+      const formattedVals = {
+        ...vals,
+        expiryDate: vals.expiryDate.format('YYYY-MM-DD'),
       };
-      setVouchers([...vouchers, newV]);
-      message.success('Voucher baru berhasil dibuat');
+
+      if (editTarget && editTarget.id) {
+        await updateVoucher(editTarget.id, formattedVals);
+        message.success('Voucher diperbarui');
+      } else {
+        await createVoucher(formattedVals);
+        message.success('Voucher baru berhasil dibuat');
+      }
+      setModalOpen(false);
+      fetchVouchers();
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || 'Terjadi kesalahan';
+      message.error(errorMsg);
     }
-    setModalOpen(false);
+  };
+
+  const handleDelete = async (id: number | string | undefined) => {
+    if (!id) return;
+    try {
+      await deleteVoucher(id);
+      message.success('Voucher berhasil dihapus');
+      fetchVouchers();
+    } catch (error) {
+      message.error('Gagal menghapus voucher');
+    }
   };
 
   const columns: TableColumnsType<Voucher> = [
@@ -157,11 +167,11 @@ const AdminVouchers: React.FC = () => {
     },
     {
       title: 'Status',
-      dataIndex: 'status',
       key: 'status',
-      render: (status: Voucher['status']) => {
-        const colors: Record<Voucher['status'], string> = { active: 'green', expired: 'red', finished: 'orange' };
-        const labels: Record<Voucher['status'], string> = { active: 'Aktif', expired: 'Kadaluarsa', finished: 'Limit Habis' };
+      render: (_, record) => {
+        const status = getVoucherStatus(record);
+        const colors: Record<string, string> = { active: 'green', expired: 'red', finished: 'orange' };
+        const labels: Record<string, string> = { active: 'Aktif', expired: 'Kadaluarsa', finished: 'Limit Habis' };
         return <Tag color={colors[status]} className="rounded-full font-bold px-3">{labels[status]}</Tag>;
       }
     },
@@ -178,7 +188,7 @@ const AdminVouchers: React.FC = () => {
             className="text-orange-500"
           />
           <Button icon={<EditOutlined />} onClick={() => openEdit(record)} type="text" className="text-primary" />
-          <Button icon={<DeleteOutlined />} danger type="text" onClick={() => setVouchers(vouchers.filter(v => v.key !== record.key))} />
+          <Button icon={<DeleteOutlined />} danger type="text" onClick={() => handleDelete(record.id)} />
         </Space>
       ),
     },
@@ -213,7 +223,7 @@ const AdminVouchers: React.FC = () => {
                   <SafetyOutlined className="text-blue-500 text-xl" />
                 </div>
                 <div>
-                  <Title level={4} className="!m-0 !font-black">{vouchers.filter(v => v.status === 'active').length}</Title>
+                  <Title level={4} className="!m-0 !font-black">{vouchers.filter(v => getVoucherStatus(v) === 'active').length}</Title>
                   <Text className="text-[10px] uppercase font-bold text-on-surface/40 tracking-widest">Voucher Aktif</Text>
                 </div>
               </div>
@@ -235,7 +245,7 @@ const AdminVouchers: React.FC = () => {
                   <CalendarOutlined className="text-red-500 text-xl" />
                 </div>
                 <div>
-                  <Title level={4} className="!m-0 !font-black">{vouchers.filter(v => v.status === 'expired').length}</Title>
+                  <Title level={4} className="!m-0 !font-black">{vouchers.filter(v => getVoucherStatus(v) === 'expired').length}</Title>
                   <Text className="text-[10px] uppercase font-bold text-on-surface/40 tracking-widest">Voucher Hangus</Text>
                 </div>
               </div>
@@ -253,6 +263,7 @@ const AdminVouchers: React.FC = () => {
             <Table
               columns={columns}
               dataSource={vouchers}
+              loading={loading}
               pagination={{ pageSize: 10 }}
               className="weightless-table"
             />
@@ -327,7 +338,7 @@ const AdminVouchers: React.FC = () => {
         }
       >
         <Table
-          dataSource={selectedVoucher ? (mockUsage[selectedVoucher.key] || []) : []}
+          dataSource={selectedVoucher && selectedVoucher.key ? (mockUsage[selectedVoucher.key] || []) : []}
           pagination={{ pageSize: 5 }}
           className="weightless-table"
           columns={[

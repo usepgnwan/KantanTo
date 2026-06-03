@@ -13,6 +13,7 @@ import {
 import AppLayout from '../layouts/AppLayout';
 import { useAuth } from '../context/AuthContext';
 import { getPackageMaterials, getPackages, PackageListItem, PackageMaterialPayload } from '../services/packageService';
+import { getMyPackagesAPI, markMaterialAsReadAPI } from '../services/myPackageService';
 import { renderLatex } from '../utils/latex';
 
 const { Title, Text } = Typography;
@@ -51,8 +52,9 @@ const PackageMaterialDetailPage: React.FC = () => {
   const [materials, setMaterials] = useState<PackageMaterialPayload[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const { isAdmin } = useAuth();
-  const hasAccess = isAdmin(); 
+  const { isAdmin, user } = useAuth();
+  const [ownsPackage, setOwnsPackage] = useState(false);
+  const hasAccess = isAdmin() || ownsPackage; 
 
   useEffect(() => {
     if (!slug) return;
@@ -84,6 +86,24 @@ const PackageMaterialDetailPage: React.FC = () => {
     };
   }, [slug]);
 
+  // Check if user owns package
+  useEffect(() => {
+    if (!slug || !user?.id) return;
+    getMyPackagesAPI(user.id).then((myPackages) => {
+      const owned = myPackages.some(tx => tx.package?.slug === slug && tx.status === 'active');
+      setOwnsPackage(owned);
+    }).catch(console.error);
+  }, [slug, user]);
+
+  const materialIndex = materials.findIndex((m) => String(m.id) === String(materialSlug) || String(m.client_id) === String(materialSlug));
+  const material = materialIndex >= 0 ? materials[materialIndex] : null;
+
+  useEffect(() => {
+    if (material && ownsPackage && packageData && user?.id) {
+      markMaterialAsReadAPI(user.id, packageData.id, Number(material.id));
+    }
+  }, [material?.id, ownsPackage, packageData?.id, user?.id]);
+
   // Trigger KaTeX re-render on content change
   useEffect(() => {
     if (!loading && window.renderMathInElement) {
@@ -100,22 +120,20 @@ const PackageMaterialDetailPage: React.FC = () => {
     }
   }, [loading, materialSlug]);
 
-  const materialIndex = materials.findIndex((m) => String(m.id) === String(materialSlug));
-  const material = materialIndex >= 0 ? materials[materialIndex] : null;
   const isLocked = Boolean(material) && !hasAccess && materialIndex > 0;
   const isPublicPreview = Boolean(material) && !hasAccess && materialIndex === 0;
 
   const handleNext = () => {
     if (materialIndex < materials.length - 1) {
       const nextMaterial = materials[materialIndex + 1];
-      navigate(`/paket/${slug}/materi/${nextMaterial.id}`);
+      navigate(`/paket/${slug}/materi/${nextMaterial.client_id || nextMaterial.id}`);
     }
   };
 
   const handlePrev = () => {
     if (materialIndex > 0) {
       const prevMaterial = materials[materialIndex - 1];
-      navigate(`/paket/${slug}/materi/${prevMaterial.id}`);
+      navigate(`/paket/${slug}/materi/${prevMaterial.client_id || prevMaterial.id}`);
     }
   };
 
@@ -159,12 +177,12 @@ const PackageMaterialDetailPage: React.FC = () => {
                     </div>
                     <div className="space-y-1 p-1">
                       {materials.map((item, idx) => {
-                        const isActive = String(item.id) === String(materialSlug);
+                        const isActive = String(item.id) === String(materialSlug) || String(item.client_id) === String(materialSlug);
                         const isItemLocked = !hasAccess && idx > 0;
                         return (
                           <div
                             key={item.id}
-                            onClick={() => !isItemLocked && navigate(`/paket/${slug}/materi/${item.id}`)}
+                            onClick={() => !isItemLocked && navigate(`/paket/${slug}/materi/${item.client_id || item.id}`)}
                             className={`
                               flex items-center gap-3 p-3 rounded-xl transition-all duration-200
                               ${isItemLocked ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}
