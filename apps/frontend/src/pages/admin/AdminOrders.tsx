@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
-import { getAdminTransactions } from '../../services/transactionService';
+import { getAdminTransactions, updateTransactionStatus } from '../../services/transactionService';
 import {
   Card, Table, Input, Button, Tag, Avatar,
-  Typography, Space, Select, Dropdown, Steps,
+  Typography, Select, Dropdown, Steps, message,
 } from 'antd';
 import type { MenuProps, TableColumnsType } from 'antd';
 import {
@@ -24,7 +24,8 @@ interface Order {
   amount: number;
   originalAmount: number;
   voucher?: string;
-  status: 'sukses' | 'pending' | 'gagal';
+  status: 'sukses' | 'pending' | 'gagal' | 'batal';
+  rawStatus: string;
   method: string;
   date: string;
 }
@@ -35,45 +36,70 @@ const AdminOrders: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        setLoading(true);
-        const res = await getAdminTransactions();
-        if (res.status && res.data) {
-          const formatted: Order[] = res.data.map((t: any) => {
-            let mappedStatus: 'sukses' | 'pending' | 'gagal' = 'pending';
-            if (t.status === 'active') mappedStatus = 'sukses';
-            else if (t.status === 'expired' || t.status === 'inactive') mappedStatus = 'gagal';
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const res = await getAdminTransactions();
+      if (res.status && res.data) {
+        const formatted: Order[] = res.data.map((t: any) => {
+          let mappedStatus: 'sukses' | 'pending' | 'gagal' | 'batal' = 'pending';
+          if (t.status === 'active') mappedStatus = 'sukses';
+          else if (t.status === 'cancelled' || t.status === 'batal') mappedStatus = 'batal';
+          else if (t.status === 'expired' || t.status === 'inactive' || t.status === 'failed') mappedStatus = 'gagal';
 
-            return {
-              key: t.id.toString(),
-              orderId: t.order_id,
-              user: t.user?.name || '-',
-              email: t.user?.email || '-',
-              package: t.package?.title || '-',
-              amount: t.amount,
-              originalAmount: t.package?.price || t.amount,
-              voucher: t.voucher?.code,
-              status: mappedStatus,
-              method: t.payment_method?.toUpperCase() || '-',
-              date: new Date(t.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
-            };
-          });
-          setOrders(formatted);
-        }
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
+          return {
+            key: t.id.toString(),
+            orderId: t.order_id,
+            user: t.user?.name || '-',
+            email: t.user?.email || '-',
+            package: t.package?.title || '-',
+            amount: t.amount,
+            originalAmount: t.package?.price || t.amount,
+            voucher: t.voucher?.code,
+            status: mappedStatus,
+            rawStatus: t.status || 'pending payment',
+            method: t.payment_method?.toUpperCase() || '-',
+            date: new Date(t.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+          };
+        });
+        setOrders(formatted);
       }
-    };
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchOrders();
   }, []);
+
+  const handleStatusChange = async (id: string, newStatus: string) => {
+    try {
+      await updateTransactionStatus(id, newStatus);
+      message.success('Status pembayaran berhasil diperbarui!');
+      setOrders((prev) =>
+        prev.map((o) => {
+          if (o.key === id) {
+            let mappedStatus: 'sukses' | 'pending' | 'gagal' | 'batal' = 'pending';
+            if (newStatus === 'active') mappedStatus = 'sukses';
+            else if (newStatus === 'cancelled' || newStatus === 'batal') mappedStatus = 'batal';
+            else if (newStatus === 'expired' || newStatus === 'inactive' || newStatus === 'failed') mappedStatus = 'gagal';
+            return { ...o, rawStatus: newStatus, status: mappedStatus };
+          }
+          return o;
+        })
+      );
+    } catch (error) {
+      message.error('Gagal memperbarui status pembayaran');
+    }
+  };
 
   const statusConfig = {
     sukses: { color: 'green', icon: <CheckCircleOutlined />, label: 'Sukses' },
     pending: { color: 'orange', icon: <ClockCircleOutlined />, label: 'Pending' },
+    batal: { color: 'volcano', icon: <CloseCircleOutlined />, label: 'Dibatalkan (Customer)' },
     gagal: { color: 'red', icon: <CloseCircleOutlined />, label: 'Gagal' },
   };
 
@@ -88,12 +114,29 @@ const AdminOrders: React.FC = () => {
   const totalRevenue = orders.filter(o => o.status === 'sukses').reduce((a, o) => a + o.amount, 0);
   const successCount = orders.filter(o => o.status === 'sukses').length;
   const pendingCount = orders.filter(o => o.status === 'pending').length;
+  const cancelledCount = orders.filter(o => o.status === 'batal').length;
 
-  const rowActions = (): MenuProps['items'] => [
+  const rowActions = (record: Order): MenuProps['items'] => [
     { key: 'view', label: 'Lihat Detail' },
-    { key: 'resend', label: 'Kirim Konfirmasi' },
     { type: 'divider' },
-    { key: 'refund', label: 'Proses Refund', danger: true },
+    {
+      key: 'active',
+      label: <span className="text-green-600 font-bold">Ubah ke Sukses</span>,
+      disabled: record.status === 'sukses',
+      onClick: () => handleStatusChange(record.key, 'active'),
+    },
+    {
+      key: 'cancelled',
+      label: <span className="text-orange-600 font-bold">Ubah ke Dibatalkan</span>,
+      disabled: record.status === 'batal',
+      onClick: () => handleStatusChange(record.key, 'cancelled'),
+    },
+    {
+      key: 'expired',
+      label: <span className="text-red-500 font-bold">Ubah ke Gagal</span>,
+      disabled: record.status === 'gagal',
+      onClick: () => handleStatusChange(record.key, 'expired'),
+    },
   ];
 
   const columns: TableColumnsType<Order> = [
@@ -179,8 +222,8 @@ const AdminOrders: React.FC = () => {
       title: '',
       key: 'action',
       width: 48,
-      render: () => (
-        <Dropdown menu={{ items: rowActions() }} trigger={['click']} placement="bottomRight">
+      render: (_, record) => (
+        <Dropdown menu={{ items: rowActions(record) }} trigger={['click']} placement="bottomRight">
           <Button type="text" icon={<MoreOutlined />} className="text-on-surface/40 hover:text-primary" />
         </Dropdown>
       ),
@@ -258,6 +301,7 @@ const AdminOrders: React.FC = () => {
                   { value: 'all', label: 'Semua Status' },
                   { value: 'sukses', label: 'Sukses' },
                   { value: 'pending', label: 'Pending' },
+                  { value: 'batal', label: 'Dibatalkan (Customer)' },
                   { value: 'gagal', label: 'Gagal' },
                 ]}
                 suffixIcon={<FilterOutlined />}

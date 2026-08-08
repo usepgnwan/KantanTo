@@ -12,6 +12,7 @@ const History = React.lazy(() => import('../pages/History'));
 const Cart = React.lazy(() => import('../pages/Cart'));
 const Checkout = React.lazy(() => import('../pages/Checkout'));
 const Profile = React.lazy(() => import('../pages/Profile'));
+const Purchases = React.lazy(() => import('../pages/Purchases'));
 const Dashboard = React.lazy(() => import('../pages/Dashboard'));
 const Practice = React.lazy(() => import('../pages/Practice'));
 const Review = React.lazy(() => import('../pages/Review'));
@@ -35,6 +36,7 @@ const AdminClasses = React.lazy(() => import('../pages/admin/AdminClasses'));
 const AdminSubjects = React.lazy(() => import('../pages/admin/AdminSubjects'));
 const AdminRoles = React.lazy(() => import('../pages/admin/AdminRoles'));
 const AdminExamHistory = React.lazy(() => import('../pages/admin/AdminExamHistory'));
+const AdminExampleExams = React.lazy(() => import('../pages/admin/AdminExampleExams'));
 const NotFound = React.lazy(() => import('../pages/NotFound'));
 
 export interface MenuItem {
@@ -126,6 +128,13 @@ export const menuConfig: MenuItem[] = [
     path: '/profile',
     name: 'Profil Saya',
     component: Profile,
+    hidden: true,
+  },
+  {
+    id: 'pembelian',
+    path: '/pembelian',
+    name: 'Pembelian',
+    component: Purchases,
     hidden: true,
   },
   {
@@ -230,6 +239,13 @@ export const menuConfig: MenuItem[] = [
     hidden: true,
   },
   {
+    id: 'admin-example-exam',
+    path: '/admin/example-exam',
+    name: 'Soal Landing Page',
+    component: AdminExampleExams,
+    hidden: true,
+  },
+  {
     id: 'admin-users',
     path: '/admin/users',
     name: 'Pengguna',
@@ -296,6 +312,20 @@ export const menuConfig: MenuItem[] = [
     id: 'admin-master-subjects',
     path: '/admin/master/subjects',
     name: 'Kelola Mapel',
+    component: AdminSubjects,
+    hidden: true,
+  },
+  {
+    id: 'admin-grades',
+    path: '/admin/grades',
+    name: 'Kelas (Grade)',
+    component: AdminClasses,
+    hidden: true,
+  },
+  {
+    id: 'admin-subjects',
+    path: '/admin/subjects',
+    name: 'Mata Pelajaran',
     component: AdminSubjects,
     hidden: true,
   },

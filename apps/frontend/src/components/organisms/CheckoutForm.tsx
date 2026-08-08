@@ -87,7 +87,7 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({ onComplete, initialValues }
             block
             className="h-14 rounded-2xl font-bold text-lg flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:scale-[1.01] transition-transform"
           >
-            Konfirmasi & Lanjutkan Ke Pembayaran <ArrowRightOutlined />
+            Bayar Sekarang <ArrowRightOutlined />
           </Button>
         </div>
       </Form>

@@ -25,16 +25,24 @@ const CheckoutPage: React.FC = () => {
   const [orderNumber, setOrderNumber] = useState('');
   const [loading, setLoading] = useState(true);
 
+  const [customerData, setCustomerData] = useState({ name: '', whatsapp: '', email: '' });
+  const [purchasedItems, setPurchasedItems] = useState<any[]>([]);
+  const [purchasedTotal, setPurchasedTotal] = useState<number>(0);
+
   useEffect(() => {
     if (!isLoggedIn) {
       navigate('/login');
       return;
     }
+    if (cartItems.length === 0 && step === 'form') {
+      navigate('/pembelian');
+      return;
+    }
     const timer = setTimeout(() => {
       setLoading(false);
-    }, 1000);
+    }, 500);
     return () => clearTimeout(timer);
-  }, [isLoggedIn, navigate]);
+  }, [isLoggedIn, cartItems.length, step, navigate]);
 
   const subtotal = cartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   
@@ -53,48 +61,30 @@ const CheckoutPage: React.FC = () => {
 
   const handleFormComplete = async (values: any) => {
     if (!user || cartItems.length === 0) return;
-    
-    setLoading(true);
-    if (total === 0) {
-      try {
-        const res = await checkoutAPI({
-          user_id: user.id,
-          package_slug: cartItems[0].id,
-          voucher_code: appliedVoucher?.code,
-        });
-        setOrderNumber(res.invoice_code); // Show invoice code on success page
-        clearCart();
-        setStep('success');
-      } catch (error: any) {
-        message.error(error.response?.data?.message || 'Gagal melakukan checkout');
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      setTimeout(() => {
-        setStep('payment');
-        setLoading(false);
-      }, 1000);
-    }
-  };
 
-  const handlePaymentSuccess = async () => {
-    if (!user || cartItems.length === 0) return;
+    const currentCart = [...cartItems];
+    const currentTotal = total;
+
+    setCustomerData({
+      name: values.name || user.name || '',
+      whatsapp: values.whatsapp || user.phone || '',
+      email: values.email || user.email || '',
+    });
+    setPurchasedItems(currentCart);
+    setPurchasedTotal(currentTotal);
     
     setLoading(true);
     try {
       const res = await checkoutAPI({
         user_id: user.id,
-        package_slug: cartItems[0].id,
+        package_slug: currentCart[0].id,
         voucher_code: appliedVoucher?.code,
       });
-      // In real scenario, backend returns "pending payment", and a webhook from payment gateway marks it "active"
-      // But for simulation, we just show success and clear cart.
-      setOrderNumber(res.invoice_code);
+      setOrderNumber(res.invoice_code || res.order_id);
+      setStep('payment');
       clearCart();
-      setStep('success');
     } catch (error: any) {
-      message.error(error.response?.data?.message || 'Gagal memproses pembayaran');
+      message.error(error.response?.data?.message || 'Gagal melakukan checkout');
     } finally {
       setLoading(false);
     }
@@ -213,7 +203,9 @@ const CheckoutPage: React.FC = () => {
                 ) : (
                   <PaymentSection 
                     orderNumber={orderNumber} 
-                    onSuccess={handlePaymentSuccess} 
+                    customerData={customerData}
+                    cartItems={purchasedItems}
+                    totalAmount={purchasedTotal}
                   />
                 )}
               </div>
@@ -222,8 +214,8 @@ const CheckoutPage: React.FC = () => {
             <Col xs={24} lg={9}>
               <div className="space-y-6 sticky top-24">
                 <OrderSummarySimple 
-                  items={cartItems} 
-                  total={total} 
+                  items={step === 'payment' ? purchasedItems : cartItems} 
+                  total={step === 'payment' ? purchasedTotal : total} 
                   discount={discount} 
                   voucherCode={appliedVoucher?.code} 
                 />

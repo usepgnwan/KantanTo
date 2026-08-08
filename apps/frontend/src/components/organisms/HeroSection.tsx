@@ -1,88 +1,76 @@
 import React from 'react';
 import { Button, Typography, Space } from 'antd';
-import { ArrowRightOutlined } from '@ant-design/icons';
+import { PlayCircleOutlined, UserOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import jumbotronImg from '../../assets/jumbotron.png';
 
 const { Title, Paragraph } = Typography;
 
 const HeroSection: React.FC = () => {
+  const navigate = useNavigate();
+
   return (
-    <section className="relative min-h-[90vh] flex items-center pt-20 overflow-hidden bg-background dark:bg-black transition-colors duration-500">
+    <section className="relative min-h-[90vh] flex items-center pt-20 pb-12 overflow-hidden bg-background dark:bg-black transition-colors duration-500">
       {/* Background Decorative Elements */}
-      <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-primary/10 to-transparent opacity-50 blur-3xl rounded-full translate-x-1/2 -translate-y-1/4" />
+      <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-primary/5 to-transparent opacity-50 blur-3xl rounded-full translate-x-1/2 -translate-y-1/4" />
       <div className="absolute bottom-0 left-0 w-1/3 h-1/2 bg-primary/5 blur-3xl rounded-full -translate-x-1/4 translate-y-1/4" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          
+          {/* Left Column */}
           <div className="space-y-8 animate-in fade-in slide-in-from-left-8 duration-1000">
             <div>
-              <div className="inline-flex items-center space-x-2 py-1 px-4 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-semibold tracking-wide mb-6">
-                <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse"></span>
-                <span>SNBT 2024 READY</span>
+              <div className="inline-flex items-center space-x-2 py-1 px-4 rounded-full bg-yellow-100 text-yellow-700 text-sm font-bold mb-6">
+                <span>⭐ TKA SD & SMP READY!</span>
               </div>
-              <Title level={1} className="!text-5xl md:!text-7xl !font-bold !font-manrope !leading-tight tracking-tight">
-                Raih Impian Masuk <br />
-                <span className="text-primary italic">PTN Idaman</span> Bersama Kami.
+              <Title level={1} className="!text-5xl md:!text-6xl !font-bold !font-manrope !leading-tight text-on-surface">
+                Persiapan TKA <br />
+                <span className="text-primary">SD & SMP</span> <br />
+                Lebih Mudah <br />
+                Bersama Rifaya Tryout.
               </Title>
-              <Paragraph className="!text-lg md:!text-xl text-surface-on/70 !font-inter max-w-lg leading-relaxed">
-                Platform Tryout Terpercaya dengan Sistem Penilaian IRT Akurat. Rasakan pengalaman belajar yang modern dan efisien.
+              <Paragraph className="!text-lg text-on-surface/70 !font-inter max-w-lg leading-relaxed mt-4">
+                Tryout berkualitas dengan sistem penilaian IRT akurat, pembahasan lengkap, dan laporan hasil belajar yang membantu kamu naik level.
               </Paragraph>
             </div>
 
-            <Space size="large" className="flex flex-wrap">
-              <Button type="primary" size="large" icon={<ArrowRightOutlined />} className="h-14 px-10 text-lg rounded-full shadow-lg shadow-primary/30 hover:scale-105 transition-transform">
-                Start Free Tryout
+            <Space size="middle" className="flex flex-wrap">
+              <Button type="primary" size="large" className="h-14 px-8 text-base rounded-full font-bold shadow-lg shadow-primary/30 hover:scale-105 transition-transform bg-primary" onClick={() => navigate('/register')}>
+                🚀 COBA TRYOUT GRATIS
               </Button>
-              <Button size="large" className="h-14 px-10 text-lg rounded-full hover:border-primary hover:text-primary transition-all">
-                Learn More
+              <Button size="large" type="text" className="h-14 px-8 text-base font-bold text-primary hover:bg-primary/5 rounded-full flex items-center gap-2" onClick={() => navigate('/paket')}>
+                <PlayCircleOutlined /> LIHAT PAKET
               </Button>
             </Space>
 
-            <div className="flex items-center space-x-6 pt-4">
-              <div className="flex -space-x-3">
-                {[1,2,3,4].map(i => (
-                  <div key={i} className="w-12 h-12 rounded-full border-2 border-surface bg-gray-200 overflow-hidden shadow-sm">
-                    <img src={`https://i.pravatar.cc/150?u=${i}`} alt="user" />
+            <div className="flex items-center space-x-4 pt-4">
+              <div className="flex -space-x-4">
+                {[1, 2, 3, 4].map(i => (
+                  <div key={i} className="w-10 h-10 rounded-full border-2 border-white bg-blue-100 flex items-center justify-center text-primary relative z-10 hover:z-20 hover:scale-110 transition-transform shadow-sm">
+                    <UserOutlined />
                   </div>
                 ))}
               </div>
               <div className="text-sm">
-                <p className="font-bold text-surface-on">15,000+ Students</p>
-                <p className="text-surface-on/60">Already joined our platform</p>
+                <p className="font-bold text-on-surface">Dipercaya oleh Siswa SD & SMP</p>
+                <p className="text-on-surface/60">yang telah bergabung dan meraih skor terbaik!</p>
               </div>
             </div>
           </div>
 
-          {/* Mixed Media Mockup Area */}
-          <div className="relative animate-in fade-in slide-in-from-right-8 duration-1000 delay-200">
-            <div className="relative bg-white dark:bg-zinc-900 rounded-[2rem] p-4 shadow-2xl border border-white/20 glass">
-              <div className="rounded-[1.5rem] overflow-hidden bg-gray-100 dark:bg-zinc-800 aspect-[4/3] relative">
-                {/* Hero Image / Video Placeholder */}
-                <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <div className="w-20 h-20 bg-primary rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl animate-pulse">
-                      <div className="w-0 h-0 border-t-[10px] border-t-transparent border-l-[18px] border-l-white border-b-[10px] border-b-transparent ml-1" />
-                    </div>
-                    <Title level={3} className="!text-white">The Weightless Experience</Title>
-                  </div>
-                </div>
-                {/* Floating Elements on Image */}
-                <div className="absolute -top-6 -right-6 w-32 h-32 glass rounded-2xl flex flex-col items-center justify-center shadow-xl animate-bounce duration-[3000ms]">
-                   <span className="text-3xl">🎯</span>
-                   <span className="text-xs font-bold mt-2">Precision Analysis</span>
-                </div>
-              </div>
-            </div>
-            {/* Absolute floating cards */}
-            <div className="absolute -bottom-10 -left-10 glass p-6 rounded-2xl shadow-xl w-64 border border-white/20 hidden md:block">
-              <div className="flex items-center space-x-4 mb-4">
-                <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white">✓</div>
-                <span className="font-bold text-sm">Exam Completed</span>
-              </div>
-              <div className="w-full bg-gray-200 dark:bg-zinc-700 h-2 rounded-full overflow-hidden">
-                <div className="bg-green-500 h-full w-[85%]" />
-              </div>
-              <p className="text-xs mt-2 text-on-surface/60">Success rate increased by 20%</p>
-            </div>
+          {/* Right Column - Illustration */}
+          <div className="relative animate-in fade-in slide-in-from-right-8 duration-1000 delay-200 w-full flex justify-center lg:justify-end items-center">
+             <div className="relative w-full max-w-lg">
+                {/* Decorative blob behind image */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-primary/10 rounded-full blur-3xl z-0"></div>
+                
+                <img 
+                  src={jumbotronImg} 
+                  alt="Ilustrasi Siswa Rifaya Tryout" 
+                  className="relative z-10 w-full h-auto object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-500" 
+                />
+             </div>
           </div>
         </div>
       </div>

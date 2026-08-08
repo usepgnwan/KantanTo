@@ -1,40 +1,21 @@
 import React, { useEffect, useState } from 'react';
+import { Typography, Row, Col, Card, Tag, Space, Button, Empty, Spin } from 'antd';
+import { UserOutlined, CheckCircleFilled } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+
 import AppLayout from '../layouts/AppLayout';
 import HeroSection from '../components/organisms/HeroSection';
+import StatsBar from '../components/organisms/StatsBar';
+import FeaturesGrid from '../components/organisms/FeaturesGrid';
+import InteractiveWidgets from '../components/organisms/InteractiveWidgets';
 import CustomerReviews from '../components/organisms/CustomerReviews';
 import ContactForm from '../components/organisms/ContactForm';
-import { Typography, Row, Col, Card, Tag, Space, Button, Empty, Spin } from 'antd';
-import { 
-  RocketOutlined, 
-  SafetyCertificateOutlined, 
-  LineChartOutlined,
-  UserOutlined,
-  CheckCircleFilled
-} from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+
 import { getPackages, PackageListItem } from '../services/packageService';
 import { recordMenuLogAPI } from '../services/logService';
 import { useAuth } from '../context/AuthContext';
 
 const { Title, Paragraph, Text } = Typography;
-
-const features = [
-  {
-    icon: <RocketOutlined className="text-4xl text-primary" />,
-    title: "Akses Instan",
-    description: "Nikmati kemudahan akses soal dan hasil analisis secara real-time tanpa menunggu lama."
-  },
-  {
-    icon: <SafetyCertificateOutlined className="text-4xl text-primary" />,
-    title: "Standard Nasional",
-    description: "Seluruh butir soal disusun berdasarkan standar resmi kemendikbud dengan tingkat akurasi tinggi."
-  },
-  {
-    icon: <LineChartOutlined className="text-4xl text-primary" />,
-    title: "Grafik Perkembangan",
-    description: "Pantau sejauh mana perkembangan belajar Anda dengan fitur grafik perbandingan yang komprehensif."
-  }
-];
 
 const IndexPage: React.FC = () => {
   const navigate = useNavigate();
@@ -81,38 +62,10 @@ const IndexPage: React.FC = () => {
   return (
     <AppLayout>
       <HeroSection />
+      <StatsBar />
+      <FeaturesGrid />
+      <InteractiveWidgets />
       
-      {/* Features Overview */}
-      <section className="py-24 bg-white dark:bg-zinc-900 transition-colors duration-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center mb-16">
-          <Title level={2} className="!text-4xl !font-manrope mb-4">Mengapa Memilih Kami?</Title>
-          <Paragraph className="text-lg text-surface-on/60 max-w-2xl mx-auto">
-            Kami menghadirkan ekosistem belajar yang asimetris dan modern untuk memaksimalkan potensi Anda.
-          </Paragraph>
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Row gutter={[32, 32]}>
-            {features.map((feature, index) => (
-              <Col xs={24} md={8} key={index}>
-                <Card 
-                  className="h-full weightless-card border-none hover:-translate-y-2 transition-all p-4"
-                  bodyStyle={{ textAlign: 'center' }}
-                >
-                  <div className="mb-6 inline-flex p-4 rounded-2xl bg-primary/5">
-                    {feature.icon}
-                  </div>
-                  <Title level={4} className="mb-4">{feature.title}</Title>
-                  <Paragraph className="text-surface-on/70">
-                    {feature.description}
-                  </Paragraph>
-                </Card>
-              </Col>
-            ))}
-          </Row>
-        </div>
-      </section>
-
       {/* Package Catalog - 4 Grid */}
       <section id="paket" className="py-24 bg-background dark:bg-zinc-800/10 transition-colors duration-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center mb-16">

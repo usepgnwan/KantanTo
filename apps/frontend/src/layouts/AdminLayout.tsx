@@ -23,6 +23,7 @@ import {
   ReadOutlined,
   PercentageOutlined,
   SafetyCertificateOutlined,
+  AppstoreAddOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../context/ThemeContext';
 
@@ -43,6 +44,7 @@ const menuItems = [
     items: [
       { path: '/admin/packages', label: 'Paket & Soal', icon: <TagsOutlined /> },
       { path: '/admin/materials', label: 'Blog', icon: <ReadOutlined /> },
+      { path: '/admin/example-exam', label: 'Soal Landing Page', icon: <FileTextOutlined /> },
       // { path: '/admin/questions', label: 'Bank Soal', icon: <FileTextOutlined /> },
     ],
   },
@@ -64,8 +66,8 @@ const menuItems = [
     section: 'Master Data',
     items: [
       { path: '/admin/master/categories', label: 'Kategori', icon: <AppstoreOutlined /> },
-      { path: '/admin/master/classes', label: 'Kelas', icon: <BankOutlined /> },
-      { path: '/admin/master/subjects', label: 'Mata Pelajaran', icon: <ReadOutlined /> },
+      { path: '/admin/grades', label: 'Kelas (Grade)', icon: <ReadOutlined /> },
+      { path: '/admin/subjects', label: 'Mata Pelajaran', icon: <AppstoreAddOutlined /> },
     ],
   },
   {
@@ -124,7 +126,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
           </div>
           {!collapsed && (
             <div className="overflow-hidden">
-              <span className="block font-black text-lg font-manrope leading-tight text-on-surface dark:text-zinc-100">Kantan</span>
+              <span className="block font-black text-lg font-manrope leading-tight text-on-surface dark:text-zinc-100">Rifaya Tryout</span>
               <span className="block text-[9px] uppercase font-bold tracking-widest text-primary/60 leading-tight">Admin Panel</span>
             </div>
           )}
@@ -185,8 +187,8 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
               <div className="flex items-center gap-3 cursor-pointer group p-2 rounded-xl hover:bg-surface-low dark:hover:bg-zinc-800 transition-all">
                 <Avatar size={36} icon={<UserOutlined />} className="bg-primary/10 text-primary shrink-0" />
                 <div className="overflow-hidden">
-                  <span className="block text-sm font-bold text-on-surface dark:text-zinc-100 truncate">Admin Kantan</span>
-                  <span className="block text-[10px] text-on-surface/40 dark:text-zinc-500 truncate">admin@kantan.edu.id</span>
+                  <span className="block text-sm font-bold text-on-surface dark:text-zinc-100 truncate">Admin Rifaya Tryout</span>
+                  <span className="block text-[10px] text-on-surface/40 dark:text-zinc-500 truncate">admin@rifayatryout.edu.id</span>
                 </div>
               </div>
             </Dropdown>

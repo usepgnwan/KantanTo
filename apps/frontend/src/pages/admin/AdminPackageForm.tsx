@@ -19,6 +19,8 @@ import {
   deletePackage,
   PackageListItem,
 } from '../../services/packageService';
+import { getGrades, Grade } from '../../services/gradeService';
+import { getMapels, Mapel } from '../../services/mapelService';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -46,6 +48,8 @@ const AdminPackageForm: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [form] = Form.useForm();
   const navigate = useNavigate();
+  const [grades, setGrades] = useState<Grade[]>([]);
+  const [mapels, setMapels] = useState<Mapel[]>([]);
 
   // ── Fetch ────────────────────────────────────────────────────────────────
   const fetchPackages = useCallback(async () => {
@@ -61,6 +65,12 @@ const AdminPackageForm: React.FC = () => {
   }, []);
 
   useEffect(() => { fetchPackages(); }, [fetchPackages]);
+
+  // Fetch grades and mapels for dropdowns
+  useEffect(() => {
+    getGrades(1, 100).then(res => setGrades(res.rows)).catch(() => {});
+    getMapels(1, 100).then(res => setMapels(res.rows)).catch(() => {});
+  }, []);
 
   // ── Modal helpers ─────────────────────────────────────────────────────────
   const openCreate = () => {
@@ -486,12 +496,7 @@ const AdminPackageForm: React.FC = () => {
                   placeholder="Pilih kelas..."
                   className="rounded-xl w-full"
                   style={{ height: 'auto', minHeight: 44 }}
-                  options={[
-                    { value: 'Kelas 10', label: 'Kelas 10' },
-                    { value: 'Kelas 11', label: 'Kelas 11' },
-                    { value: 'Kelas 12', label: 'Kelas 12' },
-                    { value: 'Alumni', label: 'Alumni' },
-                  ]}
+                  options={grades.map(g => ({ value: g.title, label: g.title }))}
                 />
               </Form.Item>
             </Col>
@@ -502,16 +507,7 @@ const AdminPackageForm: React.FC = () => {
                   placeholder="Pilih mapel..."
                   className="rounded-xl w-full"
                   style={{ height: 'auto', minHeight: 44 }}
-                  options={[
-                    { value: 'Matematika IPA', label: 'Matematika IPA' },
-                    { value: 'Fisika', label: 'Fisika' },
-                    { value: 'Kimia', label: 'Kimia' },
-                    { value: 'Sejarah', label: 'Sejarah' },
-                    { value: 'Geografi', label: 'Geografi' },
-                    { value: 'Sosiologi', label: 'Sosiologi' },
-                    { value: 'TPS', label: 'TPS' },
-                    { value: 'Literasi', label: 'Literasi' },
-                  ]}
+                  options={mapels.map(m => ({ value: m.title, label: m.title }))}
                 />
               </Form.Item>
             </Col>

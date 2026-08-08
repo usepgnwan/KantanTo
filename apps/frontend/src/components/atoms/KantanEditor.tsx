@@ -5,18 +5,20 @@ import Quill from 'quill';
 import QuillTableBetter from 'quill-table-better';
 import katex from 'katex';
 import 'quill/dist/quill.snow.css';
+import 'quill/dist/quill.bubble.css';
 import 'quill-table-better/dist/quill-table-better.css';
 import 'katex/dist/katex.min.css';
 
 const { Text } = Typography;
 
 interface KantanEditorProps {
-  value: string;
-  onChange: (val: string) => void;
+  value?: string;
+  onChange?: (val: string) => void;
   placeholder?: string;
   rows?: number;
   label?: string;
   className?: string;
+  theme?: 'snow' | 'bubble';
 }
 
 const toolbarOptions = [
@@ -117,7 +119,7 @@ const MathModal: React.FC<{
   );
 };
 
-const KantanEditor: React.FC<KantanEditorProps> = ({ value, onChange, placeholder, rows = 6, className }) => {
+const KantanEditor: React.FC<KantanEditorProps> = ({ value, onChange, placeholder, rows = 6, className, theme = 'snow' }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const quillRef = useRef<Quill | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -125,7 +127,7 @@ const KantanEditor: React.FC<KantanEditorProps> = ({ value, onChange, placeholde
   const onChangeRef = useRef(onChange);
   const [mathModalOpen, setMathModalOpen] = useState(false);
 
-  const editorMinHeight = useMemo(() => Math.max(rows * 28, 140), [rows]);
+  const editorMinHeight = useMemo(() => Math.max(rows * 40, 120), [rows]);
 
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -135,7 +137,7 @@ const KantanEditor: React.FC<KantanEditorProps> = ({ value, onChange, placeholde
     if (!editorRef.current || quillRef.current) return;
 
     const quill = new Quill(editorRef.current, {
-      theme: 'snow',
+      theme: theme,
       placeholder,
       modules: {
         table: false,
@@ -172,7 +174,9 @@ const KantanEditor: React.FC<KantanEditorProps> = ({ value, onChange, placeholde
       const html = quill.root.innerHTML;
       const normalized = html === '<p><br></p>' ? '' : html;
       lastHtmlRef.current = normalized;
-      onChangeRef.current(normalized);
+      if (onChangeRef.current) {
+        onChangeRef.current(normalized);
+      }
     });
   }, [placeholder, value]);
 
@@ -227,9 +231,9 @@ const KantanEditor: React.FC<KantanEditorProps> = ({ value, onChange, placeholde
   };
 
   return (
-    <div className={`kantan-quill rounded-lg overflow-hidden bg-white dark:bg-zinc-900 border border-on-surface/10 focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/5 ${className || ''}`}>
+    <div className={`kantan-quill ${theme === 'bubble' ? 'kantan-bubble overflow-visible relative' : 'overflow-hidden'} rounded-lg bg-white dark:bg-zinc-900 border border-on-surface/10 focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/5 ${className || ''}`}>
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={insertImage} />
-      <div ref={editorRef} style={{ minHeight: editorMinHeight }} />
+      <div ref={editorRef} style={{ minHeight: theme === 'bubble' ? 20 : editorMinHeight }} />
       <MathModal open={mathModalOpen} onClose={() => setMathModalOpen(false)} onInsert={insertFormula} />
     </div>
   );

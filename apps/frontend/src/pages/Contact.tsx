@@ -16,7 +16,7 @@ const ContactPage: React.FC = () => {
 
   const onFinish = (values: any) => {
     console.log('Success:', values);
-    alert('Pesan Anda berhasil dikirim! Tim Kantan akan segera menghubungi Anda.');
+    alert('Pesan Anda berhasil dikirim! Tim Rifaya Tryout akan segera menghubungi Anda.');
   };
 
   return (
@@ -30,19 +30,19 @@ const ContactPage: React.FC = () => {
               Pusat Dukungan
             </Text>
             <Title level={1} className="!text-4xl md:!text-5xl !font-manrope !font-black !mb-6">
-              Hubungi {setting?.nama_aplikasi || 'Tim Kantan'}
+              Hubungi {setting?.nama_aplikasi || 'Tim Rifaya Tryout'}
             </Title>
             <Paragraph className="text-lg text-on-surface/60">
-              Ada pertanyaan terkait paket pembelajaran SNBT, kendala teknis, atau ingin tahu lebih lanjut bagaimana Kantan membantu ribuan siswa lolos PTN impian? Kami siap membantu.
+              Ada pertanyaan terkait paket pembelajaran SNBT, kendala teknis, atau ingin tahu lebih lanjut bagaimana Rifaya Tryout membantu ribuan siswa lolos PTN impian? Kami siap membantu.
             </Paragraph>
           </div>
 
           <Row gutter={[48, 48]} align="top">
-            {/* Left Column: About Kantan & Contact Info */}
+            {/* Left Column: About Rifaya Tryout & Contact Info */}
             <Col xs={24} lg={10} className="animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
               <div className="pr-0 md:pr-8">
                 <Title level={3} className="!font-manrope !font-black !mb-4">
-                  Tentang {setting?.nama_aplikasi || 'Kantan'}
+                  Tentang {setting?.nama_aplikasi || 'Rifaya Tryout'}
                 </Title>
                 <div className="prose prose-p:text-on-surface/70 prose-p:leading-relaxed mb-10">
                   {setting?.deskripsi ? (
@@ -53,7 +53,7 @@ const ContactPage: React.FC = () => {
                   ) : (
                     <>
                       <p>
-                        <strong>Kantan</strong> didirikan dengan satu misi sederhana: mendemokratisasi akses pendidikan berstandar tinggi untuk persiapan Seleksi Nasional Berdasarkan Tes (SNBT).
+                        <strong>Rifaya Tryout</strong> didirikan dengan satu misi sederhana: mendemokratisasi akses pendidikan berstandar tinggi untuk persiapan Seleksi Nasional Berdasarkan Tes (SNBT).
                       </p>
                       <p>
                         Kami percaya bahwa kelulusan ke PTN impian bukanlah tentang seberapa keras Anda menghafal, melainkan seberapa cerdas Anda menggunakan <i>Cognitive Sanctuary</i>—sebuah ruang fokus yang dirancang khusus untuk meminimalkan beban mental dan memaksimalkan retensi materi.

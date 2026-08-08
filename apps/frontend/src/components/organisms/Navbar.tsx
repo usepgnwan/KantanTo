@@ -76,6 +76,11 @@ const Navbar: React.FC = () => {
       icon: <HistoryOutlined />,
     },
     {
+      key: 'pembelian',
+      label: <Link to="/pembelian">Pembelian</Link>,
+      icon: <ShoppingOutlined />,
+    },
+    {
       key: 'settings',
       label: <Link to="/profile">Pengaturan</Link>,
       icon: <SettingOutlined />,
@@ -125,7 +130,7 @@ const Navbar: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
         <div className="flex items-center">
           <Link to="/" onClick={() => logMenuClick('/', 'Logo')} className="text-2xl font-black tracking-tighter text-primary font-manrope">
-            Kantan.
+            Rifaya Tryout.
           </Link>
         </div>
 
@@ -199,7 +204,7 @@ const Navbar: React.FC = () => {
       </div>
 
       <Drawer
-        title={<span className="font-black tracking-tighter text-2xl">Kantan.</span>}
+        title={<span className="font-black tracking-tighter text-2xl">Rifaya Tryout.</span>}
         placement="right"
         onClose={() => setMobileVisible(false)}
         open={mobileVisible}

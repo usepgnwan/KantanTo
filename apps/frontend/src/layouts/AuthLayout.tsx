@@ -35,7 +35,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title, subtitle, imag
         <div>
             <Link to="/" className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-primary rounded-lg"></div>
-                <span className="font-black text-xl tracking-tighter">Kantan.</span>
+                <span className="font-black text-xl tracking-tighter">Rifaya Tryout.</span>
             </Link>
         </div>
       </nav>

@@ -22,6 +22,7 @@ export interface PackageProps {
   classes: string[];
   subjects: string[];
   isPopular?: boolean;
+  isOwned?: boolean;
 }
 
 const PackageCard: React.FC<PackageProps> = ({
@@ -37,7 +38,8 @@ const PackageCard: React.FC<PackageProps> = ({
   category,
   classes,
   subjects,
-  isPopular
+  isPopular,
+  isOwned
 }) => {
   const navigate = useNavigate();
   const { addToCart, isInCart } = useCart();
@@ -95,6 +97,11 @@ const PackageCard: React.FC<PackageProps> = ({
                 <ThunderboltOutlined /> POPULER
               </Tag>
             )}
+            {isOwned && (
+              <Tag color="green" className="m-0 border-none px-3 py-0.5 rounded-lg font-bold shadow-lg">
+                SAYA MILIKI
+              </Tag>
+            )}
           </div>
         </div>
       }
@@ -122,29 +129,45 @@ const PackageCard: React.FC<PackageProps> = ({
         </div>
 
         <div className="mt-auto pt-4 border-t border-surface-container">
-          <div className="mb-4">
-            <Text className="text-xs text-surface-on/40 line-through">Rp {originalPrice.toLocaleString('id-ID')}</Text>
-            <div className="flex items-baseline gap-1">
-              <Text className="text-2xl font-bold text-primary">Rp {price.toLocaleString('id-ID')}</Text>
-              <Text className="text-xs text-surface-on/60">/paket</Text>
-            </div>
-          </div>
-          
-          <Space className="w-full" direction="vertical">
+          {isOwned ? (
             <Button 
-              type={alreadyInCart ? "default" : "primary"} 
+              type="primary" 
               block 
-              className={`h-11 rounded-xl font-bold shadow-md ${alreadyInCart ? 'border-primary text-primary' : 'shadow-primary/20'}`}
-              onClick={handleAddToCart}
+              className="h-12 rounded-xl font-bold bg-green-600 hover:bg-green-700 border-none shadow-lg shadow-green-600/20 text-base"
+              onClick={() => {
+                handleDetailClick();
+                navigate(`/paket/${slug}`);
+              }}
             >
-              {alreadyInCart ? 'Lihat Keranjang' : 'Pilih Paket'}
+              Mulai Belajar
             </Button>
-            <Link to={`/paket/${slug}`} className="w-full" onClick={handleDetailClick}>
-              <Button block className="h-11 rounded-xl font-semibold border-surface-container hover:border-primary hover:text-primary">
-                Lihat Detail
-              </Button>
-            </Link>
-          </Space>
+          ) : (
+            <>
+              <div className="mb-4">
+                <Text className="text-xs text-surface-on/40 line-through">Rp {originalPrice.toLocaleString('id-ID')}</Text>
+                <div className="flex items-baseline gap-1">
+                  <Text className="text-2xl font-bold text-primary">Rp {price.toLocaleString('id-ID')}</Text>
+                  <Text className="text-xs text-surface-on/60">/paket</Text>
+                </div>
+              </div>
+              
+              <Space className="w-full" direction="vertical">
+                <Button 
+                  type={alreadyInCart ? "default" : "primary"} 
+                  block 
+                  className={`h-11 rounded-xl font-bold shadow-md ${alreadyInCart ? 'border-primary text-primary' : 'shadow-primary/20'}`}
+                  onClick={handleAddToCart}
+                >
+                  {alreadyInCart ? 'Lihat Keranjang' : 'Pilih Paket'}
+                </Button>
+                <Link to={`/paket/${slug}`} className="w-full" onClick={handleDetailClick}>
+                  <Button block className="h-11 rounded-xl font-semibold border-surface-container hover:border-primary hover:text-primary">
+                    Lihat Detail
+                  </Button>
+                </Link>
+              </Space>
+            </>
+          )}
         </div>
       </div>
     </Card>

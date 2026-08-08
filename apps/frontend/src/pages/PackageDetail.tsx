@@ -8,7 +8,8 @@ import {
   ShoppingOutlined,
   PlayCircleOutlined,
   LockOutlined,
-  EyeOutlined
+  EyeOutlined,
+  BookOutlined
 } from '@ant-design/icons';
 import AppLayout from '../layouts/AppLayout';
 import { useAuth } from '../context/AuthContext';
@@ -278,6 +279,19 @@ const PackageDetailPage: React.FC = () => {
                         >
                           Mulai Simulasi Ujian
                         </Button>
+
+                        {materials.length > 0 && (
+                          <Button
+                            type="default"
+                            block
+                            size="large"
+                            className="h-14 rounded-2xl font-bold flex items-center justify-center gap-2 border-primary text-primary hover:bg-primary/5"
+                            icon={<BookOutlined />}
+                            onClick={() => navigate(`/paket/${slug}/materi/${materials[0].client_id || materials[0].id}`)}
+                          >
+                            Mulai Belajar Modul
+                          </Button>
+                        )}
 
                         <div className="text-center pt-4 border-t border-surface-container">
                           <Text className="text-[10px] text-surface-on/40 uppercase font-bold tracking-tight">

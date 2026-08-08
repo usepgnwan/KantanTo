@@ -20,8 +20,10 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { getUserDashboardStatsAPI, UserDashboardStats } from '../services/dashboardService';
 import { getProfileAPI, updateProfileAPI, User as UserProfile, UpdateProfilePayload } from '../services/userService';
+import { getMyPackagesAPI, MyTransaction } from '../services/myPackageService';
 import PageLoader from '../components/atoms/PageLoader';
-import { message } from 'antd';
+import { message, Empty, Timeline } from 'antd';
+import { ShoppingOutlined } from '@ant-design/icons';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -31,6 +33,7 @@ const ProfilePage: React.FC = () => {
   const [editing, setEditing] = useState(false);
   const [dashboardStats, setDashboardStats] = useState<UserDashboardStats | null>(null);
   const [profileData, setProfileData] = useState<UserProfile | null>(null);
+  const [purchases, setPurchases] = useState<MyTransaction[]>([]);
   const [form] = Form.useForm();
 
   const fetchProfile = async (id: number) => {
@@ -60,6 +63,7 @@ const ProfilePage: React.FC = () => {
     if (user?.id) {
       getUserDashboardStatsAPI(user.id).then(setDashboardStats);
       fetchProfile(user.id);
+      getMyPackagesAPI(user.id, 'all').then(setPurchases).catch(() => {});
     }
 
     return () => clearTimeout(timer);
@@ -285,6 +289,64 @@ const ProfilePage: React.FC = () => {
                         </div>
                     </Card>
                 </div>
+
+                {/* Purchase History */}
+                <Card
+                  className="border-none bg-white rounded-[40px] p-8 shadow-2xl shadow-primary/5"
+                  title={
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
+                        <ShoppingOutlined className="text-green-500" />
+                      </div>
+                      <div>
+                        <Title level={4} className="!font-manrope !m-0 !font-black">History Pembelian</Title>
+                        <Text className="text-[10px] uppercase font-bold text-on-surface/40 tracking-widest">Riwayat transaksi Anda</Text>
+                      </div>
+                    </div>
+                  }
+                >
+                  {purchases.length === 0 ? (
+                    <Empty description="Belum ada riwayat pembelian" />
+                  ) : (
+                    <Timeline
+                      items={purchases.map(tx => {
+                        const date = new Date(tx.created_at || '');
+                        const isActive = tx.status === 'active';
+                        const isPending = tx.status === 'pending payment';
+                        return {
+                          color: isActive ? 'green' : isPending ? 'orange' : 'gray',
+                          children: (
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2">
+                              <div>
+                                <Text className="font-black block text-on-surface">{tx.package?.title || `Paket #${tx.package_id}`}</Text>
+                                <Text className="text-xs text-on-surface/40 block">
+                                  {tx.invoice_code} &bull; {date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                </Text>
+                                {tx.active_until && (
+                                  <Text className="text-[10px] text-green-600 font-bold block">
+                                    Aktif s/d: {new Date(tx.active_until).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                  </Text>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0">
+                                <Text className="font-black text-primary">
+                                  {tx.amount === 0 ? 'Gratis' : `Rp ${Number(tx.amount).toLocaleString('id-ID')}`}
+                                </Text>
+                                <span className={`text-[10px] font-bold uppercase px-3 py-1 rounded-full ${
+                                  isActive ? 'bg-green-100 text-green-700' :
+                                  isPending ? 'bg-orange-100 text-orange-700' :
+                                  'bg-gray-100 text-gray-500'
+                                }`}>
+                                  {isActive ? 'Aktif' : isPending ? 'Pending' : tx.status}
+                                </span>
+                              </div>
+                            </div>
+                          ),
+                        };
+                      })}
+                    />
+                  )}
+                </Card>
               </div>
             </Col>
           </Row>

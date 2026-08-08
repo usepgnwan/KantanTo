@@ -17,7 +17,7 @@ const PageLoader: React.FC = () => {
       </div>
       
       <div className="text-center space-y-2">
-        <Text className="text-sm font-bold uppercase tracking-[0.3em] text-primary block">Kantan Portal</Text>
+        <Text className="text-sm font-bold uppercase tracking-[0.3em] text-primary block">Rifaya Tryout Portal</Text>
         <Text className="text-xs text-on-surface/40 flex items-center gap-2">
           <LoadingOutlined /> Mempersiapkan Sanctuary Belajar Anda...
         </Text>

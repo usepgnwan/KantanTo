@@ -1,6 +1,6 @@
 import React from 'react';
 import AppLayout from '../layouts/AppLayout';
-import { Row, Col, Card, Typography, Button, Tag, Space, List, Avatar, Input, Progress } from 'antd';
+import { Row, Col, Card, Typography, Button, Tag, Space, List, Avatar, Input, Progress, Select } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { 
   BookOutlined, 
@@ -10,26 +10,39 @@ import {
   ClockCircleOutlined,
   CheckCircleOutlined,
   RightOutlined,
-  CloudDownloadOutlined,
-  ContainerOutlined,
   DownOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../context/AuthContext';
-import { getMyPackagesAPI, MyTransaction } from '../services/myPackageService';
+import { getMyPackagesAPI, getUserMapelsAPI, MyTransaction } from '../services/myPackageService';
+import { Mapel } from '../services/mapelService';
 
 const { Title, Text, Paragraph } = Typography;
 
 const Practice: React.FC = () => {
   const navigate = useNavigate();
   const [myTransactions, setMyTransactions] = React.useState<MyTransaction[]>([]);
+  const [userMapels, setUserMapels] = React.useState<Mapel[]>([]);
   const [loading, setLoading] = React.useState(true);
   const { user } = useAuth();
   const [expandedPackage, setExpandedPackage] = React.useState<number | null>(null);
 
+  const [searchTerm, setSearchTerm] = React.useState('');
+  const [selectedMapelId, setSelectedMapelId] = React.useState<string | number>('all');
+
+  // Load distinct mapels owned by user
+  React.useEffect(() => {
+    if (user?.id) {
+      getUserMapelsAPI(user.id).then(data => {
+        setUserMapels(data || []);
+      }).catch(() => setUserMapels([]));
+    }
+  }, [user]);
+
+  // Load packages based on search & mapel_id filter
   React.useEffect(() => {
     if (user?.id) {
       setLoading(true);
-      getMyPackagesAPI(user.id).then(data => {
+      getMyPackagesAPI(user.id, 'active', searchTerm, selectedMapelId).then(data => {
         setMyTransactions(data || []);
       }).catch(() => {
         setMyTransactions([]);
@@ -39,7 +52,7 @@ const Practice: React.FC = () => {
     } else {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, searchTerm, selectedMapelId]);
 
   const toggleExpand = (pkgId: number) => {
     if (expandedPackage === pkgId) {
@@ -53,11 +66,33 @@ const Practice: React.FC = () => {
     return Math.floor(tx.progress || 0);
   };
 
-  const relatedMaterials = [
-    { title: 'E-Book: Aljabar Modern', type: 'E-Book', detail: 'Ringkasan Cepat & Rumus Sakti', icon: <FileTextOutlined /> },
-    { title: 'Video: Trik Cepat Geometri', type: 'Video', detail: 'Durasi 12 Menit • HD', icon: <PlayCircleOutlined /> },
-    { title: 'Flashcard: Rumus Turunan', type: 'Flashcard', detail: '24 Kartu Hafalan', icon: <ContainerOutlined /> },
-  ];
+  const ownedMaterials = React.useMemo(() => {
+    const list: {
+      id: number;
+      title: string;
+      category: string;
+      packageTitle: string;
+      packageSlug: string;
+      clientId: string;
+    }[] = [];
+
+    myTransactions.forEach((tx) => {
+      if (tx.package && tx.package.materials) {
+        tx.package.materials.forEach((mat) => {
+          list.push({
+            id: mat.id,
+            title: mat.title,
+            category: mat.category || 'Materi',
+            packageTitle: tx.package.title,
+            packageSlug: tx.package.slug,
+            clientId: mat.client_id,
+          });
+        });
+      }
+    });
+
+    return list;
+  }, [myTransactions]);
 
   return (
     <AppLayout>
@@ -80,17 +115,32 @@ const Practice: React.FC = () => {
             <Col xs={24} lg={16}>
               
               {/* Search & Filter */}
-              <div className="mb-10 flex flex-wrap gap-4 items-center">
+              <div className="mb-10 flex flex-wrap sm:flex-nowrap gap-4 items-center">
                 <Input 
                   placeholder="Cari materi atau topik..." 
-                  prefix={<SearchOutlined />} 
-                  className="max-w-md h-12 rounded-2xl border-none shadow-sm bg-white"
+                  prefix={<SearchOutlined className="text-on-surface/30" />} 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  allowClear
+                  className="flex-1 h-12 rounded-2xl border-none shadow-sm bg-white font-medium"
                 />
-                <Space>
-                  <Tag className="rounded-full px-6 py-1 font-bold border-none bg-primary text-white cursor-pointer h-10 flex items-center">Semua</Tag>
-                  <Tag className="rounded-full px-6 py-1 font-bold border-on-surface/5 bg-white text-on-surface/60 cursor-pointer h-10 flex items-center hover:bg-surface-low transition-colors">TPS</Tag>
-                  <Tag className="rounded-full px-6 py-1 font-bold border-on-surface/5 bg-white text-on-surface/60 cursor-pointer h-10 flex items-center hover:bg-surface-low transition-colors">Literasi</Tag>
-                </Space>
+                <Select
+                  showSearch
+                  placeholder="Pilih Mata Pelajaran..."
+                  value={selectedMapelId}
+                  onChange={(val) => setSelectedMapelId(val)}
+                  className="w-full sm:w-64 h-12 shadow-sm rounded-2xl [&_.ant-select-selector]:!rounded-2xl [&_.ant-select-selector]:!border-none [&_.ant-select-selector]:!h-12 [&_.ant-select-selection-item]:!leading-[44px] [&_.ant-select-selection-placeholder]:!leading-[44px] font-bold"
+                  options={[
+                    { value: 'all', label: '📚 Semua Mata Pelajaran' },
+                    ...userMapels.map((m) => ({
+                      value: m.id,
+                      label: `📖 ${m.title}`,
+                    })),
+                  ]}
+                  filterOption={(input, option) =>
+                    (option?.label ?? '').toString().toLowerCase().includes(input.toLowerCase())
+                  }
+                />
               </div>
 
               {/* Owned Packages Section */}
@@ -102,9 +152,19 @@ const Practice: React.FC = () => {
                   <div className="text-center py-10"><Text className="text-on-surface/40">Memuat paket...</Text></div>
                 ) : myTransactions.length === 0 ? (
                   <Card className="weightless-card border-none p-10 text-center">
-                    <Title level={4} className="!m-0 !font-black text-on-surface/40">Belum Ada Paket</Title>
-                    <Paragraph className="text-on-surface/40 mt-2 mb-6">Kamu belum memiliki paket yang aktif. Yuk cari paket belajarmu sekarang!</Paragraph>
-                    <Button type="primary" onClick={() => navigate('/paket')} className="rounded-xl h-10 font-bold">Cari Paket</Button>
+                    <Title level={4} className="!m-0 !font-black text-on-surface/40">
+                      {searchTerm || selectedMapelId !== 'all' ? 'Paket Tidak Ditemukan' : 'Belum Ada Paket'}
+                    </Title>
+                    <Paragraph className="text-on-surface/40 mt-2 mb-6">
+                      {searchTerm || selectedMapelId !== 'all'
+                        ? 'Tidak ada paket yang sesuai dengan pencarian / filter Anda.'
+                        : 'Kamu belum memiliki paket yang aktif. Yuk cari paket belajarmu sekarang!'}
+                    </Paragraph>
+                    {searchTerm || selectedMapelId !== 'all' ? (
+                      <Button type="default" onClick={() => { setSearchTerm(''); setSelectedMapelId('all'); }} className="rounded-xl h-10 font-bold">Reset Filter</Button>
+                    ) : (
+                      <Button type="primary" onClick={() => navigate('/paket')} className="rounded-xl h-10 font-bold">Cari Paket</Button>
+                    )}
                   </Card>
                 ) : (
                   <Row gutter={[24, 24]}>
@@ -212,27 +272,41 @@ const Practice: React.FC = () => {
                     <Title level={4} className="!m-0 !font-black !font-manrope">Materi Terkait</Title>
                     <BookOutlined className="text-primary text-xl" />
                   </div>
-                  <List
-                    itemLayout="horizontal"
-                    dataSource={relatedMaterials}
-                    renderItem={(item) => (
-                      <List.Item className="border-none px-0 py-4 group cursor-pointer">
-                        <List.Item.Meta
-                          avatar={
-                            <div className="w-12 h-12 rounded-xl bg-surface-low flex items-center justify-center text-xl text-on-surface/40 group-hover:bg-primary/5 group-hover:text-primary transition-all">
-                              {item.icon}
-                            </div>
-                          }
-                          title={<Text className="font-bold text-on-surface block mb-0.5 group-hover:text-primary transition-colors">{item.title}</Text>}
-                          description={<Text className="text-[10px] text-on-surface/40 uppercase tracking-widest font-bold">{item.detail}</Text>}
-                        />
-                        <CloudDownloadOutlined className="text-on-surface/20 group-hover:text-primary transition-colors" />
-                      </List.Item>
-                    )}
-                  />
-                  <Button block size="large" className="rounded-2xl mt-4 font-bold border-primary/20 text-primary hover:bg-primary/5">
-                    Lihat Semua Materi
-                  </Button>
+                  {ownedMaterials.length === 0 ? (
+                    <Text className="text-xs text-on-surface/40 italic block text-center py-6">
+                      Belum ada materi dari paket yang Anda miliki.
+                    </Text>
+                  ) : (
+                    <List
+                      itemLayout="horizontal"
+                      dataSource={ownedMaterials.slice(0, 5)}
+                      renderItem={(item) => (
+                        <List.Item 
+                          className="border-none px-0 py-3 group cursor-pointer"
+                          onClick={() => navigate(`/paket/${item.packageSlug}/materi/${item.clientId}`)}
+                        >
+                          <List.Item.Meta
+                            avatar={
+                              <div className="w-10 h-10 rounded-xl bg-surface-low flex items-center justify-center text-lg text-on-surface/40 group-hover:bg-primary/10 group-hover:text-primary transition-all">
+                                {item.category?.toLowerCase() === 'video' ? <PlayCircleOutlined /> : <FileTextOutlined />}
+                              </div>
+                            }
+                            title={
+                              <Text className="font-bold text-sm text-on-surface block mb-0.5 group-hover:text-primary transition-colors truncate max-w-[200px]">
+                                {item.title}
+                              </Text>
+                            }
+                            description={
+                              <Text className="text-[10px] text-on-surface/40 uppercase tracking-widest font-bold truncate block max-w-[200px]">
+                                {item.packageTitle} &bull; {item.category}
+                              </Text>
+                            }
+                          />
+                          <RightOutlined className="text-on-surface/20 text-xs group-hover:text-primary transition-colors" />
+                        </List.Item>
+                      )}
+                    />
+                  )}
                 </Card>
 
                 {/* Study Time Reminder or Ad */}

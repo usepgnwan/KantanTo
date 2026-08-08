@@ -81,4 +81,17 @@
   .weightless-pagination .ant-pagination-item-active a {
     @apply !text-white;
   }
+
+  /* ── Quill Bubble Toolbar Fix ─────────────────────── */
+  /* Pastikan bubble tooltip tidak kepotong oleh overflow parent */
+  .ql-bubble .ql-tooltip {
+    z-index: 9999 !important;
+    position: fixed !important;
+  }
+
+  /* Default min-height bubble editor = 20px (single line) */
+  .kantan-bubble .ql-editor {
+    min-height: 20px !important;
+    padding: 6px 12px !important;
+  }
 }

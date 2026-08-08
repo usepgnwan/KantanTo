@@ -2,9 +2,8 @@ import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   HomeOutlined,
-  ThunderboltOutlined,
-  ShoppingOutlined,
   ShoppingCartOutlined,
+  ThunderboltOutlined,
   UserOutlined,
   BookOutlined
 } from '@ant-design/icons';
@@ -26,10 +25,10 @@ const BottomNav: React.FC = () => {
       path: '/latihan',
     },
     {
-      id: 'paket',
-      label: 'Katalog',
-      icon: <ShoppingOutlined />,
-      path: '/paket',
+      id: 'pembelian',
+      label: 'Pembelian',
+      icon: <ShoppingCartOutlined />,
+      path: '/pembelian',
     },
     {
       id: 'dashboard',

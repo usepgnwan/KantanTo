@@ -19,6 +19,8 @@ import {
 } from 'antd';
 import { SearchOutlined, AppstoreOutlined } from '@ant-design/icons';
 import { getPackages, PackageListItem } from '../services/packageService';
+import { getMyPackagesAPI } from '../services/myPackageService';
+import { useAuth } from '../context/AuthContext';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -41,12 +43,30 @@ const toPackageCard = (pkg: PackageListItem): PackageProps => ({
 });
 
 const PackagesPage: React.FC = () => {
+  const { user } = useAuth();
   const [packages, setPackages] = useState<PackageProps[]>([]);
+  const [ownedSlugs, setOwnedSlugs] = useState<Set<string>>(new Set());
   const [loadingPackages, setLoadingPackages] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('popular');
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 6;
+
+  useEffect(() => {
+    if (user?.id) {
+      getMyPackagesAPI(user.id, 'active')
+        .then((myTransactions) => {
+          const slugs = new Set(
+            (myTransactions || [])
+              .map((tx) => tx.package?.slug)
+              .filter(Boolean) as string[]
+          );
+          setOwnedSlugs(slugs);
+        })
+        .catch(console.error);
+    }
+  }, [user]);
+
   const filteredPackages = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     const searched = query
@@ -159,7 +179,7 @@ const PackagesPage: React.FC = () => {
                       <Row gutter={[24, 24]}>
                         {visiblePackages.map((pkg) => (
                           <Col xs={24} sm={12} xl={8} key={pkg.id}>
-                            <PackageCard {...pkg} />
+                            <PackageCard {...pkg} isOwned={ownedSlugs.has(pkg.slug)} />
                           </Col>
                         ))}
                       </Row>

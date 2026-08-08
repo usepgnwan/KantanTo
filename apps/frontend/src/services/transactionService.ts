@@ -23,3 +23,8 @@ export const getAdminTransactions = async () => {
   const response = await api.get('/admin/transactions');
   return response.data;
 };
+
+export const updateTransactionStatus = async (id: string | number, status: string) => {
+  const response = await api.put(`/admin/transactions/${id}/status`, { status });
+  return response.data;
+};
