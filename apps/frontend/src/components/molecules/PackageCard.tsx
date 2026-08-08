@@ -4,6 +4,7 @@ import { UserOutlined, ClockCircleOutlined, ThunderboltOutlined } from '@ant-des
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
+import { recordMenuLogAPI } from '../../services/logService';
 
 const { Title, Text } = Typography;
 
@@ -40,7 +41,17 @@ const PackageCard: React.FC<PackageProps> = ({
 }) => {
   const navigate = useNavigate();
   const { addToCart, isInCart } = useCart();
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, user } = useAuth();
+
+  const handleDetailClick = () => {
+    const device = window.innerWidth < 768 ? 'mobile' : 'web';
+    recordMenuLogAPI({
+      path: `/paket/${slug}`,
+      label: title,
+      device,
+      user_id: user?.id,
+    });
+  };
 
   const handleAddToCart = () => {
     if (!isLoggedIn) {
@@ -128,7 +139,7 @@ const PackageCard: React.FC<PackageProps> = ({
             >
               {alreadyInCart ? 'Lihat Keranjang' : 'Pilih Paket'}
             </Button>
-            <Link to={`/paket/${slug}`} className="w-full">
+            <Link to={`/paket/${slug}`} className="w-full" onClick={handleDetailClick}>
               <Button block className="h-11 rounded-xl font-semibold border-surface-container hover:border-primary hover:text-primary">
                 Lihat Detail
               </Button>

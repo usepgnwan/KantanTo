@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
+import { getAdminTransactions } from '../../services/transactionService';
+import dayjs from 'dayjs';
 import { Row, Col, Typography, Card, Avatar } from 'antd';
 import { UserOutlined, RiseOutlined, FireOutlined, FallOutlined, BarChartOutlined, EllipsisOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
@@ -8,19 +10,59 @@ const { Title, Text } = Typography;
 
 const AdminDashboard: React.FC = () => {
   const [activeRange, setActiveRange] = useState<'7d' | '30d'>('7d');
+  const [loading, setLoading] = useState(true);
+  const [transactions, setTransactions] = useState<any[]>([]);
 
-  // Placeholder Data
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        const res = await getAdminTransactions();
+        if (res.status && res.data) {
+          setTransactions(res.data);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboardData();
+  }, []);
+
+  const activeTransactions = transactions.filter(t => t.status === 'active');
+  const totalRevenue = activeTransactions.reduce((acc, t) => acc + t.amount, 0);
+  const totalTransactions = transactions.length;
+  const successTransactions = activeTransactions.length;
+
   const metrics = [
-    { title: 'Pengguna Aktif', value: '4,102', growth: '+12%', isPositive: true, icon: <UserOutlined />, color: 'primary' },
-    { title: 'Pendapatan (Harian)', value: 'Rp 14.5M', growth: '+5.4%', isPositive: true, icon: <RiseOutlined />, color: 'green-500' },
-    { title: 'Tingkat Penyelesaian Tryout', value: '68%', growth: '-2.1%', isPositive: false, icon: <FallOutlined />, color: 'red-500' },
+    { title: 'Total Transaksi', value: totalTransactions.toString(), growth: '', isPositive: true, icon: <BarChartOutlined />, color: 'primary' },
+    { title: 'Total Pendapatan', value: `Rp ${totalRevenue.toLocaleString('id-ID')}`, growth: '', isPositive: true, icon: <RiseOutlined />, color: 'green-500' },
+    { title: 'Transaksi Sukses', value: successTransactions.toString(), growth: '', isPositive: true, icon: <FireOutlined />, color: 'blue-500' },
   ];
 
-  const recentUsers = [
-    { name: 'Arief Kurniawan', package: 'SNBT Intensive Pro', time: '12 menit lalu' },
-    { name: 'Siti Aminah', package: 'Gratis Akses', time: '1 jam lalu' },
-    { name: 'Diana Fitri', package: 'Tryout Akbar Plus', time: '3 jam lalu' },
-  ];
+  const recentUsers = activeTransactions.slice(0, 5).map(t => ({
+    name: t.user?.name || 'Pengguna',
+    package: t.package?.title || 'Paket',
+    time: dayjs(t.created_at).format('DD MMM, HH:mm')
+  }));
+
+  // Revenue Chart (Last 7 Days)
+  const last7Days = Array.from({length: 7}, (_, i) => dayjs().subtract(6 - i, 'day').format('YYYY-MM-DD'));
+  const dailyRevenue = last7Days.reduce((acc: any, date) => {
+    acc[date] = 0;
+    return acc;
+  }, {});
+
+  activeTransactions.forEach(t => {
+    const date = dayjs(t.created_at).format('YYYY-MM-DD');
+    if (dailyRevenue[date] !== undefined) {
+      dailyRevenue[date] += t.amount;
+    }
+  });
+
+  const revenueData = last7Days.map(date => dailyRevenue[date]);
+  const revenueLabels = last7Days.map(date => dayjs(date).format('DD/MM'));
 
   // ECharts Configurations
   const revenueChartOption = {
@@ -29,7 +71,7 @@ const AdminDashboard: React.FC = () => {
     xAxis: {
       type: 'category',
       boundaryGap: false,
-      data: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'],
+      data: revenueLabels,
       axisLine: { show: false },
       axisTick: { show: false },
     },
@@ -39,10 +81,10 @@ const AdminDashboard: React.FC = () => {
     },
     series: [
       {
-        name: 'Pendapatan (Juta)',
+        name: 'Pendapatan (Rp)',
         type: 'line',
         smooth: true,
-        data: [12, 14, 11, 15, 18, 22, 28],
+        data: revenueData,
         itemStyle: { color: '#0053dd' },
         areaStyle: {
           color: {
@@ -53,6 +95,17 @@ const AdminDashboard: React.FC = () => {
       }
     ]
   };
+
+  const packageCounts = activeTransactions.reduce((acc: any, t) => {
+    const pkgName = t.package?.title || 'Lainnya';
+    acc[pkgName] = (acc[pkgName] || 0) + 1;
+    return acc;
+  }, {});
+
+  const distributionData = Object.keys(packageCounts).map(key => ({
+    name: key,
+    value: packageCounts[key]
+  }));
 
   const distributionChartOption = {
     tooltip: { trigger: 'item' },
@@ -69,12 +122,7 @@ const AdminDashboard: React.FC = () => {
           borderColor: '#fff',
           borderWidth: 2
         },
-        data: [
-          { value: 1048, name: 'Saintek Pro', itemStyle: { color: '#0053dd' } },
-          { value: 735, name: 'Soshum Mastery', itemStyle: { color: '#0762ff' } },
-          { value: 580, name: 'Akses Gratis', itemStyle: { color: '#adb3b7' } },
-          { value: 484, name: 'Tryout Akbar', itemStyle: { color: '#fca5a5' } }
-        ]
+        data: distributionData.length > 0 ? distributionData : [{ value: 0, name: 'Belum Ada Transaksi' }]
       }
     ]
   };
@@ -145,7 +193,7 @@ const AdminDashboard: React.FC = () => {
                   </Title>
                   <EllipsisOutlined className="text-xl text-on-surface/40 cursor-pointer hover:text-primary transition-colors" />
                 </div>
-                <ReactECharts option={revenueChartOption} style={{ height: '350px' }} />
+                {!loading && <ReactECharts option={revenueChartOption} style={{ height: '350px' }} />}
               </Card>
             </Col>
 
@@ -153,7 +201,7 @@ const AdminDashboard: React.FC = () => {
             <Col xs={24} lg={8}>
               <Card className="weightless-card border-none border-on-surface/5 bg-white dark:bg-zinc-900 p-2 h-full">
                 <Title level={5} className="!mb-8 !font-manrope !font-black px-4 pt-4">Distribusi Pengguna</Title>
-                <ReactECharts option={distributionChartOption} style={{ height: '280px' }} />
+                {!loading && <ReactECharts option={distributionChartOption} style={{ height: '280px' }} />}
               </Card>
             </Col>
           </Row>
@@ -163,7 +211,7 @@ const AdminDashboard: React.FC = () => {
             <Col xs={24} lg={12}>
                <Card className="weightless-card border border-on-surface/5 bg-surface-lowest p-0 overflow-hidden">
                  <div className="p-6 border-b border-on-surface/5 flex justify-between items-center bg-surface-low/30">
-                    <Title level={5} className="!m-0 !font-manrope !font-black">Pendaftar Terbaru</Title>
+                    <Title level={5} className="!m-0 !font-manrope !font-black">Pembeli Terbaru</Title>
                     <span className="text-xs text-primary font-bold cursor-pointer">Lihat Semua</span>
                  </div>
                  <div className="divide-y divide-on-surface/5">

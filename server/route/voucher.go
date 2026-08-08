@@ -10,6 +10,7 @@ func RouteVoucher(e *echo.Group) {
 	voucher := e.Group("/vouchers")
 	
 	voucher.GET("", controller.GetVouchers)
+	voucher.GET("/:id/usage", controller.GetVoucherUsageHistory)
 	voucher.GET("/:id", controller.GetVoucherByID)
 	
 	voucher.POST("", controller.CreateVoucher)

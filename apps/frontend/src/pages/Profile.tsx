@@ -18,7 +18,10 @@ import {
   BankOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../context/AuthContext';
+import { getUserDashboardStatsAPI, UserDashboardStats } from '../services/dashboardService';
+import { getProfileAPI, updateProfileAPI, User as UserProfile, UpdateProfilePayload } from '../services/userService';
 import PageLoader from '../components/atoms/PageLoader';
+import { message } from 'antd';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -26,14 +29,71 @@ const ProfilePage: React.FC = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
+  const [dashboardStats, setDashboardStats] = useState<UserDashboardStats | null>(null);
+  const [profileData, setProfileData] = useState<UserProfile | null>(null);
   const [form] = Form.useForm();
+
+  const fetchProfile = async (id: number) => {
+    try {
+      const data = await getProfileAPI(id);
+      setProfileData(data);
+      form.setFieldsValue({
+        name: data.name,
+        email: data.email,
+        whatsapp: data.nohp,
+        school: data.asal_sekolah,
+        dreamDescription: data.dream_description,
+        target_campus: data.target_campus,
+        target_major: data.target_major,
+        target_point: data.target_point,
+      });
+    } catch (error) {
+      message.error('Gagal memuat profil');
+    }
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setLoading(false);
     }, 1000);
+
+    if (user?.id) {
+      getUserDashboardStatsAPI(user.id).then(setDashboardStats);
+      fetchProfile(user.id);
+    }
+
     return () => clearTimeout(timer);
-  }, []);
+  }, [user]);
+
+  const handleSave = async () => {
+    if (!editing) {
+      setEditing(true);
+      return;
+    }
+
+    try {
+      const values = await form.validateFields();
+      if (!user?.id) return;
+      
+      const payload: UpdateProfilePayload = {
+        name: values.name,
+        email: values.email,
+        nohp: values.whatsapp,
+        asal_sekolah: values.school,
+        dream_description: values.dreamDescription,
+        target_campus: values.target_campus,
+        target_major: values.target_major,
+        target_point: values.target_point,
+      };
+
+      const updated = await updateProfileAPI(user.id, payload);
+      setProfileData(updated);
+      message.success('Profil berhasil diperbarui!');
+      setEditing(false);
+    } catch (error) {
+      message.error('Gagal memperbarui profil, silakan periksa isian Anda.');
+    }
+  };
 
   if (loading) return <PageLoader />;
 
@@ -68,11 +128,11 @@ const ProfilePage: React.FC = () => {
                   
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center p-4 rounded-3xl bg-surface-low">
-                      <Title level={4} className="!m-0 !font-black !text-primary">12</Title>
+                      <Title level={4} className="!m-0 !font-black !text-primary">{dashboardStats?.total_exams || 0}</Title>
                       <Text className="text-[10px] font-bold uppercase tracking-widest text-on-surface/40">Tryout Diikuti</Text>
                     </div>
                     <div className="text-center p-4 rounded-3xl bg-surface-low">
-                      <Title level={4} className="!m-0 !font-black !text-secondary">685</Title>
+                      <Title level={4} className="!m-0 !font-black !text-secondary">{Math.round(dashboardStats?.avg_score || 0)}</Title>
                       <Text className="text-[10px] font-bold uppercase tracking-widest text-on-surface/40">Rata-rata Skor</Text>
                     </div>
                   </div>
@@ -120,7 +180,7 @@ const ProfilePage: React.FC = () => {
                         <Button 
                           type={editing ? "primary" : "text"} 
                           icon={editing ? <SaveOutlined /> : <EditOutlined />} 
-                          onClick={() => setEditing(!editing)}
+                          onClick={handleSave}
                           className={editing ? "rounded-full px-6" : "text-primary font-bold"}
                         >
                             {editing ? "Simpan Perubahan" : "Edit Profil"}
@@ -131,14 +191,6 @@ const ProfilePage: React.FC = () => {
                   <Form
                     form={form}
                     layout="vertical"
-                    initialValues={{
-                      name: user?.name,
-                      email: user?.email,
-                      whatsapp: '081234567890',
-                      school: 'SMA Negeri 1 Jakarta',
-                      dreamDescription: 'Ingin menjadi Dokter Spesialis Bedah yang bisa membantu banyak orang kurang mampu di pelosok Indonesia.',
-                      bucketList: 'Lolos SNBT 2024, Skor UTBK > 700, KKN di Desa Penari',
-                    }}
                     disabled={!editing}
                   >
                     <Row gutter={24}>
@@ -149,12 +201,12 @@ const ProfilePage: React.FC = () => {
                       </Col>
                       <Col xs={24} md={12}>
                         <Form.Item name="email" label={<Text className="text-[10px] uppercase font-bold text-on-surface/40 tracking-widest">Alamat Email</Text>}>
-                          <Input className="h-12 rounded-xl bg-surface-low border-none font-bold" prefix={<MailOutlined className="opacity-20" />} />
+                          <Input disabled className="h-12 rounded-xl bg-surface-low border-none font-bold text-on-surface/50" prefix={<MailOutlined className="opacity-20" />} />
                         </Form.Item>
                       </Col>
                       <Col xs={24} md={12}>
                         <Form.Item name="whatsapp" label={<Text className="text-[10px] uppercase font-bold text-on-surface/40 tracking-widest">Nomor WhatsApp</Text>}>
-                          <Input className="h-12 rounded-xl bg-surface-low border-none font-bold" prefix={<WhatsAppOutlined className="opacity-20" />} />
+                          <Input disabled className="h-12 rounded-xl bg-surface-low border-none font-bold text-on-surface/50" prefix={<WhatsAppOutlined className="opacity-20" />} />
                         </Form.Item>
                       </Col>
                       <Col xs={24} md={12}>
@@ -177,9 +229,19 @@ const ProfilePage: React.FC = () => {
                           <Input.TextArea rows={3} className="rounded-2xl bg-surface-low border-none font-medium p-4" placeholder="Tuliskan cita-cita besarmu di sini..." />
                         </Form.Item>
                       </Col>
-                      <Col span={24}>
-                        <Form.Item name="bucketList" label={<Text className="text-[10px] uppercase font-bold text-on-surface/40 tracking-widest">Bucket List (Pisahkan dengan koma)</Text>}>
-                          <Input className="h-12 rounded-xl bg-surface-low border-none font-bold" prefix={<CheckSquareOutlined className="opacity-20" />} placeholder="Cth: Lolos UI, Juara OSN, Hafal 30 Juz" />
+                      <Col xs={24} md={8}>
+                        <Form.Item name="target_campus" label={<Text className="text-[10px] uppercase font-bold text-on-surface/40 tracking-widest">Target Kampus / Sekolah</Text>}>
+                          <Input className="h-12 rounded-xl bg-surface-low border-none font-bold" prefix={<BankOutlined className="opacity-20" />} placeholder="Cth: Universitas Indonesia" />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={8}>
+                        <Form.Item name="target_major" label={<Text className="text-[10px] uppercase font-bold text-on-surface/40 tracking-widest">Target Jurusan</Text>}>
+                          <Input className="h-12 rounded-xl bg-surface-low border-none font-bold" prefix={<CheckSquareOutlined className="opacity-20" />} placeholder="Cth: Kedokteran" />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={8}>
+                        <Form.Item name="target_point" label={<Text className="text-[10px] uppercase font-bold text-on-surface/40 tracking-widest">Target Skor / Point</Text>}>
+                          <Input className="h-12 rounded-xl bg-surface-low border-none font-bold" prefix={<StarOutlined className="opacity-20" />} placeholder="Cth: 750" />
                         </Form.Item>
                       </Col>
                     </Row>

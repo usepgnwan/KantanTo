@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
+import { getAdminTransactions } from '../../services/transactionService';
 import {
   Card, Table, Input, Button, Tag, Avatar,
   Typography, Space, Select, Dropdown, Steps,
@@ -28,27 +29,55 @@ interface Order {
   date: string;
 }
 
-const mockOrders: Order[] = [
-  { key: '1', orderId: 'KTN-20260422-1012', user: 'Arief Kurniawan', email: 'arief@gmail.com', package: 'Saintek Pro', originalAmount: 75000, amount: 60000, voucher: 'PROMOSI20', status: 'sukses', method: 'QRIS', date: '22 Apr 2026' },
-  { key: '2', orderId: 'KTN-20260422-1011', user: 'Diana Fitri', email: 'diana@gmail.com', package: 'Tryout Akbar', originalAmount: 25000, amount: 25000, status: 'sukses', method: 'Transfer Bank', date: '22 Apr 2026' },
-  { key: '3', orderId: 'KTN-20260420-0998', user: 'Rini Wulandari', email: 'rini@outlook.com', package: 'Saintek Pro', originalAmount: 75000, amount: 75000, status: 'sukses', method: 'QRIS', date: '20 Apr 2026' },
-  { key: '4', orderId: 'KTN-20260419-0989', user: 'Joko Prasetyo', email: 'joko@gmail.com', package: 'Intensif UTBK', originalAmount: 95000, amount: 80000, voucher: 'DISKONMABA', status: 'pending', method: 'Virtual Account', date: '19 Apr 2026' },
-  { key: '5', orderId: 'KTN-20260418-0975', user: 'Ayu Lestari', email: 'ayu@gmail.com', package: 'Intensif UTBK', originalAmount: 95000, amount: 95000, status: 'sukses', method: 'QRIS', date: '18 Apr 2026' },
-  { key: '6', orderId: 'KTN-20260415-0954', user: 'Budi Santoso', email: 'budi@gmail.com', package: 'Soshum Mastery', originalAmount: 85000, amount: 85000, status: 'gagal', method: 'Transfer Bank', date: '15 Apr 2026' },
-  { key: '7', orderId: 'KTN-20260414-0940', user: 'Dani Permana', email: 'dani@yahoo.com', package: 'Soshum Mastery', originalAmount: 85000, amount: 68000, voucher: 'BOLOSBELAJAR', status: 'sukses', method: 'QRIS', date: '14 Apr 2026' },
-];
-
-const statusConfig = {
-  sukses: { color: 'green', icon: <CheckCircleOutlined />, label: 'Sukses' },
-  pending: { color: 'orange', icon: <ClockCircleOutlined />, label: 'Pending' },
-  gagal: { color: 'red', icon: <CloseCircleOutlined />, label: 'Gagal' },
-};
-
 const AdminOrders: React.FC = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const filtered = mockOrders.filter((o) => {
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        setLoading(true);
+        const res = await getAdminTransactions();
+        if (res.status && res.data) {
+          const formatted: Order[] = res.data.map((t: any) => {
+            let mappedStatus: 'sukses' | 'pending' | 'gagal' = 'pending';
+            if (t.status === 'active') mappedStatus = 'sukses';
+            else if (t.status === 'expired' || t.status === 'inactive') mappedStatus = 'gagal';
+
+            return {
+              key: t.id.toString(),
+              orderId: t.order_id,
+              user: t.user?.name || '-',
+              email: t.user?.email || '-',
+              package: t.package?.title || '-',
+              amount: t.amount,
+              originalAmount: t.package?.price || t.amount,
+              voucher: t.voucher?.code,
+              status: mappedStatus,
+              method: t.payment_method?.toUpperCase() || '-',
+              date: new Date(t.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })
+            };
+          });
+          setOrders(formatted);
+        }
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchOrders();
+  }, []);
+
+  const statusConfig = {
+    sukses: { color: 'green', icon: <CheckCircleOutlined />, label: 'Sukses' },
+    pending: { color: 'orange', icon: <ClockCircleOutlined />, label: 'Pending' },
+    gagal: { color: 'red', icon: <CloseCircleOutlined />, label: 'Gagal' },
+  };
+
+  const filtered = orders.filter((o) => {
     const matchSearch =
       o.orderId.toLowerCase().includes(search.toLowerCase()) ||
       o.user.toLowerCase().includes(search.toLowerCase());
@@ -56,9 +85,9 @@ const AdminOrders: React.FC = () => {
     return matchSearch && matchStatus;
   });
 
-  const totalRevenue = mockOrders.filter(o => o.status === 'sukses').reduce((a, o) => a + o.amount, 0);
-  const successCount = mockOrders.filter(o => o.status === 'sukses').length;
-  const pendingCount = mockOrders.filter(o => o.status === 'pending').length;
+  const totalRevenue = orders.filter(o => o.status === 'sukses').reduce((a, o) => a + o.amount, 0);
+  const successCount = orders.filter(o => o.status === 'sukses').length;
+  const pendingCount = orders.filter(o => o.status === 'pending').length;
 
   const rowActions = (): MenuProps['items'] => [
     { key: 'view', label: 'Lihat Detail' },
@@ -236,6 +265,7 @@ const AdminOrders: React.FC = () => {
             </div>
 
             <Table
+              loading={loading}
               columns={columns}
               dataSource={filtered}
               pagination={{ pageSize: 8, showSizeChanger: false, showTotal: (total) => `Total ${total} pesanan` }}

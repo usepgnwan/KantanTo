@@ -18,6 +18,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { menuConfig } from '../../routes/config';
+import { recordMenuLogAPI } from '../../services/logService';
 
 const Navbar: React.FC = () => {
   const { mode, toggleTheme } = useTheme();
@@ -35,6 +36,17 @@ const Navbar: React.FC = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const logMenuClick = (path: string, label: string) => {
+    if (path.includes('/keranjang') || path.includes('/paket/')) return;
+    const device = window.innerWidth < 768 ? 'mobile' : 'web';
+    recordMenuLogAPI({
+      path,
+      label,
+      device,
+      user_id: user?.id,
+    });
+  };
 
   const handleLogout = () => {
     logout();
@@ -112,7 +124,7 @@ const Navbar: React.FC = () => {
     <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${scrolled || mobileVisible ? 'bg-white/80 backdrop-blur-xl py-2 shadow-sm' : 'bg-transparent py-4'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
         <div className="flex items-center">
-          <Link to="/" className="text-2xl font-black tracking-tighter text-primary font-manrope">
+          <Link to="/" onClick={() => logMenuClick('/', 'Logo')} className="text-2xl font-black tracking-tighter text-primary font-manrope">
             Kantan.
           </Link>
         </div>
@@ -123,6 +135,10 @@ const Navbar: React.FC = () => {
             mode="horizontal"
             selectedKeys={[location.pathname]}
             items={menuItems}
+            onClick={(info) => {
+              const item = menuConfig.find(m => m.path === info.key);
+              logMenuClick(info.key, item?.name || info.key);
+            }}
             className="bg-transparent border-none flex-grow min-w-[400px] font-bold text-xs uppercase tracking-widest"
           />
           <Space size="large" className="ml-8 border-l border-on-surface/5 pl-8">
@@ -142,7 +158,10 @@ const Navbar: React.FC = () => {
             </Link>
 
             {isLoggedIn ? (
-              <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" arrow={{ pointAtCenter: true }} trigger={['click']}>
+              <Dropdown menu={{ 
+                items: userMenuItems,
+                onClick: (info) => logMenuClick(info.key, `UserMenu: ${info.key}`)
+              }} placement="bottomRight" arrow={{ pointAtCenter: true }} trigger={['click']}>
                 <div className="flex items-center gap-3 cursor-pointer group">
                   <Avatar
                     src={user?.avatar}
@@ -157,8 +176,8 @@ const Navbar: React.FC = () => {
               </Dropdown>
             ) : (
               <Space size="middle">
-                <Link to="/login" className="text-xs font-heavy uppercase tracking-widest text-on-surface/60 hover:text-primary transition-colors">Masuk</Link>
-                <Link to="/register" className="rounded-full px-8 h-10 font-bold uppercase tracking-widest text-[10px] p-3 text-white text-xs font-heavy bg-primary shadow-lg shadow-primary/20">Daftar</Link>
+                <Link to="/login" onClick={() => logMenuClick('/login', 'Login')} className="text-xs font-heavy uppercase tracking-widest text-on-surface/60 hover:text-primary transition-colors">Masuk</Link>
+                <Link to="/register" onClick={() => logMenuClick('/register', 'Register')} className="rounded-full px-8 h-10 font-bold uppercase tracking-widest text-[10px] p-3 text-white text-xs font-heavy bg-primary shadow-lg shadow-primary/20">Daftar</Link>
               </Space>
             )}
           </Space>
@@ -208,7 +227,11 @@ const Navbar: React.FC = () => {
           mode="vertical"
           selectedKeys={[location.pathname]}
           items={menuItems}
-          onClick={() => setMobileVisible(false)}
+          onClick={(info) => {
+            const item = menuConfig.find(m => m.path === info.key);
+            logMenuClick(info.key, item?.name || info.key);
+            setMobileVisible(false);
+          }}
           className="border-none weightless-menu font-bold"
         />
 
@@ -220,15 +243,18 @@ const Navbar: React.FC = () => {
               <Menu
                 mode="vertical"
                 items={userMenuItems.filter((i: any) => i.type !== 'divider')}
-                onClick={() => setMobileVisible(false)}
+                onClick={(info) => {
+                  logMenuClick(info.key, `UserMenu: ${info.key}`);
+                  setMobileVisible(false);
+                }}
                 className="border-none weightless-menu font-bold"
               />
             </>
           </>
         ) : (
           <div className="mt-12 space-y-4">
-            <Button block size="large" className="rounded-2xl h-14 font-bold border-on-surface/10" onClick={() => navigate('/login')}>Masuk</Button>
-            <Button block type="primary" size="large" className="rounded-2xl h-14 font-bold shadow-lg shadow-primary/20" onClick={() => navigate('/register')}>Buat Akun Gratis</Button>
+            <Button block size="large" className="rounded-2xl h-14 font-bold border-on-surface/10" onClick={() => { logMenuClick('/login', 'Login'); navigate('/login'); }}>Masuk</Button>
+            <Button block type="primary" size="large" className="rounded-2xl h-14 font-bold shadow-lg shadow-primary/20" onClick={() => { logMenuClick('/register', 'Register'); navigate('/register'); }}>Buat Akun Gratis</Button>
           </div>
         )}
       </Drawer>

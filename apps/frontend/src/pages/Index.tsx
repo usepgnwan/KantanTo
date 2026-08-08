@@ -13,6 +13,8 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { getPackages, PackageListItem } from '../services/packageService';
+import { recordMenuLogAPI } from '../services/logService';
+import { useAuth } from '../context/AuthContext';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -36,8 +38,20 @@ const features = [
 
 const IndexPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [packages, setPackages] = useState<PackageListItem[]>([]);
   const [loadingPackages, setLoadingPackages] = useState(true);
+
+  const handlePackageClick = (pkg: PackageListItem) => {
+    const device = window.innerWidth < 768 ? 'mobile' : 'web';
+    recordMenuLogAPI({
+      path: `/paket/${pkg.slug}`,
+      label: pkg.title,
+      device,
+      user_id: user?.id,
+    });
+    navigate(`/paket/${pkg.slug}`);
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -161,7 +175,7 @@ const IndexPage: React.FC = () => {
                           type="primary"
                           block
                           className="h-10 rounded-xl font-bold"
-                          onClick={() => navigate(`/paket/${pkg.slug}`)}
+                          onClick={() => handlePackageClick(pkg)}
                         >
                           Pilih Paket
                         </Button>

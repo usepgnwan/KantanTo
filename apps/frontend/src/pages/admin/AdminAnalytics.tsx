@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminLayout from '../../layouts/AdminLayout';
-import { Row, Col, Typography, Card, Select, Statistic } from 'antd';
+import { Row, Col, Typography, Card, Select, Statistic, Table, Tag } from 'antd';
 import {
   RiseOutlined,
   FallOutlined,
@@ -9,55 +9,192 @@ import {
   FireOutlined,
 } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
+import { getMenuLogsAPI, MenuLogResponse } from '../../services/logService';
+import { getAdminTransactions } from '../../services/transactionService';
+import { getUsers, User } from '../../services/userService';
 
 const { Title, Text } = Typography;
 
 const AdminAnalytics: React.FC = () => {
   const [period, setPeriod] = useState('30d');
+  const [logs, setLogs] = useState<MenuLogResponse[]>([]);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(true);
+
+  useEffect(() => {
+    getMenuLogsAPI()
+      .then(setLogs)
+      .catch(console.error)
+      .finally(() => setLoadingLogs(false));
+      
+    getAdminTransactions()
+      .then(res => {
+        if (res.status && res.data) {
+          setTransactions(res.data);
+        }
+      })
+      .catch(console.error);
+
+    getUsers(1, 10000)
+      .then(res => {
+        if (res.rows) setUsers(res.rows);
+      })
+      .catch(console.error);
+  }, []);
+
+  const getChartData = () => {
+    const days = period === '7d' ? 7 : period === '30d' ? 30 : 90;
+    const dates: string[] = [];
+    const today = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      dates.push(`${d.getDate()} ${d.toLocaleString('id-ID', { month: 'short' })}`);
+    }
+
+    const packageStats: Record<string, number[]> = {};
+    const legendData: Set<string> = new Set();
+
+    logs.forEach(log => {
+      // Hanya menghitung klik yang mengarah ke detail paket
+      if (log.path.includes('/paket/')) {
+        const d = new Date(log.created_at);
+        const logDate = `${d.getDate()} ${d.toLocaleString('id-ID', { month: 'short' })}`;
+        const index = dates.indexOf(logDate);
+        if (index !== -1) {
+          const pkgName = log.label;
+          legendData.add(pkgName);
+          if (!packageStats[pkgName]) {
+            packageStats[pkgName] = new Array(days).fill(0);
+          }
+          packageStats[pkgName][index]++;
+        }
+      }
+    });
+
+    const colors = ['#0053dd', '#6d567f', '#595e72', '#0762ff', '#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
+    const series = Array.from(legendData).map((pkgName, i) => {
+      const color = colors[i % colors.length];
+      return {
+        name: pkgName,
+        type: 'line',
+        stack: 'Total',
+        smooth: true,
+        data: packageStats[pkgName],
+        itemStyle: { color },
+        areaStyle: {}, // Let ECharts handle opacity automatically
+      };
+    });
+
+    return { dates, series, legend: Array.from(legendData) };
+  };
+
+  const getFunnelData = () => {
+    // Menghitung jumlah berdasarkan kategori URL di menu logs
+    const totalCount = logs.length;
+    const catalogCount = logs.filter(l => l.path.includes('/paket')).length;
+    const authCount = logs.filter(l => l.path === '/register' || l.path === '/login').length;
+    const dashboardCount = logs.filter(l => l.path === '/dashboard' || l.path === '/latihan' || l.path === '/riwayat').length;
+
+    // Untuk funnel, idealnya data harus menurun (descending). 
+    // Kita pastikan nilainya tidak lebih besar dari step sebelumnya secara logis jika ingin visualisasi kerucut yang sempurna, 
+    // tapi ECharts funnel akan mengurutkan jika di set 'descending', atau kita bisa biarkan berantakan tapi bentuknya tak beraturan.
+    // Echarts sort: 'descending' akan mengurutkan value secara otomatis.
+    return [
+      { value: totalCount, name: 'Total Interaksi', itemStyle: { color: '#dde1f9' }, label: { color: '#1e40af' } },
+      { value: catalogCount, name: 'Lihat Paket', itemStyle: { color: '#93c5fd' } },
+      { value: authCount, name: 'Klik Masuk/Daftar', itemStyle: { color: '#3b82f6' } },
+      { value: dashboardCount, name: 'Akses Dashboard/Belajar', itemStyle: { color: '#1d4ed8' } },
+    ];
+  };
+
+  const chartData = getChartData();
+  const funnelData = getFunnelData();
+
+  const getUserGrowthData = () => {
+    const days = period === '7d' ? 7 : period === '30d' ? 30 : 90;
+    const dates: string[] = [];
+    const today = new Date();
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      dates.push(`${d.getDate()} ${d.toLocaleString('id-ID', { month: 'short' })}`);
+    }
+
+    const dataNewUsers = new Array(days).fill(0);
+    const dataActiveUsers = new Array(days).fill(0);
+
+    users.forEach(user => {
+      // Calculate Pengguna Baru
+      if (user.created_at) {
+        const d = new Date(user.created_at);
+        const uDate = `${d.getDate()} ${d.toLocaleString('id-ID', { month: 'short' })}`;
+        const idx = dates.indexOf(uDate);
+        if (idx !== -1) dataNewUsers[idx]++;
+      }
+      
+      // Calculate Pengguna Aktif
+      if (user.last_login) {
+        const d2 = new Date(user.last_login);
+        const lDate = `${d2.getDate()} ${d2.toLocaleString('id-ID', { month: 'short' })}`;
+        const idx2 = dates.indexOf(lDate);
+        if (idx2 !== -1) dataActiveUsers[idx2]++;
+      }
+    });
+
+    return { dates, dataNewUsers, dataActiveUsers };
+  };
+
+  const growthData = getUserGrowthData();
 
   // ─────────────────────────────────────────
   // 1. User Growth — Line + Bar combo
   // ─────────────────────────────────────────
   const userGrowthOption = {
-    tooltip: { trigger: 'axis' },
-    legend: { data: ['Pengguna Baru', 'Pengguna Aktif'], bottom: 0 },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'cross', crossStyle: { color: '#999' } } },
+    legend: { data: ['Pengguna Aktif', 'Pendaftar Baru'], bottom: 0 },
     grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
     xAxis: {
       type: 'category',
-      data: ['1 Apr', '5 Apr', '10 Apr', '15 Apr', '20 Apr', '25 Apr', '30 Apr'],
+      data: growthData.dates,
+      axisPointer: { type: 'shadow' },
       axisLine: { show: false },
       axisTick: { show: false },
       axisLabel: { color: '#9ca3af' },
     },
-    yAxis: {
-      type: 'value',
-      splitLine: { lineStyle: { type: 'dashed', color: '#e5e7eb' } },
-      axisLabel: { color: '#9ca3af' },
-    },
-    series: [
+    yAxis: [
       {
-        name: 'Pengguna Baru',
-        type: 'bar',
-        barWidth: '30%',
-        data: [180, 220, 195, 310, 275, 390, 420],
-        itemStyle: { color: '#dde1f9', borderRadius: [4, 4, 0, 0] },
+        type: 'value',
+        name: 'Pengguna Aktif',
+        nameTextStyle: { color: '#9ca3af', padding: [0, 0, 0, 20] },
+        splitLine: { lineStyle: { type: 'dashed', color: '#ebeef1' } },
+        axisLabel: { color: '#9ca3af' },
       },
+      {
+        type: 'value',
+        name: 'Pendaftar Baru',
+        nameTextStyle: { color: '#9ca3af', padding: [0, 20, 0, 0] },
+        splitLine: { show: false },
+        axisLabel: { color: '#9ca3af' },
+      },
+    ],
+    series: [
       {
         name: 'Pengguna Aktif',
         type: 'line',
         smooth: true,
-        data: [1200, 1380, 1250, 1600, 1780, 2100, 2340],
-        itemStyle: { color: '#0053dd' },
-        lineStyle: { width: 3 },
-        areaStyle: {
-          color: {
-            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
-            colorStops: [
-              { offset: 0, color: 'rgba(0,83,221,0.18)' },
-              { offset: 1, color: 'rgba(0,83,221,0)' },
-            ],
-          },
-        },
+        data: growthData.dataActiveUsers,
+        itemStyle: { color: '#0053dd', shadowColor: 'rgba(0, 83, 221, 0.4)', shadowBlur: 10 },
+        lineStyle: { width: 4 },
+      },
+      {
+        name: 'Pendaftar Baru',
+        type: 'bar',
+        yAxisIndex: 1,
+        barWidth: '30%',
+        data: growthData.dataNewUsers,
+        itemStyle: { color: '#dbeafe', borderRadius: [4, 4, 0, 0] },
       },
     ],
   };
@@ -65,27 +202,49 @@ const AdminAnalytics: React.FC = () => {
   // ─────────────────────────────────────────
   // 2. Revenue by package — horizontal bar
   // ─────────────────────────────────────────
+  const getRevenueData = () => {
+    const revenueMap: Record<string, number> = {};
+    transactions.forEach(t => {
+       if (t.status === 'active') {
+          const pkgName = t.package?.title || 'Lainnya';
+          revenueMap[pkgName] = (revenueMap[pkgName] || 0) + t.amount;
+       }
+    });
+    
+    // Sort by revenue ascending for horizontal bar (largest at top)
+    const sorted = Object.entries(revenueMap).sort((a, b) => a[1] - b[1]); 
+    // If empty, provide placeholder
+    if (sorted.length === 0) {
+      return { categories: ['Belum Ada Transaksi'], data: [{ value: 0, itemStyle: { color: '#adb3b7' } }] };
+    }
+
+    return {
+      categories: sorted.map(s => s[0]),
+      data: sorted.map((s, i) => {
+         const colors = ['#adb3b7', '#6d567f', '#595e72', '#0762ff', '#0053dd'];
+         const color = colors[Math.min(i, colors.length - 1)];
+         return { value: s[1], itemStyle: { color, borderRadius: [0, 6, 6, 0] } };
+      })
+    };
+  };
+
+  const revData = getRevenueData();
+
   const revenueByPackageOption = {
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     grid: { left: '3%', right: '10%', bottom: '5%', containLabel: true },
     xAxis: { type: 'value', axisLabel: { color: '#9ca3af', formatter: (v: number) => `${v / 1000}K` } },
     yAxis: {
       type: 'category',
-      data: ['Saintek Pro', 'Soshum Mastery', 'Tryout Akbar', 'Intensif UTBK', 'Gratis'],
-      axisLabel: { color: '#9ca3af', fontWeight: 600, fontSize: 11 },
+      data: revData.categories,
+      axisLabel: { color: '#9ca3af', fontWeight: 600, fontSize: 11, width: 90, overflow: 'truncate' },
     },
     series: [
       {
         name: 'Pendapatan (Rp)',
         type: 'bar',
         barWidth: '55%',
-        data: [
-          { value: 42500000, itemStyle: { color: '#0053dd', borderRadius: [0, 6, 6, 0] } },
-          { value: 31200000, itemStyle: { color: '#0762ff', borderRadius: [0, 6, 6, 0] } },
-          { value: 19800000, itemStyle: { color: '#595e72', borderRadius: [0, 6, 6, 0] } },
-          { value: 14300000, itemStyle: { color: '#6d567f', borderRadius: [0, 6, 6, 0] } },
-          { value: 0, itemStyle: { color: '#adb3b7', borderRadius: [0, 6, 6, 0] } },
-        ],
+        data: revData.data,
         label: {
           show: true,
           position: 'right',
@@ -120,13 +279,7 @@ const AdminAnalytics: React.FC = () => {
         gap: 4,
         label: { show: true, position: 'inside', color: '#fff', fontSize: 12, fontWeight: 700 },
         emphasis: { label: { fontSize: 14 } },
-        data: [
-          { value: 100, name: 'Kunjungi Halaman', itemStyle: { color: '#dde1f9' }, label: { color: '#1e40af' } },
-          { value: 68, name: 'Mulai Daftar', itemStyle: { color: '#93c5fd' } },
-          { value: 52, name: 'Bayar Paket', itemStyle: { color: '#3b82f6' } },
-          { value: 38, name: 'Mulai Tryout', itemStyle: { color: '#1d4ed8' } },
-          { value: 24, name: 'Selesai Tryout', itemStyle: { color: '#0053dd' } },
-        ],
+        data: funnelData,
       },
     ],
   };
@@ -180,12 +333,12 @@ const AdminAnalytics: React.FC = () => {
   // ─────────────────────────────────────────
   const dailyTriesOption = {
     tooltip: { trigger: 'axis' },
-    legend: { data: ['Saintek', 'Soshum', 'Campuran'], bottom: 0 },
-    grid: { left: '3%', right: '4%', bottom: '15%', containLabel: true },
+    legend: { data: chartData.legend, bottom: 0 },
+    grid: { left: '3%', right: '4%', bottom: '25%', containLabel: true },
     xAxis: {
       type: 'category',
       boundaryGap: false,
-      data: ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'],
+      data: chartData.dates,
       axisLine: { show: false },
       axisTick: { show: false },
       axisLabel: { color: '#9ca3af' },
@@ -195,35 +348,7 @@ const AdminAnalytics: React.FC = () => {
       splitLine: { lineStyle: { type: 'dashed', color: '#e5e7eb' } },
       axisLabel: { color: '#9ca3af' },
     },
-    series: [
-      {
-        name: 'Saintek',
-        type: 'line',
-        stack: 'Total',
-        smooth: true,
-        data: [120, 145, 132, 180, 155, 90, 70],
-        itemStyle: { color: '#0053dd' },
-        areaStyle: { color: 'rgba(0,83,221,0.25)' },
-      },
-      {
-        name: 'Soshum',
-        type: 'line',
-        stack: 'Total',
-        smooth: true,
-        data: [80, 95, 88, 110, 102, 60, 45],
-        itemStyle: { color: '#6d567f' },
-        areaStyle: { color: 'rgba(109,86,127,0.2)' },
-      },
-      {
-        name: 'Campuran',
-        type: 'line',
-        stack: 'Total',
-        smooth: true,
-        data: [40, 55, 48, 65, 58, 30, 22],
-        itemStyle: { color: '#595e72' },
-        areaStyle: { color: 'rgba(89,94,114,0.15)' },
-      },
-    ],
+    series: chartData.series,
   };
 
   const kpiCards = [
@@ -231,6 +356,50 @@ const AdminAnalytics: React.FC = () => {
     { label: 'Pengguna Baru (30 Hari)', value: '1,592', delta: '+11.2%', up: true, icon: <TeamOutlined /> },
     { label: 'Rata-rata Skor Tryout', value: '71.4 / 100', delta: '+3.1%', up: true, icon: <TrophyOutlined /> },
     { label: 'Churn Rate', value: '4.8%', delta: '+0.6%', up: false, icon: <FallOutlined /> },
+  ];
+
+  const logColumns = [
+    {
+      title: 'Waktu',
+      dataIndex: 'created_at',
+      key: 'created_at',
+      render: (text: string) => <Text className="text-xs font-semibold">{new Date(text).toLocaleString('id-ID')}</Text>,
+    },
+    {
+      title: 'Label Menu / Paket',
+      dataIndex: 'label',
+      key: 'label',
+      render: (text: string) => <Text className="font-bold text-primary">{text}</Text>,
+    },
+    {
+      title: 'Path',
+      dataIndex: 'path',
+      key: 'path',
+      render: (text: string) => <Text className="text-xs text-on-surface/60">{text}</Text>,
+    },
+    {
+      title: 'Perangkat',
+      dataIndex: 'device',
+      key: 'device',
+      render: (text: string) => (
+        <Tag color={text === 'web' ? 'blue' : 'purple'} className="rounded-md font-bold uppercase text-[10px] border-none">
+          {text}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Pengguna',
+      dataIndex: 'user',
+      key: 'user',
+      render: (user: any) => user ? (
+        <div className="flex flex-col">
+          <Text className="text-xs font-bold">{user.name}</Text>
+          <Text className="text-[10px] text-on-surface/40">{user.email}</Text>
+        </div>
+      ) : (
+        <Text className="text-xs text-on-surface/40 italic">Guest</Text>
+      ),
+    },
   ];
 
   return (
@@ -304,8 +473,8 @@ const AdminAnalytics: React.FC = () => {
             <Col xs={24} lg={9}>
               <Card className="weightless-card border-none bg-white dark:bg-zinc-900 h-full">
                 <div className="px-2 pt-2 mb-2">
-                  <Title level={5} className="!m-0 !font-manrope !font-black">Corong Konversi Pengguna</Title>
-                  <Text className="text-xs text-on-surface/40 dark:text-zinc-500">Dari Kunjungan → Penyelesaian Tryout</Text>
+                  <Title level={5} className="!m-0 !font-manrope !font-black">Corong Navigasi Pengguna</Title>
+                  <Text className="text-xs text-on-surface/40 dark:text-zinc-500">Dari Interaksi Kunjungan → Akses Area Belajar</Text>
                 </div>
                 <ReactECharts option={funnelOption} style={{ height: '320px' }} />
               </Card>
@@ -326,10 +495,31 @@ const AdminAnalytics: React.FC = () => {
             <Col xs={24}>
               <Card className="weightless-card border-none bg-white dark:bg-zinc-900">
                 <div className="px-2 pt-2 mb-2">
-                  <Title level={5} className="!m-0 !font-manrope !font-black">Total Pengerjaan Tryout per Hari</Title>
-                  <Text className="text-xs text-on-surface/40 dark:text-zinc-500">Dipecah berdasarkan program studi (Saintek, Soshum, Campuran)</Text>
+                  <Title level={5} className="!m-0 !font-manrope !font-black">Total Klik Paket per Hari</Title>
+                  <Text className="text-xs text-on-surface/40 dark:text-zinc-500">Dipecah berdasarkan paket spesifik</Text>
                 </div>
                 <ReactECharts option={dailyTriesOption} style={{ height: '280px' }} />
+              </Card>
+            </Col>
+          </Row>
+
+          {/* ── Row 4: Menu Logs Table ── */}
+          <Row gutter={[20, 20]} className="mt-8">
+            <Col xs={24}>
+              <Card className="weightless-card border-none bg-white dark:bg-zinc-900">
+                <div className="px-2 pt-2 mb-6">
+                  <Title level={5} className="!m-0 !font-manrope !font-black">Riwayat Aktivitas Navigasi (Menu Logs)</Title>
+                  <Text className="text-xs text-on-surface/40 dark:text-zinc-500">Daftar lengkap log klik menu dan halaman paket terbaru</Text>
+                </div>
+                <Table
+                  dataSource={logs}
+                  columns={logColumns}
+                  rowKey="id"
+                  loading={loadingLogs}
+                  pagination={{ pageSize: 10, className: 'weightless-pagination' }}
+                  className="font-sans"
+                  size="middle"
+                />
               </Card>
             </Col>
           </Row>

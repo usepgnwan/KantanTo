@@ -25,8 +25,13 @@ export interface User {
   asal_sekolah: string;
   role_id: number;
   role: Role;
+  dream_description?: string;
+  target_campus?: string;
+  target_major?: string;
+  target_point?: string;
   created_at?: string;
   updated_at?: string;
+  last_login?: string;
 }
 
 export interface PaginatedUserResponse {
@@ -71,4 +76,25 @@ export const loginUser = async (data: { email: string; password: string }): Prom
   } catch {}
 
   return { token, roleid, user };
+};
+
+export interface UpdateProfilePayload {
+  name?: string;
+  email?: string;
+  nohp?: string;
+  asal_sekolah?: string;
+  dream_description?: string;
+  target_campus?: string;
+  target_major?: string;
+  target_point?: string;
+}
+
+export const getProfileAPI = async (id: number): Promise<User> => {
+  const response = await api.get(`/user/profile/${id}`);
+  return response.data.data;
+};
+
+export const updateProfileAPI = async (id: number, payload: UpdateProfilePayload): Promise<User> => {
+  const response = await api.put(`/user/profile/${id}`, payload);
+  return response.data.data;
 };

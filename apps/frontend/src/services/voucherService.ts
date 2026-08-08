@@ -82,3 +82,15 @@ export const applyVoucherAPI = async (code: string, userId: number): Promise<Vou
 export const recordVoucherUsageAPI = async (payload: { voucher_id: number; user_id: number; order_id: string; package_id: number; amount: number; date: string }): Promise<void> => {
   await api.post('/vouchers/record-usage', payload);
 };
+
+export const getVoucherUsageHistoryAPI = async (id: number | string): Promise<VoucherUsage[]> => {
+  const response = await api.get(`/vouchers/${id}/usage`);
+  return unwrapList(response.data).map((u: any) => ({
+    id: String(u.id),
+    orderId: u.order_id,
+    user: u.user?.name || '-',
+    package: u.package?.title || '-',
+    amount: u.amount,
+    date: new Date(u.created_at).toLocaleString('id-ID'),
+  }));
+};

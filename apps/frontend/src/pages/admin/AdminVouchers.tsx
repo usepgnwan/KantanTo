@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getVouchers, createVoucher, updateVoucher, deleteVoucher, Voucher, VoucherUsage } from '../../services/voucherService';
+import { getVouchers, createVoucher, updateVoucher, deleteVoucher, Voucher, VoucherUsage, getVoucherUsageHistoryAPI } from '../../services/voucherService';
 import AdminLayout from '../../layouts/AdminLayout';
 import {
   Card, Table, Button, Tag, Typography, Space, Modal,
@@ -23,21 +23,14 @@ import dayjs from 'dayjs';
 const { Title, Text } = Typography;
 
 
-const mockUsage: Record<string, VoucherUsage[]> = {
-  '1': [
-    { id: 'u1', orderId: 'KTN-1012', user: 'Arief Kurniawan', package: 'Saintek Pro', amount: 60000, date: '2026-04-22 10:15' },
-    { id: 'u2', orderId: 'KTN-1025', user: 'Budi Santoso', package: 'Saintek Pro', amount: 60000, date: '2026-04-23 14:20' },
-  ],
-  '2': [
-    { id: 'u3', orderId: 'KTN-1050', user: 'Diana Fitri', package: 'Tryout Akbar', amount: 10000, date: '2026-04-24 09:12' },
-  ]
-};
 
 const AdminVouchers: React.FC = () => {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [usageHistory, setUsageHistory] = useState<VoucherUsage[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [editTarget, setEditTarget] = useState<Voucher | null>(null);
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
   const [form] = Form.useForm();
@@ -68,6 +61,22 @@ const AdminVouchers: React.FC = () => {
     setEditTarget(null);
     form.resetFields();
     setModalOpen(true);
+  };
+
+  const openHistory = async (v: Voucher) => {
+    setSelectedVoucher(v);
+    setHistoryOpen(true);
+    if (!v.id) return;
+    
+    setHistoryLoading(true);
+    try {
+      const data = await getVoucherUsageHistoryAPI(v.id);
+      setUsageHistory(data);
+    } catch (error) {
+      message.error('Gagal memuat riwayat voucher');
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const openEdit = (v: Voucher) => {
@@ -183,7 +192,7 @@ const AdminVouchers: React.FC = () => {
         <Space>
           <Button 
             icon={<HistoryOutlined />} 
-            onClick={() => { setSelectedVoucher(record); setHistoryOpen(true); }} 
+            onClick={() => openHistory(record)} 
             type="text" 
             className="text-orange-500"
           />
@@ -338,7 +347,8 @@ const AdminVouchers: React.FC = () => {
         }
       >
         <Table
-          dataSource={selectedVoucher && selectedVoucher.key ? (mockUsage[selectedVoucher.key] || []) : []}
+          loading={historyLoading}
+          dataSource={usageHistory}
           pagination={{ pageSize: 5 }}
           className="weightless-table"
           columns={[

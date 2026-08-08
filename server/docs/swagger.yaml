@@ -10,6 +10,17 @@ definitions:
     - email
     - password
     type: object
+  controller.RecordLogRequest:
+    properties:
+      device:
+        type: string
+      label:
+        type: string
+      path:
+        type: string
+      user_id:
+        type: integer
+    type: object
   controller.RegisterRequest:
     properties:
       asal_sekolah:
@@ -28,6 +39,25 @@ definitions:
     - name
     - nohp
     - password
+    type: object
+  controller.UpdateProfileRequest:
+    properties:
+      asal_sekolah:
+        type: string
+      dream_description:
+        type: string
+      email:
+        type: string
+      name:
+        type: string
+      nohp:
+        type: string
+      target_campus:
+        type: string
+      target_major:
+        type: string
+      target_point:
+        type: string
     type: object
   helpers.Response:
     properties:
@@ -116,6 +146,28 @@ info:
   title: Mapel API Documentation
   version: "1.0"
 paths:
+  /api/admin/transactions:
+    get:
+      description: Get all transactions for admin
+      parameters:
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get all transactions
+      tags:
+      - Transaction
   /api/artikel:
     get:
       consumes:
@@ -575,6 +627,52 @@ paths:
       summary: Update Category
       tags:
       - Category
+  /api/checkout:
+    post:
+      consumes:
+      - application/json
+      description: Create a transaction for a package, handle vouchers and zero payment
+        automatically
+      parameters:
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Process Checkout
+      tags:
+      - Checkout
+  /api/dashboard/user-stats:
+    get:
+      consumes:
+      - application/json
+      description: Get dynamic stats for User Dashboard
+      parameters:
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      - description: User ID
+        in: query
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Get user dashboard stats
+      tags:
+      - Dashboard
   /api/grade:
     get:
       consumes:
@@ -758,6 +856,51 @@ paths:
       summary: Update Grade
       tags:
       - Grade
+  /api/logs/menu:
+    get:
+      consumes:
+      - application/json
+      description: Get all menu click logs
+      parameters:
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Get Menu Logs
+      tags:
+      - Log
+    post:
+      consumes:
+      - application/json
+      description: Record a click on the menu/navbar
+      parameters:
+      - description: Log Data
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controller.RecordLogRequest'
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Record Menu Log
+      tags:
+      - Log
   /api/mapel:
     get:
       consumes:
@@ -1226,6 +1369,101 @@ paths:
       summary: Get list of Users
       tags:
       - User
+  /api/user/packages:
+    get:
+      consumes:
+      - application/json
+      description: Get all active packages for the authenticated user, including materials
+      parameters:
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Get user's packages
+      tags:
+      - User Package
+  /api/user/profile/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get a user's profile details.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Get User Profile
+      tags:
+      - User
+    put:
+      consumes:
+      - application/json
+      description: Update a user's profile details.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Update Profile Data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/controller.UpdateProfileRequest'
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/helpers.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/helpers.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: Update User Profile
+      tags:
+      - User
   /api/user/register:
     post:
       consumes:
@@ -1253,6 +1491,183 @@ paths:
       summary: Register a new User
       tags:
       - User
+  /api/vouchers:
+    get:
+      consumes:
+      - application/json
+      description: Get a paginated list of Vouchers
+      parameters:
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Get all Vouchers (Paginated)
+      tags:
+      - Voucher
+    post:
+      consumes:
+      - application/json
+      description: Create a new voucher
+      parameters:
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Create new Voucher
+      tags:
+      - Voucher
+  /api/vouchers/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete Voucher by ID
+      parameters:
+      - description: Voucher ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Delete Voucher
+      tags:
+      - Voucher
+    get:
+      consumes:
+      - application/json
+      description: Get specific Voucher by its ID
+      parameters:
+      - description: Voucher ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Get Voucher by ID
+      tags:
+      - Voucher
+    put:
+      consumes:
+      - application/json
+      description: Update Voucher by ID
+      parameters:
+      - description: Voucher ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Update Voucher
+      tags:
+      - Voucher
+  /api/vouchers/{id}/usage:
+    get:
+      consumes:
+      - application/json
+      description: Get usage history of a specific voucher
+      parameters:
+      - description: Voucher ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Get Voucher Usage History
+      tags:
+      - Voucher
+  /api/vouchers/apply:
+    post:
+      consumes:
+      - application/json
+      description: Validate and apply a voucher code for a specific user
+      parameters:
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Apply Voucher
+      tags:
+      - Voucher
+  /api/vouchers/record-usage:
+    post:
+      consumes:
+      - application/json
+      description: Record usage of a voucher after a successful checkout
+      parameters:
+      - default: Z9ToSwagger1413999
+        description: API secret key
+        in: header
+        name: secret-to-apps
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses: {}
+      security:
+      - ApiKeyAuth: []
+      summary: Record Voucher Usage
+      tags:
+      - Voucher
 securityDefinitions:
   ApiKeyAuth:
     in: header

@@ -14,6 +14,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useNavigate } from 'react-router-dom';
+import { getUserDashboardStatsAPI, UserDashboardStats } from '../services/dashboardService';
+import { getMyPackagesAPI, MyTransaction } from '../services/myPackageService';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -22,22 +24,31 @@ const Dashboard: React.FC = () => {
   const { items: cartItems, removeFromCart } = useCart();
   const navigate = useNavigate();
 
-  // Mock data based on Stitch design
+  const [dashboardStats, setDashboardStats] = React.useState<UserDashboardStats | null>(null);
+  const [myPackages, setMyPackages] = React.useState<MyTransaction[]>([]);
+
+  React.useEffect(() => {
+    if (user?.id) {
+      getUserDashboardStatsAPI(user.id).then(setDashboardStats);
+      getMyPackagesAPI(user.id).then(setMyPackages);
+    }
+  }, [user]);
+
   const stats = [
-    { title: 'Total TO Dimiliki', value: '24', icon: <HistoryOutlined />, color: 'blue' },
-    { title: 'Total TO Dikerjakan', value: '18', icon: <CheckCircleOutlined />, color: 'green' },
-    { title: 'Rata-rata Skor', value: '685', icon: <RiseOutlined />, color: 'purple' },
-    { title: 'Belajar Minggu Ini', value: '14.5 jam', icon: <ClockCircleOutlined />, color: 'orange' },
+    { title: 'Total TO Dimiliki', value: dashboardStats?.total_packages || '0', icon: <HistoryOutlined />, color: 'blue' },
+    { title: 'Total TO Dikerjakan', value: dashboardStats?.total_exams || '0', icon: <CheckCircleOutlined />, color: 'green' },
+    { title: 'Rata-rata Skor', value: Math.round(dashboardStats?.avg_score || 0).toString(), icon: <RiseOutlined />, color: 'purple' },
+    { title: 'Belajar Minggu Ini', value: `${(dashboardStats?.study_hours || 0).toFixed(1)} jam`, icon: <ClockCircleOutlined />, color: 'orange' },
   ];
 
-  const accuracyData = [
-    { day: 'Mon', accuracy: 65, error: 35 },
-    { day: 'Tue', accuracy: 72, error: 28 },
-    { day: 'Wed', accuracy: 68, error: 32 },
-    { day: 'Thu', accuracy: 85, error: 15 },
-    { day: 'Fri', accuracy: 78, error: 22 },
-    { day: 'Sat', accuracy: 90, error: 10 },
-    { day: 'Sun', accuracy: 82, error: 18 },
+  const accuracyData = dashboardStats?.accuracy_data || [
+    { day: 'Mon', accuracy: 0, error: 0 },
+    { day: 'Tue', accuracy: 0, error: 0 },
+    { day: 'Wed', accuracy: 0, error: 0 },
+    { day: 'Thu', accuracy: 0, error: 0 },
+    { day: 'Fri', accuracy: 0, error: 0 },
+    { day: 'Sat', accuracy: 0, error: 0 },
+    { day: 'Sun', accuracy: 0, error: 0 },
   ];
 
   const studyTimeData = [
@@ -52,11 +63,7 @@ const Dashboard: React.FC = () => {
 
 
 
-  const scheduleEvents = [
-    { date: '2024-04-26', title: 'Tryout Mandiri 04', type: 'warning' },
-    { date: '2024-04-28', title: 'Live Class: Literasi Inggris', type: 'success' },
-    { date: '2024-05-01', title: 'Saintek Intensive 01', type: 'error' },
-  ];
+
 
   return (
     <AppLayout>
@@ -93,6 +100,18 @@ const Dashboard: React.FC = () => {
               <Button type="primary" className="rounded-full font-bold h-10 px-6 uppercase tracking-widest text-[10px]">Upgrade</Button>
             </div>
           </div>
+
+          {dashboardStats?.dream_description && (
+            <Alert
+              message="Dream Description (Apa Targetmu?)"
+              description={dashboardStats.dream_description}
+              type="info"
+              showIcon
+              closable
+              icon={<BulbOutlined className="text-xl" />}
+              className="mb-8 border-none bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl [&_.ant-alert-message]:font-bold [&_.ant-alert-message]:text-blue-700 [&_.ant-alert-description]:text-blue-900/80 shadow-sm"
+            />
+          )}
 
           {/* Stats Grid */}
           <Row gutter={[24, 24]} className="mb-12">
@@ -146,7 +165,7 @@ const Dashboard: React.FC = () => {
                             style={{ height: `${data.accuracy}%` }}
                           >
                             <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-on-surface text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
-                              Acc: {data.accuracy}%
+                              Acc: {Math.round(data.accuracy)}%
                             </div>
                           </div>
                           {/* Error Rate Bar */}
@@ -155,7 +174,7 @@ const Dashboard: React.FC = () => {
                             style={{ height: `${data.error}%` }}
                           >
                             <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-red-500 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
-                              Err: {data.error}%
+                              Err: {Math.round(data.error)}%
                             </div>
                           </div>
                         </div>
@@ -178,23 +197,33 @@ const Dashboard: React.FC = () => {
                       </div>
                       
                       <div className="space-y-4">
-                        {scheduleEvents.map((event, idx) => (
-                          <div key={idx} className="flex items-center gap-4 p-3 rounded-2xl bg-surface-low border border-on-surface/5 hover:border-primary/20 transition-all cursor-pointer">
-                            <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center font-bold
-                              ${event.type === 'warning' ? 'bg-orange-50 text-orange-600' : ''}
-                              ${event.type === 'success' ? 'bg-green-50 text-green-600' : ''}
-                              ${event.type === 'error' ? 'bg-red-50 text-red-600' : ''}
-                            `}>
-                              <span className="text-[10px] uppercase leading-none">{event.date.split('-')[2]}</span>
-                              <span className="text-base">Apr</span>
+                        {myPackages.slice(0, 4).map((tx, idx) => {
+                          const dateObj = new Date(tx.created_at || Date.now());
+                          const types = ['warning', 'success', 'error', 'info'];
+                          const type = types[idx % types.length];
+                          
+                          return (
+                            <div key={tx.id} className="flex items-center gap-4 p-3 rounded-2xl bg-surface-low border border-on-surface/5 hover:border-primary/20 transition-all cursor-pointer" onClick={() => navigate('/latihan')}>
+                              <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center font-bold
+                                ${type === 'warning' ? 'bg-orange-50 text-orange-600' : ''}
+                                ${type === 'success' ? 'bg-green-50 text-green-600' : ''}
+                                ${type === 'error' ? 'bg-red-50 text-red-600' : ''}
+                                ${type === 'info' ? 'bg-blue-50 text-blue-600' : ''}
+                              `}>
+                                <span className="text-[10px] uppercase leading-none">{dateObj.getDate()}</span>
+                                <span className="text-base">{dateObj.toLocaleString('id-ID', { month: 'short' })}</span>
+                              </div>
+                              <div className="flex-grow">
+                                <Title level={5} className="!m-0 !text-sm !font-black">{tx.package.title}</Title>
+                                <Text className="text-[10px] text-on-surface/40 uppercase tracking-widest font-bold">Progress: {Math.round(tx.progress)}%</Text>
+                              </div>
+                              <ArrowRightOutlined className="text-on-surface/20" />
                             </div>
-                            <div className="flex-grow">
-                              <Title level={5} className="!m-0 !text-sm !font-black">{event.title}</Title>
-                              <Text className="text-[10px] text-on-surface/40 uppercase tracking-widest font-bold">08:00 - 10:00 WIB</Text>
-                            </div>
-                            <ArrowRightOutlined className="text-on-surface/20" />
-                          </div>
-                        ))}
+                          );
+                        })}
+                        {myPackages.length === 0 && (
+                          <div className="text-center p-4 text-on-surface/40 text-xs">Belum ada Tryout / Paket yang dimiliki.</div>
+                        )}
                       </div>
                     </Card>
                   </Col>
@@ -330,7 +359,7 @@ const Dashboard: React.FC = () => {
                     Siap untuk Simulasi Berikutnya?
                   </Title>
                   <Paragraph className="text-white/80 text-lg mb-8 max-w-xl">
-                    Berdasarkan analisismu, fokuslah pada materi <Text className="text-white font-bold">Literasi Bahasa Inggris</Text> untuk meningkatkan skor totalmu sebesar <Text className="text-white font-bold">+15 poin</Text>.
+                    Berdasarkan analisismu, fokuslah pada materi <Text className="text-white font-bold">{dashboardStats?.recommendation?.subject || 'Literasi Bahasa Inggris'}</Text> untuk meningkatkan skor totalmu sebesar <Text className="text-white font-bold">+{dashboardStats?.recommendation?.potential_points || 15} poin</Text>.
                   </Paragraph>
                   <Space size="large">
                     <Button 
@@ -338,6 +367,14 @@ const Dashboard: React.FC = () => {
                       size="large" 
                       ghost 
                       className="rounded-full h-14 px-10 border-white/20 text-white font-bold hover:bg-white/10"
+                      onClick={() => {
+                        const rec = dashboardStats?.recommendation;
+                        if (rec && rec.package_slug && rec.material_id) {
+                          navigate(`/paket/${rec.package_slug}/materi/${rec.material_id}`);
+                        } else {
+                          navigate('/latihan');
+                        }
+                      }}
                     >
                       Buka Pembahasan
                     </Button>
@@ -345,6 +382,7 @@ const Dashboard: React.FC = () => {
                       type="default" 
                       size="large" 
                       className="bg-white text-primary border-none rounded-full h-14 px-10 font-bold hover:scale-105 transition-all shadow-xl"
+                      onClick={() => navigate('/latihan')}
                     >
                       Mulai Tryout Baru <ArrowRightOutlined />
                     </Button>
@@ -362,18 +400,33 @@ const Dashboard: React.FC = () => {
 
           {/* Recent History / Notification Footer */}
           <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="weightless-card border-none flex items-center p-4">
-              <Space size="large">
-                <div className="w-14 h-14 rounded-2xl bg-on-surface text-white flex items-center justify-center text-2xl">
-                  <WarningOutlined className="text-yellow-400" />
-                </div>
-                <div>
-                  <Text className="text-[10px] uppercase font-bold text-on-surface/40 tracking-widest">Peringatan</Text>
-                  <Title level={5} className="!m-0 !font-black">Lengkapi Profilmu</Title>
-                  <Paragraph className="m-0 text-xs text-on-surface/60">Tambahkan target PTN cadangan untuk analisis yang lebih akurat.</Paragraph>
-                </div>
-              </Space>
-            </Card>
+            {!dashboardStats?.is_profile_complete ? (
+              <Card className="weightless-card border-none flex items-center p-4">
+                <Space size="large">
+                  <div className="w-14 h-14 rounded-2xl bg-on-surface text-white flex items-center justify-center text-2xl">
+                    <WarningOutlined className="text-yellow-400" />
+                  </div>
+                  <div>
+                    <Text className="text-[10px] uppercase font-bold text-on-surface/40 tracking-widest">Peringatan</Text>
+                    <Title level={5} className="!m-0 !font-black">Lengkapi Profilmu</Title>
+                    <Paragraph className="m-0 text-xs text-on-surface/60">Tambahkan target PTN cadangan untuk analisis yang lebih akurat.</Paragraph>
+                  </div>
+                </Space>
+              </Card>
+            ) : (
+              <Card className="weightless-card border-none flex items-center p-4 bg-gradient-to-r from-green-50 to-emerald-50">
+                <Space size="large">
+                  <div className="w-14 h-14 rounded-2xl bg-green-500 text-white flex items-center justify-center text-2xl shadow-lg shadow-green-500/30">
+                    <CheckCircleOutlined />
+                  </div>
+                  <div>
+                    <Text className="text-[10px] uppercase font-bold text-green-600/70 tracking-widest">Profil Lengkap</Text>
+                    <Title level={5} className="!m-0 !font-black text-green-800">Saatnya Memulai Targetmu!</Title>
+                    <Paragraph className="m-0 text-xs text-green-700/80">Kamu sudah melengkapi profil. Fokus pada belajarmu dan kejar PTN impianmu!</Paragraph>
+                  </div>
+                </Space>
+              </Card>
+            )}
             
             <Card className="weightless-card border-none flex items-center p-4">
               <Space size="large">
@@ -382,8 +435,8 @@ const Dashboard: React.FC = () => {
                 </div>
                 <div>
                   <Text className="text-[10px] uppercase font-bold text-on-surface/40 tracking-widest">Pencapaian Baru</Text>
-                  <Title level={5} className="!m-0 !font-black">Skor Tertinggi Mingguan!</Title>
-                  <Paragraph className="m-0 text-xs text-on-surface/60">Kamu berada di Top 5% peserta Tryout Minggu ini.</Paragraph>
+                  <Title level={5} className="!m-0 !font-black">{dashboardStats?.is_top_5 ? 'Skor Tertinggi Mingguan!' : 'Ayo Tingkatkan Skormu!'}</Title>
+                  <Paragraph className="m-0 text-xs text-on-surface/60">{dashboardStats?.is_top_5 ? 'Selamat! Kamu berada di jajaran Top 5 peserta Tryout dengan nilai terbesar.' : 'Tingkatkan terus nilaimu untuk bisa masuk ke Top 5 peserta Tryout.'}</Paragraph>
                 </div>
               </Space>
             </Card>

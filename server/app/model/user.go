@@ -11,8 +11,13 @@ type User struct {
 	Password    string    `json:"-"` // Disembunyikan di HTTP Response
 	Status      string    `json:"status"`
 	AsalSekolah string    `json:"asal_sekolah"`
-	RoleID      uint      `json:"role_id"`
-	Role        Role      `gorm:"foreignKey:RoleID" json:"role"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	RoleID           uint       `json:"role_id"`
+	Role             Role       `gorm:"foreignKey:RoleID" json:"role"`
+	DreamDescription string     `gorm:"type:text" json:"dream_description"`
+	TargetCampus     string     `json:"target_campus"`
+	TargetMajor      string     `json:"target_major"`
+	TargetPoint      string     `json:"target_point"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+	LastLogin   *time.Time `json:"last_login"`
 }

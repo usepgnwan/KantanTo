@@ -61,6 +61,11 @@ func LoginUser(c echo.Context) error {
 		return c.JSON(http.StatusUnauthorized, Response{Status: false, Message: "Akun Anda belum aktif / di-suspend"})
 	}
 
+	// Update last_login
+	now := time.Now()
+	connection.DB.Model(&user).Update("last_login", now)
+	user.LastLogin = &now
+
 	// Setup claims
 	claims := &JwtCustomClaims{
 		user.ID,

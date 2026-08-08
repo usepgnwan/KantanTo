@@ -214,3 +214,23 @@ func RecordVoucherUsage(c echo.Context) error {
 	tx.Commit()
 	return c.JSON(http.StatusOK, Response{Status: true, Message: "Pemakaian voucher berhasil dicatat", Data: usage})
 }
+
+// GetVoucherUsageHistory godoc
+// @Summary      Get Voucher Usage History
+// @Description  Get usage history of a specific voucher
+// @Tags         Voucher
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id   path      int  true  "Voucher ID"
+// @Param secret-to-apps header string true "API secret key" default(Z9ToSwagger1413999)
+// @Router       /api/vouchers/{id}/usage [get]
+func GetVoucherUsageHistory(c echo.Context) error {
+	id := c.Param("id")
+	var usages []model.VoucherUsage
+	if err := connection.DB.Preload("User").Preload("Package").Where("voucher_id = ?", id).Order("created_at desc").Find(&usages).Error; err != nil {
+		return c.JSON(http.StatusInternalServerError, Response{Status: false, Message: "Gagal memuat riwayat voucher"})
+	}
+
+	return c.JSON(http.StatusOK, Response{Status: true, Message: "Berhasil memuat riwayat voucher", Data: usages})
+}

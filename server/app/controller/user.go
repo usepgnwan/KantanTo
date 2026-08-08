@@ -101,3 +101,96 @@ func RegisterUser(c echo.Context) error {
 
 	return c.JSON(http.StatusCreated, Response{Status: true, Message: "Registrasi berhasil", Data: newUser})
 }
+
+// GetProfile godoc
+// @Summary      Get User Profile
+// @Description  Get a user's profile details.
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id path int true "User ID"
+// @Param secret-to-apps header string true "API secret key" default(Z9ToSwagger1413999)
+// @Success      200  {object}  Response
+// @Failure      404  {object}  Response
+// @Router       /api/user/profile/{id} [get]
+func GetProfile(c echo.Context) error {
+	id := c.Param("id")
+	var user model.User
+	if err := connection.DB.Preload("Role").First(&user, id).Error; err != nil {
+		return c.JSON(http.StatusNotFound, Response{Status: false, Message: "User tidak ditemukan"})
+	}
+	return c.JSON(http.StatusOK, Response{Status: true, Message: "Success", Data: user})
+}
+
+type UpdateProfileRequest struct {
+	Name             string `json:"name"`
+	Email            string `json:"email"`
+	Nohp             string `json:"nohp"`
+	AsalSekolah      string `json:"asal_sekolah"`
+	DreamDescription string `json:"dream_description"`
+	TargetCampus     string `json:"target_campus"`
+	TargetMajor      string `json:"target_major"`
+	TargetPoint      string `json:"target_point"`
+}
+
+// UpdateProfile godoc
+// @Summary      Update User Profile
+// @Description  Update a user's profile details.
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id path int true "User ID"
+// @Param        request body controller.UpdateProfileRequest true "Update Profile Data"
+// @Param secret-to-apps header string true "API secret key" default(Z9ToSwagger1413999)
+// @Success      200  {object}  Response
+// @Failure      400  {object}  Response
+// @Failure      404  {object}  Response
+// @Router       /api/user/profile/{id} [put]
+func UpdateProfile(c echo.Context) error {
+	id := c.Param("id")
+	var user model.User
+	if err := connection.DB.First(&user, id).Error; err != nil {
+		return c.JSON(http.StatusNotFound, Response{Status: false, Message: "User tidak ditemukan"})
+	}
+
+	var req UpdateProfileRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Format request tidak valid"})
+	}
+
+	// Update fields if provided
+	if req.Name != "" {
+		user.Name = req.Name
+	}
+	if req.Email != "" {
+		// Optional: check uniqueness
+		user.Email = req.Email
+	}
+	if req.Nohp != "" {
+		// Optional: check uniqueness
+		user.Nohp = req.Nohp
+	}
+	if req.AsalSekolah != "" {
+		user.AsalSekolah = req.AsalSekolah
+	}
+	if req.DreamDescription != "" {
+		user.DreamDescription = req.DreamDescription
+	}
+	if req.TargetCampus != "" {
+		user.TargetCampus = req.TargetCampus
+	}
+	if req.TargetMajor != "" {
+		user.TargetMajor = req.TargetMajor
+	}
+	if req.TargetPoint != "" {
+		user.TargetPoint = req.TargetPoint
+	}
+
+	if err := connection.DB.Save(&user).Error; err != nil {
+		return c.JSON(http.StatusInternalServerError, Response{Status: false, Message: "Gagal menyimpan profile"})
+	}
+
+	return c.JSON(http.StatusOK, Response{Status: true, Message: "Profile berhasil diperbarui", Data: user})
+}

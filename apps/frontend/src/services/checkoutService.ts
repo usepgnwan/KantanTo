@@ -28,6 +28,7 @@ export interface TransactionResponse {
   payment_method: string;
   status: string;
   active_until: string | null;
+  created_at?: string;
 }
 
 export const checkoutAPI = async (payload: CheckoutRequest): Promise<TransactionResponse> => {
