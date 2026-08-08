@@ -8,4 +8,5 @@ import (
 
 func RouteTransaction(e *echo.Group) {
 	e.GET("/admin/transactions", controller.GetAllTransactions)
+	e.PUT("/admin/transactions/:id/status", controller.UpdateTransactionStatus)
 }

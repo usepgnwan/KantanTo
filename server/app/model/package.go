@@ -23,6 +23,7 @@ type PackageQuestion struct {
 	ID             uint                 `gorm:"primaryKey" json:"id"`
 	PackageID      uint                 `gorm:"index" json:"package_id"`
 	Package        Package              `gorm:"foreignKey:PackageID;constraint:OnDelete:CASCADE" json:"-"`
+	PackageSlug    string               `gorm:"index" json:"package_slug"`
 	ClientID       string               `gorm:"index;not null" json:"client_id"`
 	Type           string               `json:"type"`
 	Title          string               `json:"title"`

@@ -52,6 +52,16 @@ func Checkout(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, Response{Status: false, Message: "Paket tidak ditemukan"})
 	}
 
+	// Check if user already has an active transaction for this package
+	var existingCount int64
+	connection.DB.Model(&model.Transaction{}).
+		Where("user_id = ? AND package_id = ? AND status = ?", req.UserID, pkg.ID, "active").
+		Count(&existingCount)
+
+	if existingCount > 0 {
+		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Anda sudah memiliki paket aktif ini. Silakan langsung belajar."})
+	}
+
 	amount := pkg.Price
 
 	// Check voucher

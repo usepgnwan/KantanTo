@@ -2,6 +2,7 @@ package controller
 
 import (
 	"net/http"
+	"time"
 	"server/app/model"
 	"server/connection"
 	. "server/app/helpers"
@@ -26,3 +27,50 @@ func GetAllTransactions(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, Response{Status: true, Message: "Berhasil memuat transaksi", Data: transactions})
 }
+
+// UpdateTransactionStatus
+// @Summary Update transaction status
+// @Description Update transaction status for admin
+// @Tags Transaction
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Param id path string true "Transaction ID"
+// @Success 200 {object} Response
+// @Router /api/admin/transactions/{id}/status [put]
+func UpdateTransactionStatus(c echo.Context) error {
+	id := c.Param("id")
+
+	type StatusRequest struct {
+		Status string `json:"status"` // 'active', 'pending payment', 'expired'
+	}
+
+	req := new(StatusRequest)
+	if err := c.Bind(req); err != nil {
+		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Format data tidak valid"})
+	}
+
+	var transaction model.Transaction
+	if err := connection.DB.Preload("Package").First(&transaction, id).Error; err != nil {
+		return c.JSON(http.StatusNotFound, Response{Status: false, Message: "Transaksi tidak ditemukan"})
+	}
+
+	transaction.Status = req.Status
+	if req.Status == "active" {
+		durationDays := 30
+		if transaction.Package.Duration > 0 {
+			durationDays = transaction.Package.Duration
+		}
+		t := time.Now().AddDate(0, 0, durationDays)
+		transaction.ActiveUntil = &t
+	} else if req.Status == "pending payment" {
+		transaction.ActiveUntil = nil
+	}
+
+	if err := connection.DB.Save(&transaction).Error; err != nil {
+		return c.JSON(http.StatusInternalServerError, Response{Status: false, Message: "Gagal me-update status transaksi"})
+	}
+
+	return c.JSON(http.StatusOK, Response{Status: true, Message: "Status transaksi berhasil diperbarui", Data: transaction})
+}
+

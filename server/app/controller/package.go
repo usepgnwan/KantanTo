@@ -8,6 +8,7 @@ import (
 	"server/app/model"
 	"server/connection"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -167,8 +168,32 @@ func DeletePackage(c echo.Context) error {
 
 func findPackageBySlug(c echo.Context) (model.Package, error) {
 	slug := c.Param("slug")
+	if slug == "" {
+		return model.Package{}, echo.NewHTTPError(http.StatusBadRequest, "Slug tidak boleh kosong")
+	}
 	var pkg model.Package
 	err := connection.DB.Where("slug = ?", slug).First(&pkg).Error
+	if err == gorm.ErrRecordNotFound {
+		titleWords := strings.Split(strings.ReplaceAll(slug, "-", " "), " ")
+		for i, w := range titleWords {
+			if len(w) > 0 {
+				titleWords[i] = strings.ToUpper(w[:1]) + w[1:]
+			}
+		}
+		title := strings.Join(titleWords, " ")
+		pkg = model.Package{
+			Slug:         slug,
+			Title:        title,
+			Description:  "Paket " + title,
+			Status:       "draft",
+			ClassesJSON:  "[]",
+			SubjectsJSON: "[]",
+		}
+		if createErr := connection.DB.Create(&pkg).Error; createErr != nil {
+			return pkg, createErr
+		}
+		return pkg, nil
+	}
 	return pkg, err
 }
 
@@ -316,7 +341,7 @@ func SavePackageQuestion(c echo.Context) error {
 	}
 
 	normalizeQuestionPayload(payload)
-	question, err := persistQuestion(pkg.ID, *payload)
+	question, err := persistQuestion(pkg, *payload)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, helpers.Response{Status: false, Message: "Gagal menyimpan soal"})
 	}
@@ -339,7 +364,7 @@ func SavePackageQuestions(c echo.Context) error {
 	err = connection.DB.Transaction(func(tx *gorm.DB) error {
 		for i := range payload {
 			normalizeQuestionPayload(&payload[i])
-			question, err := persistQuestionWithDB(tx, pkg.ID, payload[i])
+			question, err := persistQuestionWithDB(tx, pkg, payload[i])
 			if err != nil {
 				return err
 			}
@@ -534,8 +559,8 @@ func DeletePackageVideo(c echo.Context) error {
 	return c.JSON(http.StatusOK, helpers.Response{Status: true, Message: "Video berhasil dihapus"})
 }
 
-func persistQuestion(packageID uint, payload packageQuestionPayload) (model.PackageQuestion, error) {
-	return persistQuestionWithDB(connection.DB, packageID, payload)
+func persistQuestion(pkg model.Package, payload packageQuestionPayload) (model.PackageQuestion, error) {
+	return persistQuestionWithDB(connection.DB, pkg, payload)
 }
 
 func persistMaterial(packageID uint, payload packageMaterialPayload) (model.PackageMaterial, error) {
@@ -546,18 +571,19 @@ func persistVideo(packageID uint, payload packageVideoPayload) (model.PackageVid
 	return persistVideoWithDB(connection.DB, packageID, payload)
 }
 
-func persistQuestionWithDB(db *gorm.DB, packageID uint, payload packageQuestionPayload) (model.PackageQuestion, error) {
+func persistQuestionWithDB(db *gorm.DB, pkg model.Package, payload packageQuestionPayload) (model.PackageQuestion, error) {
 	optionsJSON := toJSON(payload.Options)
 	correctJSON := toJSON(payload.Correct)
 	discussionJSON := toJSON(payload.DiscussionRefs)
 
 	question := model.PackageQuestion{}
-	err := db.Where("package_id = ? AND client_id = ?", packageID, payload.ID).First(&question).Error
+	err := db.Where("package_id = ? AND client_id = ?", pkg.ID, payload.ID).First(&question).Error
 	if err != nil && err != gorm.ErrRecordNotFound {
 		return question, err
 	}
 
-	question.PackageID = packageID
+	question.PackageID = pkg.ID
+	question.PackageSlug = pkg.Slug
 	question.ClientID = payload.ID
 	question.Type = payload.Type
 	question.Title = payload.Title

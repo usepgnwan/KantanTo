@@ -57,6 +57,7 @@ func ConnectDB() {
 		&model.Transaction{},
 		&model.UserMaterialProgress{},
 		&model.MenuLog{},
+		&model.ExampleExam{},
 	)
 	if err != nil {
 		log.Fatal("Failed to migrate database:", err)

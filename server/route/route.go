@@ -31,6 +31,7 @@ func InitRouting(e *echo.Echo) {
 
 	api.POST("/checkout", controller.Checkout)
 	api.GET("/user/packages", controller.GetMyPackages)
+	api.GET("/user/mapels", controller.GetMyMapels)
 	api.POST("/user/progress", controller.MarkMaterialAsRead)
 
 	// Call separate route logic
@@ -48,4 +49,5 @@ func InitRouting(e *echo.Echo) {
 	RouteTransaction(api)
 	RouteLog(api)
 	RouteDashboard(api)
+	RouteExampleExam(api)
 }
