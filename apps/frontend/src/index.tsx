@@ -13,4 +13,12 @@ root.render(
   </React.StrictMode>
 );
 
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').then(reg => {
+    console.log('SW registered successfully:', reg.scope);
+  }).catch(err => {
+    console.log('SW registration failed:', err);
+  });
+}
+
 reportWebVitals();

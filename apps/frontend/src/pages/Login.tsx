@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { Form, Input, Button, Checkbox, Divider, Typography, message } from 'antd';
-import { MailOutlined, LockOutlined, GoogleOutlined, AppleOutlined } from '@ant-design/icons';
+import React, { useState, useEffect } from 'react';
+import { Form, Input, Button, Checkbox, Divider, Typography, message, notification } from 'antd';
+import { MailOutlined, LockOutlined, GoogleOutlined, AppleOutlined, DownloadOutlined } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../layouts/AuthLayout';
 import authVisual from '../assets/login.png';
@@ -15,6 +15,61 @@ const LoginPage: React.FC = () => {
   const [pageLoading, setPageLoading] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
+  
+  const [notifApi, contextHolder] = notification.useNotification();
+
+  useEffect(() => {
+    // Tetap listen jika event telat fire
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      (window as any).deferredPWAInstallPrompt = e;
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Periksa apakah web sudah di-install (berjalan sebagai standalone PWA)
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
+
+    let timeoutId: NodeJS.Timeout;
+
+    if (!isStandalone) {
+      // Selalu tampilkan notifikasi setelah 1.5 detik
+      timeoutId = setTimeout(() => {
+        notifApi.info({
+          key: 'pwa-install-notif',
+          message: 'Install Aplikasi Rifaya',
+          description: 'Pasang aplikasi di layar utama Anda untuk akses lebih cepat!',
+          placement: 'bottomRight',
+          duration: 0,
+          icon: <DownloadOutlined style={{ color: '#0060ad' }} />,
+          btn: (
+            <Button type="primary" size="small" onClick={async () => {
+              const promptEvent = (window as any).deferredPWAInstallPrompt;
+              if (promptEvent) {
+                promptEvent.prompt();
+                const { outcome } = await promptEvent.userChoice;
+                if (outcome === 'accepted') {
+                  console.log('User accepted the A2HS prompt');
+                }
+                (window as any).deferredPWAInstallPrompt = null;
+              } else {
+                // Fallback jika event ditahan browser
+                message.info('Silakan klik ikon Install (layar dengan panah ke bawah) di address bar browser Anda.', 5);
+              }
+              notifApi.destroy();
+            }}>
+              Install Sekarang
+            </Button>
+          ),
+        });
+      }, 1500);
+    }
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, [notifApi]);
 
   const onFinish = async (values: any) => {
     setLoading(true);
@@ -71,6 +126,7 @@ const LoginPage: React.FC = () => {
       }}
 
     >
+      {contextHolder}
       <Form
         name="login"
         layout="vertical"
