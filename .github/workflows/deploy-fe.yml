@@ -29,6 +29,10 @@ jobs:
       working-directory: ./apps/frontend
       env:
         CI: false
+        REACT_APP_LINK_BACKEND: ${{ secrets.REACT_APP_LINK_BACKEND }}
+        REACT_APP_SECRET_BACKEND: ${{ secrets.REACT_APP_SECRET_BACKEND }}
+        REACT_APP_OAUTH_CLIENT_ID: ${{ secrets.REACT_APP_OAUTH_CLIENT_ID }}
+        REACT_APP_OAUTH_REDIRECT: ${{ secrets.REACT_APP_OAUTH_REDIRECT }}
       run: npm run build
 
     - name: Copy Build to VPS
@@ -38,7 +42,7 @@ jobs:
         username: ${{ secrets.SERVER_USERNAME }}
         key: ${{ secrets.SERVER_SSH_KEY }}
         source: "apps/frontend/build"
-        target: "/var/www/kantanto/frontend"
+        target: "/var/www/KantanTo/apps/frontend"
         strip_components: 2
 
     - name: Restart Frontend Service
@@ -48,18 +52,13 @@ jobs:
         username: ${{ secrets.SERVER_USERNAME }}
         key: ${{ secrets.SERVER_SSH_KEY }}
         script: |
-          # Pastikan folder target ada
-          mkdir -p /var/www/kantanto/frontend
-          cd /var/www/kantanto/frontend
+          # Pastikan package.json tersedia di server (asumsi repo sudah di-clone di VPS)
+          cd /var/www/KantanTo/apps/frontend
           
-          # Matikan proses serve lama yang menggunakan port 3000 (jika ada)
-          pkill -f "serve -s build -l 3000" || true
+          # Matikan proses serve lama yang menggunakan build (jika ada)
+          pkill -f "serve -s build" || true
           
-          # Pastikan package serve terinstall secara global: npm install -g serve
-          # Jika belum terinstall, uncomment baris di bawah ini:
-          # npm install -g serve
+          # Jalankan ulang frontend di background menggunakan npm run preview
+          nohup npm run preview > frontend.log 2>&1 &
           
-          # Jalankan ulang frontend di background menggunakan nohup
-          nohup serve -s build -l 3000 > frontend.log 2>&1 &
-          
-          echo "Frontend berhasil di-restart!"
+          echo "Frontend berhasil di-restart dengan npm run preview!"
