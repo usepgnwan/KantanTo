@@ -4,14 +4,14 @@ import PackageCard, { PackageProps } from '../components/molecules/PackageCard';
 import PackageFilters from '../components/organisms/PackageFilters';
 import LatestActivity from '../components/molecules/LatestActivity';
 import CustomerReviews from '../components/organisms/CustomerReviews';
-import { 
-  Typography, 
-  Row, 
-  Col, 
-  Input, 
-  Select, 
-  Pagination, 
-  Empty, 
+import {
+  Typography,
+  Row,
+  Col,
+  Input,
+  Select,
+  Pagination,
+  Empty,
   Breadcrumb,
   Space,
   Card,
@@ -71,11 +71,11 @@ const PackagesPage: React.FC = () => {
     const query = searchQuery.trim().toLowerCase();
     const searched = query
       ? packages.filter((pkg) =>
-          [pkg.title, pkg.category, ...pkg.classes, ...pkg.subjects]
-            .join(' ')
-            .toLowerCase()
-            .includes(query)
-        )
+        [pkg.title, pkg.category, ...pkg.classes, ...pkg.subjects]
+          .join(' ')
+          .toLowerCase()
+          .includes(query)
+      )
       : packages;
 
     return [...searched].sort((a, b) => {
@@ -131,18 +131,18 @@ const PackagesPage: React.FC = () => {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-12">
             <div className="max-w-2xl">
               <div className="flex items-center gap-2 text-primary font-bold mb-2">
-                 <AppstoreOutlined />
-                 <span className="uppercase tracking-widest text-xs">Explore Catalog</span>
+                <AppstoreOutlined />
+                <span className="uppercase tracking-widest text-xs">Explore Catalog</span>
               </div>
-              <Title level={1} className="!text-4xl md:!text-5xl !font-manrope !m-0">Katalog Paket Belajar</Title>
-              <Paragraph className="text-lg text-surface-on/60 mt-4 !m-0">
-                Temukan amunisi terbaikmu untuk menaklukkan SNBT 2024. Pilih paket yang sesuai kebutuhanmu.
+              <Title level={1} className="!text-3xl md:!text-5xl !font-black !mb-4 tracking-tight">Pilih Paket Belajarmu!</Title>
+              <Paragraph className="text-on-surface/60 text-lg max-w-2xl mx-auto m-0">
+                Temukan amunisi terbaikmu untuk menaklukkan SNBT {new Date().getFullYear()}. Pilih paket yang sesuai kebutuhanmu.
               </Paragraph>
             </div>
-            
+
             <div className="w-full md:w-auto flex flex-col sm:flex-row gap-4">
-              <Input 
-                placeholder="Cari paket tryout..." 
+              <Input
+                placeholder="Cari paket tryout..."
                 prefix={<SearchOutlined className="text-surface-on/30" />}
                 className="h-12 w-full sm:w-64 rounded-xl border-none shadow-sm"
                 value={searchQuery}
@@ -208,13 +208,6 @@ const PackagesPage: React.FC = () => {
 
       <CustomerReviews />
 
-      {/* Mini CTA */}
-      <section className="py-20 bg-white dark:bg-black border-t border-surface-container">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-           <Title level={3} className="!font-manrope mb-6 italic">"Pendidikan adalah senjata paling mematikan di dunia, karena dengan itu Anda bisa mengubah dunia."</Title>
-           <Text className="text-surface-on/60">— Nelson Mandela</Text>
-        </div>
-      </section>
     </AppLayout>
   );
 };

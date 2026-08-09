@@ -8,6 +8,7 @@ import 'quill/dist/quill.snow.css';
 import 'quill/dist/quill.bubble.css';
 import 'quill-table-better/dist/quill-table-better.css';
 import 'katex/dist/katex.min.css';
+import 'katex/dist/contrib/mhchem.js';
 
 const { Text } = Typography;
 
@@ -53,6 +54,8 @@ const MathModal: React.FC<{
     { label: 'Limit', value: '\\lim_{x \\to \\infty} f(x)' },
     { label: 'Fisika', value: 'F = m a' },
     { label: 'Energi', value: 'E_k = \\frac{1}{2}mv^2' },
+    { label: 'Kimia', value: '\\ce{H2O}' },
+    { label: 'Reaksi', value: '\\ce{CO2 + C -> 2 CO}' },
   ];
 
   return (

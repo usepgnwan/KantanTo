@@ -2,33 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Button, Radio, Spin } from 'antd';
 import { CheckCircleFilled, LoadingOutlined } from '@ant-design/icons';
 import { getRandomExampleExam, ExampleExam } from '../../services/exampleExamService';
-import katex from 'katex';
+import { renderQuillHtml } from '../../utils/renderContent';
 import 'katex/dist/katex.min.css';
-
-// Render KaTeX from a latex string
-const renderKaTeX = (latex: string, displayMode = false): string => {
-  try {
-    return katex.renderToString(latex, { displayMode, throwOnError: false });
-  } catch {
-    return latex;
-  }
-};
-
-// Render Quill HTML: handles both ql-formula spans AND $...$ / $$...$$ patterns
-const renderQuillHtml = (html: string): string => {
-  if (!html) return '';
-  return html
-    // Quill formula embed: <span class="ql-formula" data-value="LATEX">
-    .replace(/<span\s+class="ql-formula"\s+data-value="([^"]+)"[^>]*>[^<]*<\/span>/g, (_, latex) =>
-      renderKaTeX(decodeURIComponent(latex), false)
-    )
-    // Block LaTeX: $$...$$
-    .replace(/\$\$([^$]+)\$\$/g, (_, l) =>
-      `<div class="my-3 flex justify-center overflow-x-auto">${renderKaTeX(l, true)}</div>`
-    )
-    // Inline LaTeX: $...$
-    .replace(/\$([^$\n]+)\$/g, (_, l) => renderKaTeX(l, false));
-};
 
 const QuizWidget: React.FC = () => {
   const [selectedAnswer, setSelectedAnswer] = useState<string>();

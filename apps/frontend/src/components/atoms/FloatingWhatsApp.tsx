@@ -34,10 +34,10 @@ const FloatingWhatsApp: React.FC = () => {
   return (
     <button
       onClick={handleClick}
-      className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-16 h-16 bg-[#25D366] hover:bg-[#128C7E] text-white rounded-[2rem] shadow-2xl shadow-green-500/40 transition-all duration-300 transform hover:-translate-y-1 hover:scale-110"
+      className="fixed bottom-24 md:bottom-6 right-4 md:right-6 z-50 flex items-center justify-center w-14 h-14 md:w-16 md:h-16 bg-[#25D366] hover:bg-[#128C7E] text-white rounded-full md:rounded-[2rem] shadow-2xl shadow-green-500/40 transition-all duration-300 transform hover:-translate-y-1 hover:scale-110"
       aria-label="Chat with Admin on WhatsApp"
     >
-      <WhatsAppOutlined className="text-4xl" />
+      <WhatsAppOutlined className="text-3xl md:text-4xl" />
     </button>
   );
 };

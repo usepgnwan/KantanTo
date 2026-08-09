@@ -14,36 +14,11 @@ import AppLayout from '../layouts/AppLayout';
 import { useAuth } from '../context/AuthContext';
 import { getPackageMaterials, getPackages, PackageListItem, PackageMaterialPayload } from '../services/packageService';
 import { getMyPackagesAPI, markMaterialAsReadAPI } from '../services/myPackageService';
-import { renderLatex } from '../utils/latex';
+import { renderContent } from '../utils/renderContent';
 
 const { Title, Text } = Typography;
 
 declare global { interface Window { katex?: any; renderMathInElement?: any; } }
-
-const renderKaTeX = (latex: string, displayMode = false): string => {
-  if (window.katex) {
-    try {
-      return window.katex.renderToString(latex, { displayMode, throwOnError: false });
-    } catch { return latex; }
-  }
-  return `<span class="font-mono bg-blue-50 text-blue-700 px-1 rounded text-sm">${displayMode ? '$$' : '$'}${latex}${displayMode ? '$$' : '$'}</span>`;
-};
-
-const renderContent = (raw: string): string => {
-  if (!raw) return '<p>Belum ada konten materi.</p>';
-  return raw
-    .replace(/\$\$([^$]+)\$\$/g, (_, latex) => `<div class="my-6 py-4 flex justify-center overflow-x-auto">${renderKaTeX(latex, true)}</div>`)
-    .replace(/\$([^$\n]+)\$/g, (_, latex) => renderKaTeX(latex, false))
-    .replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-on-surface dark:text-zinc-100">$1</strong>')
-    .replace(/_(.+?)_/g, '<em>$1</em>')
-    .replace(/^### (.+)$/gm, '<h3 class="text-xl font-black font-manrope mt-8 mb-3 text-on-surface dark:text-zinc-100">$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2 class="text-2xl font-black font-manrope mt-10 mb-4 text-on-surface dark:text-zinc-100">$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1 class="text-3xl font-black font-manrope mt-12 mb-5 text-on-surface dark:text-zinc-100">$1</h1>')
-    .replace(/^- (.+)$/gm, '<li class="ml-6 mb-2 list-disc leading-relaxed">$1</li>')
-    .replace(/^(\d+)\. (.+)$/gm, '<li class="ml-6 mb-2 list-decimal leading-relaxed">$2</li>')
-    .replace(/`(.+?)`/g, '<code class="bg-surface-low dark:bg-zinc-800 px-2 py-0.5 rounded-md text-sm font-mono text-primary">$1</code>')
-    .replace(/\n{2,}/g, '</p><p class="mb-5 leading-loose">');
-};
 
 const PackageMaterialDetailPage: React.FC = () => {
   const { slug, materialSlug } = useParams<{ slug: string; materialSlug: string }>();
@@ -245,7 +220,7 @@ const PackageMaterialDetailPage: React.FC = () => {
                           <div
                             id="materi-content"
                             className="prose prose-lg dark:prose-invert max-w-none font-sans text-on-surface/80 dark:text-zinc-300"
-                            dangerouslySetInnerHTML={{ __html: `<p class="mb-5 leading-loose">${renderLatex(renderContent(material.content))}</p>` }}
+                            dangerouslySetInnerHTML={{ __html: `<p class="mb-5 leading-loose">${renderContent(material.content)}</p>` }}
                           />
 
                           {/* PDF attachments */}

@@ -1,10 +1,10 @@
 import React from 'react';
 import AppLayout from '../layouts/AppLayout';
 import { Row, Col, Card, Typography, Avatar, Space, Progress, Tag, Button, Alert } from 'antd';
-import { 
-  HistoryOutlined, 
-  ThunderboltOutlined, 
-  BulbOutlined, 
+import {
+  HistoryOutlined,
+  ThunderboltOutlined,
+  BulbOutlined,
   RiseOutlined,
   ClockCircleOutlined,
   CheckCircleOutlined,
@@ -69,19 +69,17 @@ const Dashboard: React.FC = () => {
     <AppLayout>
       <div className="bg-surface-low/30 min-h-screen py-12 transition-colors duration-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
+
           {/* Welcome Header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-6">
             <div className="flex items-center gap-6">
-              <Avatar 
-                size={84} 
-                src={user?.avatar} 
+              <Avatar
+                size={84}
+                src={user?.avatar}
                 className="border-4 border-white shadow-xl shadow-primary/10"
               />
               <div>
-                <Text className="text-sm font-heavy uppercase tracking-[0.2em] text-on-surface/40 leading-none mb-2 block">
-                  ID: 2024-ANBK-0892
-                </Text>
+
                 <Title level={2} className="!m-0 !font-black !text-4xl !font-manrope">
                   Halo, {user?.name.split(' ')[0]}
                 </Title>
@@ -89,15 +87,6 @@ const Dashboard: React.FC = () => {
                   Pantau progres belajarmu hari ini
                 </Paragraph>
               </div>
-            </div>
-            
-            <div className="bg-white dark:bg-zinc-800 p-4 px-8 rounded-[2rem] shadow-sm border border-on-surface/5 flex items-center gap-4">
-              <div className="text-right">
-                <Text className="text-[10px] uppercase font-bold tracking-widest text-on-surface/40 block">Berlangganan Sampai</Text>
-                <Text className="font-black text-primary">12 Des 2024</Text>
-              </div>
-              <div className="h-8 w-px bg-on-surface/5 mx-2" />
-              <Button type="primary" className="rounded-full font-bold h-10 px-6 uppercase tracking-widest text-[10px]">Upgrade</Button>
             </div>
           </div>
 
@@ -139,7 +128,7 @@ const Dashboard: React.FC = () => {
             {/* Left Column: Stats & Recommendation */}
             <Col xs={24} lg={16}>
               <div className="flex flex-col gap-6">
-                
+
                 {/* Accuracy Bar Chart */}
                 <Card className="weightless-card border-none p-2">
                   <div className="flex items-center justify-between mb-8">
@@ -160,7 +149,7 @@ const Dashboard: React.FC = () => {
                       <div key={i} className="flex-grow flex flex-col items-center group cursor-pointer h-full justify-end">
                         <div className="w-full max-w-[40px] flex flex-col-reverse h-full justify-end pt-8">
                           {/* Accuracy Bar */}
-                          <div 
+                          <div
                             className="w-full bg-primary rounded-t-sm transition-all duration-700 relative group-hover:brightness-110"
                             style={{ height: `${data.accuracy}%` }}
                           >
@@ -169,7 +158,7 @@ const Dashboard: React.FC = () => {
                             </div>
                           </div>
                           {/* Error Rate Bar */}
-                          <div 
+                          <div
                             className="w-full bg-primary/10 rounded-t-xl transition-all duration-500 relative group-hover:bg-primary/20"
                             style={{ height: `${data.error}%` }}
                           >
@@ -195,13 +184,13 @@ const Dashboard: React.FC = () => {
                         </div>
                         <Button type="text" className="text-primary font-bold text-xs uppercase tracking-widest">Detail</Button>
                       </div>
-                      
+
                       <div className="space-y-4">
                         {myPackages.slice(0, 4).map((tx, idx) => {
                           const dateObj = new Date(tx.created_at || Date.now());
                           const types = ['warning', 'success', 'error', 'info'];
                           const type = types[idx % types.length];
-                          
+
                           return (
                             <div key={tx.id} className="flex items-center gap-4 p-3 rounded-2xl bg-surface-low border border-on-surface/5 hover:border-primary/20 transition-all cursor-pointer" onClick={() => navigate('/latihan')}>
                               <div className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center font-bold
@@ -227,7 +216,7 @@ const Dashboard: React.FC = () => {
                       </div>
                     </Card>
                   </Col>
-                  
+
                   <Col xs={24} md={10}>
                     <Card className="weightless-card border-none h-full p-2">
                       <div className="flex items-center justify-between mb-6">
@@ -250,7 +239,7 @@ const Dashboard: React.FC = () => {
                           </div>
                         ))}
                       </div>
-                      
+
                       <Button type="primary" block className="rounded-xl h-10 font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20" onClick={() => navigate('/keranjang')}>
                         Checkout Sekarang
                       </Button>
@@ -293,22 +282,22 @@ const Dashboard: React.FC = () => {
                       </div>
                       <div className="flex items-center justify-center gap-2 mb-2">
                         <Tag color="blue" className="rounded-full border-none px-3 font-bold">
-                          {(parseInt(dashboardStats?.target_point || '790', 10) - Math.round(dashboardStats?.avg_score || 0)) > 0 
-                            ? `+${parseInt(dashboardStats?.target_point || '790', 10) - Math.round(dashboardStats?.avg_score || 0)} menuju target` 
+                          {(parseInt(dashboardStats?.target_point || '790', 10) - Math.round(dashboardStats?.avg_score || 0)) > 0
+                            ? `+${parseInt(dashboardStats?.target_point || '790', 10) - Math.round(dashboardStats?.avg_score || 0)} menuju target`
                             : 'Target Tercapai!'}
                         </Tag>
                       </div>
                       <Paragraph className="text-xs text-on-surface/60 max-w-[200px] mx-auto">
-                        {(parseInt(dashboardStats?.target_point || '790', 10) - Math.round(dashboardStats?.avg_score || 0)) > 0 
-                            ? `Hampir tercapai. Sedikit lagi menuju target ${dashboardStats?.target_campus || 'Universitas Indonesia'}!` 
-                            : `Selamat! Anda telah mencapai target skor untuk masuk ${dashboardStats?.target_campus || 'Universitas Indonesia'}!`}
+                        {(parseInt(dashboardStats?.target_point || '790', 10) - Math.round(dashboardStats?.avg_score || 0)) > 0
+                          ? `Hampir tercapai. Sedikit lagi menuju target ${dashboardStats?.target_campus || 'Universitas Indonesia'}!`
+                          : `Selamat! Anda telah mencapai target skor untuk masuk ${dashboardStats?.target_campus || 'Universitas Indonesia'}!`}
                       </Paragraph>
                     </div>
 
-                    <Alert 
-                      message={`Target: ${dashboardStats?.target_point || '790'} (${dashboardStats?.target_major || 'Kedokteran UI'})`} 
-                      type="info" 
-                      showIcon 
+                    <Alert
+                      message={`Target: ${dashboardStats?.target_point || '790'} (${dashboardStats?.target_major || 'Kedokteran UI'})`}
+                      type="info"
+                      showIcon
                       icon={<BulbOutlined />}
                       className="border-none bg-primary/5 rounded-2xl"
                     />
@@ -327,11 +316,11 @@ const Dashboard: React.FC = () => {
                   <div className="h-40 flex items-end justify-between px-4 gap-2">
                     {studyTimeData.map((data, i) => (
                       <div key={i} className="flex-grow flex flex-col items-center group cursor-pointer h-full justify-end">
-                        <div 
+                        <div
                           className="w-full bg-orange-100 group-hover:bg-orange-200 rounded-lg transition-all duration-500 relative"
                           style={{ height: `${(data.hours / 6) * 100}%` }}
                         >
-                          <div 
+                          <div
                             className="absolute bottom-0 left-0 w-full bg-orange-400 opacity-80 rounded-lg"
                             style={{ height: '100%' }}
                           />
@@ -353,7 +342,7 @@ const Dashboard: React.FC = () => {
             <Card className="bg-gradient-to-r from-primary to-primary-container border-none rounded-[3rem] overflow-hidden relative p-4">
               <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-[100px] translate-x-1/2 -translate-y-1/2" />
               <div className="absolute bottom-0 left-10 w-64 h-64 bg-white/5 rounded-full blur-[80px] -translate-x-1/2 translate-y-1/2" />
-              
+
               <Row gutter={[48, 48]} align="middle" className="relative z-10 p-4 md:p-8">
                 <Col xs={24} md={16}>
                   <div className="inline-flex items-center gap-2 bg-white/10 rounded-full px-4 py-1.5 mb-6 backdrop-blur-md">
@@ -367,10 +356,10 @@ const Dashboard: React.FC = () => {
                     Berdasarkan analisismu, fokuslah pada materi <Text className="text-white font-bold">{dashboardStats?.recommendation?.subject || 'Literasi Bahasa Inggris'}</Text> untuk meningkatkan skor totalmu sebesar <Text className="text-white font-bold">+{dashboardStats?.recommendation?.potential_points || 15} poin</Text>.
                   </Paragraph>
                   <Space size="large">
-                    <Button 
-                      type="default" 
-                      size="large" 
-                      ghost 
+                    <Button
+                      type="default"
+                      size="large"
+                      ghost
                       className="rounded-full h-14 px-10 border-white/20 text-white font-bold hover:bg-white/10"
                       onClick={() => {
                         const rec = dashboardStats?.recommendation;
@@ -383,9 +372,9 @@ const Dashboard: React.FC = () => {
                     >
                       Buka Pembahasan
                     </Button>
-                    <Button 
-                      type="default" 
-                      size="large" 
+                    <Button
+                      type="default"
+                      size="large"
                       className="bg-white text-primary border-none rounded-full h-14 px-10 font-bold hover:scale-105 transition-all shadow-xl"
                       onClick={() => navigate('/latihan')}
                     >
@@ -432,7 +421,7 @@ const Dashboard: React.FC = () => {
                 </Space>
               </Card>
             )}
-            
+
             <Card className="weightless-card border-none flex items-center p-4">
               <Space size="large">
                 <div className="w-14 h-14 rounded-2xl bg-green-500 text-white flex items-center justify-center text-2xl">
