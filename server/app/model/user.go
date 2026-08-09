@@ -11,7 +11,8 @@ type User struct {
 	Password    string    `json:"-"` // Disembunyikan di HTTP Response
 	Status      string    `json:"status"`
 	AsalSekolah string    `json:"asal_sekolah"`
-	RoleID           uint       `json:"role_id"`
+	FotoProfil  string    `json:"foto_profil"`
+	RoleID      uint      `json:"role_id"`
 	Role             Role       `gorm:"foreignKey:RoleID" json:"role"`
 	DreamDescription string     `gorm:"type:text" json:"dream_description"`
 	TargetCampus     string     `json:"target_campus"`

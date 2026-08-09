@@ -10,10 +10,10 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// GetGrade godoc
-// @Summary      Get all Grade (Paginated)
-// @Description  Get a paginated list of Grade
-// @Tags         Grade
+// GetEducationLevel godoc
+// @Summary      Get all Education Level (Paginated)
+// @Description  Get a paginated list of Education Level
+// @Tags         Education Level
 // @Accept       json
 // @Produce      json
 // @Param        page    query     int     false  "Page number" default(1)
@@ -23,13 +23,13 @@ import (
 // @Success      200  {object}  Response{data=helpers.ResponsePaginate}
 // @Failure      500  {object}  Response
 // @Param secret-to-apps header string true "API secret key" default(Z9ToSwagger1413999)
-// @Router       /api/grade [get]
-func GetGrade(c echo.Context) error {
+// @Router       /api/education-level [get]
+func GetEducationLevel(c echo.Context) error {
 	data := &Paginate{
-		Model: &model.Grade{},
+		Model: &model.EducationLevel{},
 	}
 	db := connection.DB
-	query := db.Model(&model.Grade{}).Preload("EducationLevel")
+	query := db.Model(&model.EducationLevel{})
 
 	title := c.QueryParam("title")
 	if title != "" {
@@ -40,91 +40,91 @@ func GetGrade(c echo.Context) error {
 	return c.JSON(http.StatusOK, Response{Status: true, Message: "Success get data", Data: result})
 }
 
-// GetGradeByID godoc
-// @Summary      Get Grade by ID
-// @Description  Get specific Grade by its ID
-// @Tags         Grade
+// GetEducationLevelByID godoc
+// @Summary      Get Education Level by ID
+// @Description  Get specific Education Level by its ID
+// @Tags         Education Level
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        id   path      int  true  "Category ID"
+// @Param        id   path      int  true  "Education Level ID"
 // @Success      200  {object}  Response
 // @Failure      404  {object}  Response
 // @Param secret-to-apps header string true "API secret key" default(Z9ToSwagger1413999)
-// @Router       /api/grade/{id} [get]
-func GetGradeByID(c echo.Context) error {
+// @Router       /api/education-level/{id} [get]
+func GetEducationLevelByID(c echo.Context) error {
 	id := c.Param("id")
-	var Grade model.Grade
-	if err := connection.DB.Preload("EducationLevel").First(&Grade, id).Error; err != nil {
+	var educationLevel model.EducationLevel
+	if err := connection.DB.First(&educationLevel, id).Error; err != nil {
 		return c.JSON(http.StatusNotFound, Response{Status: false, Message: "Data tidak ditemukan"})
 	}
-	return c.JSON(http.StatusOK, Response{Status: true, Message: "Success", Data: Grade})
+	return c.JSON(http.StatusOK, Response{Status: true, Message: "Success", Data: educationLevel})
 }
 
-// CreateGrade godoc
-// @Summary      Create new Grade
-// @Description  Create a new Grade
-// @Tags         Grade
+// CreateEducationLevel godoc
+// @Summary      Create new Education Level
+// @Description  Create a new Education Level
+// @Tags         Education Level
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        request body model.Category true "Category Payload"
+// @Param        request body model.EducationLevel true "Education Level Payload"
 // @Success      200  {object}  Response
 // @Failure      400  {object}  Response
 // @Param secret-to-apps header string true "API secret key" default(Z9ToSwagger1413999)
-// @Router       /api/grade [post]
-func CreateGrade(c echo.Context) error {
-	Grade := new(model.Grade)
-	if err := c.Bind(Grade); err != nil {
+// @Router       /api/education-level [post]
+func CreateEducationLevel(c echo.Context) error {
+	educationLevel := new(model.EducationLevel)
+	if err := c.Bind(educationLevel); err != nil {
 		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: err.Error()})
 	}
-	if err := connection.DB.Create(&Grade).Error; err != nil {
+	if err := connection.DB.Create(&educationLevel).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Status: false, Message: "Gagal menyimpan data"})
 	}
-	return c.JSON(http.StatusCreated, Response{Status: true, Message: "Created successfully", Data: Grade})
+	return c.JSON(http.StatusCreated, Response{Status: true, Message: "Created successfully", Data: educationLevel})
 }
 
-// UpdateGrade godoc
-// @Summary      Update Grade
-// @Description  Update Grade by ID
-// @Tags         Grade
+// UpdateEducationLevel godoc
+// @Summary      Update Education Level
+// @Description  Update Education Level by ID
+// @Tags         Education Level
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        id   path      int  true  "Category ID"
-// @Param        request body model.Category true "Category Payload"
+// @Param        id   path      int  true  "Education Level ID"
+// @Param        request body model.EducationLevel true "Education Level Payload"
 // @Success      200  {object}  Response
 // @Failure      404  {object}  Response
 // @Param secret-to-apps header string true "API secret key" default(Z9ToSwagger1413999)
-// @Router       /api/grade/{id} [put]
-func UpdateGrade(c echo.Context) error {
+// @Router       /api/education-level/{id} [put]
+func UpdateEducationLevel(c echo.Context) error {
 	id, _ := strconv.Atoi(c.Param("id"))
-	var Grade model.Grade
-	if err := connection.DB.First(&Grade, id).Error; err != nil {
+	var educationLevel model.EducationLevel
+	if err := connection.DB.First(&educationLevel, id).Error; err != nil {
 		return c.JSON(http.StatusNotFound, Response{Status: false, Message: "Data tidak ditemukan"})
 	}
-	if err := c.Bind(&Grade); err != nil {
+	if err := c.Bind(&educationLevel); err != nil {
 		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: err.Error()})
 	}
-	connection.DB.Save(&Grade)
-	return c.JSON(http.StatusOK, Response{Status: true, Message: "Updated successfully", Data: Grade})
+	connection.DB.Save(&educationLevel)
+	return c.JSON(http.StatusOK, Response{Status: true, Message: "Updated successfully", Data: educationLevel})
 }
 
-// DeleteGrade godoc
-// @Summary      Delete Grade
-// @Description  Delete Grade by ID
-// @Tags         Grade
+// DeleteEducationLevel godoc
+// @Summary      Delete Education Level
+// @Description  Delete Education Level by ID
+// @Tags         Education Level
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        id   path      int  true  "Category ID"
+// @Param        id   path      int  true  "Education Level ID"
 // @Success      200  {object}  Response
 // @Failure      404  {object}  Response
 // @Param secret-to-apps header string true "API secret key" default(Z9ToSwagger1413999)
-// @Router       /api/grade/{id} [delete]
-func DeleteGrade(c echo.Context) error {
+// @Router       /api/education-level/{id} [delete]
+func DeleteEducationLevel(c echo.Context) error {
 	id := c.Param("id")
-	if err := connection.DB.Delete(&model.Grade{}, id).Error; err != nil {
+	if err := connection.DB.Delete(&model.EducationLevel{}, id).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Status: false, Message: "Gagal menghapus data"})
 	}
 	return c.JSON(http.StatusOK, Response{Status: true, Message: "Deleted successfully"})

@@ -1,13 +1,37 @@
-import React from 'react';
-import { Typography, Row, Col, Form, Input, Button, Card } from 'antd';
+import React, { useState } from 'react';
+import { Typography, Row, Col, Form, Input, Button, Card, message } from 'antd';
 import { SendOutlined } from '@ant-design/icons';
+import { submitContactMessage } from '../../services/contactMessageService';
 
 const { Title, Paragraph } = Typography;
 const { TextArea } = Input;
 
 const ContactForm: React.FC = () => {
-  const onFinish = (values: any) => {
-    console.log('Success:', values);
+  const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
+
+  const onFinish = async (values: any) => {
+    try {
+      setLoading(true);
+      await submitContactMessage({
+        name: values.name,
+        email: values.email,
+        subject: values.subject || 'Pesan dari Landing Page',
+        message: values.message,
+      });
+      message.success({
+        content: 'Pesan Anda berhasil dikirim! Tim kami akan segera menghubungi Anda melalui email.',
+        duration: 5,
+      });
+      form.resetFields();
+    } catch (error: any) {
+      message.error({
+        content: 'Terjadi kesalahan saat mengirim pesan: ' + (error.response?.data?.message || error.message),
+        duration: 5,
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -22,6 +46,7 @@ const ContactForm: React.FC = () => {
 
         <Card className="border-none glass shadow-xl rounded-[2rem] overflow-hidden p-4 md:p-12">
           <Form
+            form={form}
             layout="vertical"
             onFinish={onFinish}
             autoComplete="off"
@@ -49,6 +74,14 @@ const ContactForm: React.FC = () => {
             </Row>
 
             <Form.Item
+              label={<span className="font-semibold">Subjek</span>}
+              name="subject"
+              rules={[{ required: true, message: 'Harap isi subjek pesan' }]}
+            >
+              <Input placeholder="Misal: Pertanyaan tentang paket tryout" className="h-12 rounded-xl" />
+            </Form.Item>
+
+            <Form.Item
               label={<span className="font-semibold">Pesan</span>}
               name="message"
               rules={[{ required: true, message: 'Harap tulis pesan Anda' }]}
@@ -57,7 +90,7 @@ const ContactForm: React.FC = () => {
             </Form.Item>
 
             <Form.Item className="text-center pt-6 mb-0">
-              <Button type="primary" size="large" icon={<SendOutlined />} htmlType="submit" className="h-14 px-12 text-lg rounded-full shadow-lg shadow-primary/30">
+              <Button type="primary" size="large" icon={<SendOutlined />} htmlType="submit" loading={loading} className="h-14 px-12 text-lg rounded-full shadow-lg shadow-primary/30">
                 Kirim Pesan
               </Button>
             </Form.Item>
@@ -69,3 +102,4 @@ const ContactForm: React.FC = () => {
 };
 
 export default ContactForm;
+

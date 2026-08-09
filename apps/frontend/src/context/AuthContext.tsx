@@ -6,6 +6,7 @@ export interface JwtPayload {
   nama: string;
   phone: string;
   email: string;
+  foto_profil?: string;
   roleid: number | string;
   deskripsi_role: string;
   exp: number;
@@ -102,6 +103,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     name: payload.nama,
     email: payload.email,
     phone: payload.phone,
+    avatar: payload.foto_profil,
   } : null;
 
   return (

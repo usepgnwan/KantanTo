@@ -37,6 +37,8 @@ func InitRouting(e *echo.Echo) {
 	// Call separate route logic
 	RouteMapel(api)
 	RouteCategory(api)
+	RouteEducationLevel(api)
+	RouteContactMessage(api)
 	RouteGrade(api)
 	RouteSetting(api)
 	RouteRole(api)

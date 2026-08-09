@@ -1,6 +1,6 @@
 import React from 'react';
 import { Typography, Row, Col } from 'antd';
-import { ArrowUpOutlined } from '@ant-design/icons';
+import { ArrowUpOutlined, UserOutlined } from '@ant-design/icons';
 
 const { Title } = Typography;
 
@@ -51,8 +51,8 @@ const CustomerReviews: React.FC = () => {
             <Col xs={24} lg={8} key={review.id}>
               <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm hover:shadow-md transition-shadow h-full flex flex-col relative overflow-hidden group">
                 <div className="flex gap-4 mb-4 relative z-10">
-                  <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-gray-200">
-                    <img src={review.avatar} alt={review.user} className="w-full h-full object-cover" />
+                  <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-gray-200 flex items-center justify-center">
+                    <UserOutlined className="text-2xl text-gray-400" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2 mb-0.5">

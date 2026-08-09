@@ -222,6 +222,9 @@ func GetUserDashboardStats(c echo.Context) error {
 			"is_top_5":            isTop5,
 			"is_profile_complete": isProfileComplete,
 			"dream_description":   user.DreamDescription,
+			"target_campus":       user.TargetCampus,
+			"target_major":        user.TargetMajor,
+			"target_point":        user.TargetPoint,
 		},
 	})
 }

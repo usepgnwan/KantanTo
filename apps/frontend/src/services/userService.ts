@@ -23,6 +23,7 @@ export interface User {
   nohp: string;
   status: string; // 'aktif' | 'pending' | 'non-aktif'
   asal_sekolah: string;
+  foto_profil?: string;
   role_id: number;
   role: Role;
   dream_description?: string;
@@ -97,4 +98,32 @@ export const getProfileAPI = async (id: number): Promise<User> => {
 export const updateProfileAPI = async (id: number, payload: UpdateProfilePayload): Promise<User> => {
   const response = await api.put(`/user/profile/${id}`, payload);
   return response.data.data;
+};
+
+export const forgotPassword = async (email: string): Promise<{ message: string }> => {
+  const response = await api.post('/auth/forgot-password', { email });
+  return response.data;
+};
+
+export const resetPassword = async (token: string, new_password: string): Promise<{ message: string }> => {
+  const response = await api.post('/auth/reset-password', { token, new_password });
+  return response.data;
+};
+
+export const googleLogin = async (code: string): Promise<LoginResponse & { bearer?: string }> => {
+  const response = await api.post('/auth/google', { code });
+  const { token, bearer, user } = response.data.data;
+
+  // Save raw token in standard localStorage for interceptors
+  if (token) localStorage.setItem('token', token);
+
+  // Decode roleid from JWT payload (base64 decode middle part)
+  let roleid = 2;
+  try {
+    const payloadBase64 = token.split('.')[1];
+    const decoded = JSON.parse(atob(payloadBase64));
+    roleid = decoded.roleid ?? 2;
+  } catch {}
+
+  return { token, bearer, roleid, user };
 };

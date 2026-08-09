@@ -24,6 +24,7 @@ import {
   PercentageOutlined,
   SafetyCertificateOutlined,
   AppstoreAddOutlined,
+  MailOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../context/ThemeContext';
 
@@ -55,6 +56,12 @@ const menuItems = [
     ],
   },
   {
+    section: 'Komunikasi',
+    items: [
+      { path: '/admin/messages', label: 'Pesan Masuk', icon: <MailOutlined /> },
+    ],
+  },
+  {
     section: 'Pengguna',
     items: [
       { path: '/admin/users', label: 'Pengguna', icon: <TeamOutlined /> },
@@ -66,6 +73,7 @@ const menuItems = [
     section: 'Master Data',
     items: [
       { path: '/admin/master/categories', label: 'Kategori', icon: <AppstoreOutlined /> },
+      { path: '/admin/education-levels', label: 'Tingkat Pendidikan', icon: <BankOutlined /> },
       { path: '/admin/grades', label: 'Kelas (Grade)', icon: <ReadOutlined /> },
       { path: '/admin/subjects', label: 'Mata Pelajaran', icon: <AppstoreAddOutlined /> },
     ],

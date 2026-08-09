@@ -275,33 +275,38 @@ const Dashboard: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="text-center py-4">
-                      <div className="relative inline-flex mb-4">
-                        <Progress 
-                          type="dashboard" 
-                          percent={85} 
-                          strokeWidth={8}
-                          strokeColor="#0060ad"
-                          trailColor="rgba(0, 96, 173, 0.05)"
-                          width={180}
-                          format={() => (
-                            <div className="flex flex-col">
-                              <span className="text-4xl font-black font-manrope">720</span>
-                              <span className="text-[10px] uppercase font-bold text-on-surface/40 tracking-widest">Prediksi Skor</span>
-                            </div>
-                          )}
-                        />
+                    <div className="text-center py-6">
+                      <div className="relative mb-6 px-6">
+                        <div className="absolute top-0 left-2 text-6xl text-primary/10 font-serif leading-none">"</div>
+                        <div className="relative z-10 px-4 py-2">
+                          <span className="text-xl md:text-2xl leading-tight font-black font-manrope text-on-surface italic">
+                            {dashboardStats?.dream_description || 'Semangat mengejar impianmu!'}
+                          </span>
+                        </div>
+                        <div className="absolute bottom-[-10px] right-2 text-6xl text-primary/10 font-serif leading-none rotate-180">"</div>
+                      </div>
+                      <div className="flex items-center justify-center gap-4 mb-6">
+                        <span className="text-xs uppercase font-bold text-primary tracking-[0.2em]">Vision Board Kamu</span>
+                        <Button size="small" type="dashed" className="rounded-full text-[10px] uppercase font-bold text-on-surface/50 hover:text-primary hover:border-primary" onClick={() => navigate('/profile')}>
+                          Edit
+                        </Button>
                       </div>
                       <div className="flex items-center justify-center gap-2 mb-2">
-                        <Tag color="blue" className="rounded-full border-none px-3 font-bold">+70 menuju target</Tag>
+                        <Tag color="blue" className="rounded-full border-none px-3 font-bold">
+                          {(parseInt(dashboardStats?.target_point || '790', 10) - Math.round(dashboardStats?.avg_score || 0)) > 0 
+                            ? `+${parseInt(dashboardStats?.target_point || '790', 10) - Math.round(dashboardStats?.avg_score || 0)} menuju target` 
+                            : 'Target Tercapai!'}
+                        </Tag>
                       </div>
                       <Paragraph className="text-xs text-on-surface/60 max-w-[200px] mx-auto">
-                        Hampir tercapai. Sedikit lagi menuju target Universitas Indonesia!
+                        {(parseInt(dashboardStats?.target_point || '790', 10) - Math.round(dashboardStats?.avg_score || 0)) > 0 
+                            ? `Hampir tercapai. Sedikit lagi menuju target ${dashboardStats?.target_campus || 'Universitas Indonesia'}!` 
+                            : `Selamat! Anda telah mencapai target skor untuk masuk ${dashboardStats?.target_campus || 'Universitas Indonesia'}!`}
                       </Paragraph>
                     </div>
 
                     <Alert 
-                      message="Target: 790 (Kedokteran UI)" 
+                      message={`Target: ${dashboardStats?.target_point || '790'} (${dashboardStats?.target_major || 'Kedokteran UI'})`} 
                       type="info" 
                       showIcon 
                       icon={<BulbOutlined />}

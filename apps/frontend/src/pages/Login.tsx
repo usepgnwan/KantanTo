@@ -3,7 +3,7 @@ import { Form, Input, Button, Checkbox, Divider, Typography, message } from 'ant
 import { MailOutlined, LockOutlined, GoogleOutlined, AppleOutlined } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../layouts/AuthLayout';
-import authVisual from '../assets/auth-visual.png';
+import authVisual from '../assets/login.png';
 import PageLoader from '../components/atoms/PageLoader';
 import { loginUser } from '../services/userService';
 import { useAuth } from '../context/AuthContext';
@@ -44,6 +44,20 @@ const LoginPage: React.FC = () => {
     }
   };
 
+  const handleGoogleLogin = () => {
+    // Note: User mentioned OAUTH_REDIRECT for frontend, using that and standard REACT_APP prefix just in case
+    const clientId = process.env.REACT_APP_OAUTH_CLIENT_ID || process.env.OAUTH_CLIEN_ID;
+    const redirectUri = process.env.REACT_APP_OAUTH_REDIRECT || process.env.OAUTH_REDIRECT || 'http://localhost:3000/oauth/callback';
+
+    if (!clientId) {
+      message.error('Client ID Google tidak ditemukan di konfigurasi frontend (.env)');
+      return;
+    }
+
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=email profile&access_type=offline`;
+    window.location.href = googleAuthUrl;
+  };
+
   if (pageLoading) return <PageLoader />;
 
   return (
@@ -52,9 +66,10 @@ const LoginPage: React.FC = () => {
       subtitle="Masuk untuk mengakses materi belajar dan riwayat tryout Anda."
       image={authVisual}
       quote={{
-        text: "Pendidikan adalah senjata paling mematikan di dunia, karena dengan pendidikan, Anda dapat mengubah dunia.",
-        author: "Nelson Mandela"
+        text: "Buat akun untuk mulai menggunakan tryout",
+        author: "Rifaya Education",
       }}
+
     >
       <Form
         name="login"
@@ -114,12 +129,12 @@ const LoginPage: React.FC = () => {
             <Text className="text-[10px] uppercase tracking-[0.2em] text-on-surface/30 font-bold">Atau Lanjut Dengan</Text>
           </Divider>
 
-          <div className="grid grid-cols-2 gap-3 mt-4">
-            <Button className="h-11 rounded-xl border-on-surface/5 flex items-center justify-center gap-2 font-semibold hover:bg-surface-low transition-all text-xs">
+          <div className="grid grid-cols-1 gap-3 mt-4">
+            <Button
+              onClick={handleGoogleLogin}
+              className="h-11 rounded-xl border-on-surface/5 flex items-center justify-center gap-2 font-semibold hover:bg-surface-low transition-all text-xs"
+            >
               <GoogleOutlined className="text-red-500" /> Google
-            </Button>
-            <Button className="h-11 rounded-xl border-on-surface/5 flex items-center justify-center gap-2 font-semibold hover:bg-surface-low transition-all text-xs">
-              <AppleOutlined /> Apple
             </Button>
           </div>
         </div>

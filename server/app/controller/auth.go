@@ -24,6 +24,7 @@ type JwtCustomClaims struct {
 	Nama          string `json:"nama"`
 	Phone         string `json:"phone"`
 	Email         string `json:"email"`
+	FotoProfil    string `json:"foto_profil"`
 	RoleID        uint   `json:"roleid"`
 	DeskripsiRole string `json:"deskripsi_role"`
 	jwt.RegisteredClaims
@@ -72,6 +73,7 @@ func LoginUser(c echo.Context) error {
 		user.Name,
 		user.Nohp,
 		user.Email,
+		user.FotoProfil,
 		user.RoleID,
 		user.Role.Title,
 		jwt.RegisteredClaims{

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import AppLayout from '../layouts/AppLayout';
-import { Row, Col, Typography, Input, Button, Form, Card, Divider, Skeleton } from 'antd';
+import { Row, Col, Typography, Input, Button, Form, Card, Divider, Skeleton, message } from 'antd';
 import { MailOutlined, PhoneOutlined, EnvironmentOutlined, SendOutlined } from '@ant-design/icons';
 import { getSetting, Setting } from '../services/settingService';
+import { submitContactMessage } from '../services/contactMessageService';
 
 const { Title, Paragraph, Text } = Typography;
 const { TextArea } = Input;
@@ -14,9 +15,33 @@ const ContactPage: React.FC = () => {
     getSetting().then(data => setSetting(data)).catch(() => console.error('Gagal mengambil kontak'));
   }, []);
 
-  const onFinish = (values: any) => {
-    console.log('Success:', values);
-    alert('Pesan Anda berhasil dikirim! Tim Rifaya Tryout akan segera menghubungi Anda.');
+  const [loading, setLoading] = useState(false);
+  const [form] = Form.useForm();
+
+  const onFinish = async (values: any) => {
+    try {
+      setLoading(true);
+      await submitContactMessage({
+        name: values.name,
+        email: values.email,
+        subject: values.subject,
+        message: values.message,
+      });
+      message.success({
+        content: 'Pesan Anda berhasil dikirim! Tim kami akan segera menghubungi Anda melalui email.',
+        duration: 5,
+        className: 'mt-20' // to avoid being hidden under navbar
+      });
+      form.resetFields();
+    } catch (error: any) {
+      message.error({
+        content: 'Terjadi kesalahan saat mengirim pesan: ' + (error.response?.data?.message || error.message),
+        duration: 5,
+        className: 'mt-20'
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -109,6 +134,7 @@ const ContactPage: React.FC = () => {
                 <Paragraph className="text-on-surface/60 mb-8">Isi formulir di bawah ini dan representatif kami akan membalas dalam waktu maksimal 1x24 jam.</Paragraph>
                 
                 <Form
+                  form={form}
                   layout="vertical"
                   onFinish={onFinish}
                   requiredMark={false}
@@ -164,6 +190,7 @@ const ContactPage: React.FC = () => {
                       htmlType="submit" 
                       size="large" 
                       block 
+                      loading={loading}
                       className="h-14 rounded-xl font-bold shadow-lg shadow-primary/20 text-lg flex items-center justify-center gap-2 transition-transform hover:scale-[1.02]"
                     >
                       <SendOutlined /> Kirim Pesan Sekarang

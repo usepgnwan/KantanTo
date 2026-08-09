@@ -3,7 +3,7 @@ import { Form, Input, Button, Divider, Typography, Checkbox, message } from 'ant
 import { MailOutlined, LockOutlined, UserOutlined, WhatsAppOutlined, GoogleOutlined, AppleOutlined } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../layouts/AuthLayout';
-import authVisual from '../assets/auth-visual.png';
+import authVisual from '../assets/login.png';
 import PageLoader from '../components/atoms/PageLoader';
 import { registerUser } from '../services/userService';
 
@@ -49,8 +49,8 @@ const RegisterPage: React.FC = () => {
       subtitle="Bergabunglah dengan ribuan siswa lainnya dan mulai raih impian masuk PTN idaman."
       image={authVisual}
       quote={{
-        text: "Masa depan adalah milik mereka yang percaya pada keindahan impian mereka.",
-        author: "Eleanor Roosevelt"
+        text: "Buat akun untuk mulai menggunakan tryout",
+        author: "Rifaya Education",
       }}
     >
       <Form
@@ -65,8 +65,8 @@ const RegisterPage: React.FC = () => {
           label={<span className="text-[10px] font-bold uppercase tracking-widest text-on-surface/40">Nama Lengkap</span>}
           rules={[{ required: true, message: 'Mohon masukkan nama lengkap Anda!' }]}
         >
-          <Input 
-            prefix={<UserOutlined className="text-on-surface/20 mr-2" />} 
+          <Input
+            prefix={<UserOutlined className="text-on-surface/20 mr-2" />}
             placeholder="Contoh: Budi Santoso"
             className="h-12 rounded-xl bg-surface-low border-none px-4 focus:bg-white transition-all"
           />
@@ -77,9 +77,9 @@ const RegisterPage: React.FC = () => {
           label={<span className="text-[10px] font-bold uppercase tracking-widest text-on-surface/40">Alamat Email</span>}
           rules={[{ required: true, message: 'Mohon masukkan email Anda!' }, { type: 'email', message: 'Format email tidak valid!' }]}
         >
-          <Input 
-            prefix={<MailOutlined className="text-on-surface/20 mr-2" />} 
-            placeholder="nama@email.com" 
+          <Input
+            prefix={<MailOutlined className="text-on-surface/20 mr-2" />}
+            placeholder="nama@email.com"
             className="h-12 rounded-xl bg-surface-low border-none px-4 focus:bg-white transition-all"
           />
         </Form.Item>
@@ -89,8 +89,8 @@ const RegisterPage: React.FC = () => {
           label={<span className="text-[10px] font-bold uppercase tracking-widest text-on-surface/40">Nomor WhatsApp</span>}
           rules={[{ required: true, message: 'Mohon masukkan nomor WhatsApp Anda!' }]}
         >
-          <Input 
-            prefix={<WhatsAppOutlined className="text-on-surface/20 mr-2" />} 
+          <Input
+            prefix={<WhatsAppOutlined className="text-on-surface/20 mr-2" />}
             placeholder="0812xxxx"
             className="h-12 rounded-xl bg-surface-low border-none px-4 focus:bg-white transition-all"
           />
@@ -115,10 +115,10 @@ const RegisterPage: React.FC = () => {
         </Form.Item>
 
         <Form.Item>
-          <Button 
-            type="primary" 
-            htmlType="submit" 
-            block 
+          <Button
+            type="primary"
+            htmlType="submit"
+            block
             loading={loading}
             className="h-12 rounded-xl font-bold text-lg shadow-lg shadow-primary/20 hover:scale-[1.01] transition-transform"
           >
@@ -130,7 +130,7 @@ const RegisterPage: React.FC = () => {
           <Divider plain className="!border-on-surface/5">
             <Text className="text-[10px] uppercase tracking-[0.2em] text-on-surface/30 font-bold">Atau Daftar Dengan</Text>
           </Divider>
-          
+
           <div className="grid grid-cols-2 gap-3 mt-4">
             <Button className="h-11 rounded-xl border-on-surface/5 flex items-center justify-center gap-2 font-semibold hover:bg-surface-low transition-all text-xs">
               <GoogleOutlined className="text-red-500" /> Google

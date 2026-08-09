@@ -15,6 +15,12 @@ export interface Grade {
   id: number;
   title: string;
   deskripsi: string;
+  education_level_id?: number;
+  education_level?: {
+    id: number;
+    title: string;
+    deskripsi: string;
+  };
   created_at?: string;
   updated_at?: string;
 }
@@ -42,12 +48,12 @@ export const getGradeById = async (id: number): Promise<Grade> => {
   return response.data.data;
 };
 
-export const createGrade = async (data: { title: string; deskripsi: string }): Promise<Grade> => {
+export const createGrade = async (data: { title: string; deskripsi: string; education_level_id?: number }): Promise<Grade> => {
   const response = await api.post('/grade', data);
   return response.data.data;
 };
 
-export const updateGrade = async (id: number, data: { title: string; deskripsi: string }): Promise<Grade> => {
+export const updateGrade = async (id: number, data: { title: string; deskripsi: string; education_level_id?: number }): Promise<Grade> => {
   const response = await api.put(`/grade/${id}`, data);
   return response.data.data;
 };

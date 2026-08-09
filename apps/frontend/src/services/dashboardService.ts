@@ -34,6 +34,9 @@ export interface UserDashboardStats {
   is_top_5?: boolean;
   is_profile_complete?: boolean;
   dream_description?: string;
+  target_campus?: string;
+  target_major?: string;
+  target_point?: string;
 }
 
 export const getUserDashboardStatsAPI = async (userId: number): Promise<UserDashboardStats | null> => {

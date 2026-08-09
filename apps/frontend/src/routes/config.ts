@@ -4,6 +4,9 @@ import React from 'react';
 const Landing = React.lazy(() => import('../pages/Index'));
 const LoginPage = React.lazy(() => import('../pages/Login'));
 const RegisterPage = React.lazy(() => import('../pages/Register'));
+const OAuthCallback = React.lazy(() => import('../pages/OAuthCallback'));
+const ForgotPassword = React.lazy(() => import('../pages/ForgotPassword'));
+const ResetPassword = React.lazy(() => import('../pages/ResetPassword'));
 const Packages = React.lazy(() => import('../pages/Packages'));
 const PackageDetail = React.lazy(() => import('../pages/PackageDetail'));
 const PackageMaterials = React.lazy(() => import('../pages/PackageMaterials'));
@@ -33,6 +36,8 @@ const AdminVouchers = React.lazy(() => import('../pages/admin/AdminVouchers'));
 const AdminSettings = React.lazy(() => import('../pages/admin/AdminSettings'));
 const AdminCategories = React.lazy(() => import('../pages/admin/AdminCategories'));
 const AdminClasses = React.lazy(() => import('../pages/admin/AdminClasses'));
+const AdminEducationLevels = React.lazy(() => import('../pages/admin/AdminEducationLevels'));
+const AdminContactMessages = React.lazy(() => import('../pages/admin/AdminContactMessages'));
 const AdminSubjects = React.lazy(() => import('../pages/admin/AdminSubjects'));
 const AdminRoles = React.lazy(() => import('../pages/admin/AdminRoles'));
 const AdminExamHistory = React.lazy(() => import('../pages/admin/AdminExamHistory'));
@@ -73,6 +78,30 @@ export const menuConfig: MenuItem[] = [
     path: '/register',
     name: 'Daftar',
     component: RegisterPage,
+    hidden: true,
+    guest: true,
+  },
+  {
+    id: 'oauth-callback',
+    path: '/oauth/callback',
+    name: 'OAuth Callback',
+    component: OAuthCallback,
+    hidden: true,
+    guest: true,
+  },
+  {
+    id: 'forgot-password',
+    path: '/forgot-password',
+    name: 'Lupa Password',
+    component: ForgotPassword,
+    hidden: true,
+    guest: true,
+  },
+  {
+    id: 'reset-password',
+    path: '/reset-password',
+    name: 'Reset Password',
+    component: ResetPassword,
     hidden: true,
     guest: true,
   },
@@ -320,6 +349,20 @@ export const menuConfig: MenuItem[] = [
     path: '/admin/grades',
     name: 'Kelas (Grade)',
     component: AdminClasses,
+    hidden: true,
+  },
+  {
+    id: 'admin-education-levels',
+    path: '/admin/education-levels',
+    name: 'Tingkat Pendidikan',
+    component: AdminEducationLevels,
+    hidden: true,
+  },
+  {
+    id: 'admin-contact-messages',
+    path: '/admin/messages',
+    name: 'Pesan Masuk',
+    component: AdminContactMessages,
     hidden: true,
   },
   {

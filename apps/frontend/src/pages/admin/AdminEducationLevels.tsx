@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Button, Card, Typography, Modal, Form, Input, Space, Tag, message, Breadcrumb, Popconfirm, Select } from 'antd';
+import { Table, Button, Card, Typography, Modal, Form, Input, Space, message, Breadcrumb, Popconfirm } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined, BankOutlined } from '@ant-design/icons';
 import AdminLayout from '../../layouts/AdminLayout';
-import { getGrades, createGrade, updateGrade, deleteGrade, Grade } from '../../services/gradeService';
-import { getEducationLevels, EducationLevel } from '../../services/educationLevelService';
+import { getEducationLevels, createEducationLevel, updateEducationLevel, deleteEducationLevel, EducationLevel } from '../../services/educationLevelService';
 
 const { Title, Text } = Typography;
 
-const AdminClasses: React.FC = () => {
-  const [data, setData] = useState<Grade[]>([]);
+const AdminEducationLevels: React.FC = () => {
+  const [data, setData] = useState<EducationLevel[]>([]);
   const [loading, setLoading] = useState(false);
   const [total, setTotal] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -18,27 +17,21 @@ const AdminClasses: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form] = Form.useForm();
-  const [educationLevels, setEducationLevels] = useState<EducationLevel[]>([]);
-
-  useEffect(() => {
-    getEducationLevels(1, 100).then(res => setEducationLevels(res.rows)).catch(() => {});
-  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await getGrades(currentPage, perPage, searchQuery);
+      const response = await getEducationLevels(currentPage, perPage, searchQuery);
       setData(response.rows);
       setTotal(response.total);
     } catch (error) {
-      message.error('Gagal mengambil data kelas');
+      message.error('Gagal mengambil data tingkat pendidikan');
     } finally {
       setLoading(false);
     }
   }, [currentPage, perPage, searchQuery]);
 
   useEffect(() => {
-    // Debounce search query effect
     const timeout = setTimeout(() => {
       fetchData();
     }, 500);
@@ -51,35 +44,34 @@ const AdminClasses: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleEdit = (record: Grade) => {
+  const handleEdit = (record: EducationLevel) => {
     setEditingId(record.id);
     form.setFieldsValue({
       title: record.title,
       description: record.deskripsi,
-      education_level_id: record.education_level_id,
     });
     setIsModalOpen(true);
   };
 
   const handleDelete = async (id: number) => {
     try {
-      await deleteGrade(id);
-      message.success('Tingkat kelas berhasil dihapus');
+      await deleteEducationLevel(id);
+      message.success('Tingkat pendidikan berhasil dihapus');
       fetchData();
     } catch (error) {
-      message.error('Gagal menghapus tingkat kelas');
+      message.error('Gagal menghapus tingkat pendidikan');
     }
   };
 
   const onFinish = async (values: any) => {
-    const payload = { title: values.title, deskripsi: values.description, education_level_id: values.education_level_id };
+    const payload = { title: values.title, deskripsi: values.description };
     try {
       if (editingId) {
-        await updateGrade(editingId, payload);
-        message.success('Data kelas diperbarui');
+        await updateEducationLevel(editingId, payload);
+        message.success('Data diperbarui');
       } else {
-        await createGrade(payload);
-        message.success('Tingkat kelas baru ditambahkan');
+        await createEducationLevel(payload);
+        message.success('Tingkat pendidikan baru ditambahkan');
       }
       setIsModalOpen(false);
       fetchData();
@@ -91,41 +83,26 @@ const AdminClasses: React.FC = () => {
   const columns = [
     {
       title: 'Tingkat Pendidikan',
-      key: 'education_level',
-      render: (_: any, record: Grade) => <Text className="font-bold text-on-surface text-sm">{record.education_level?.title || '-'}</Text>,
-    },
-    {
-      title: 'Tingkat Kelas',
       dataIndex: 'title',
       key: 'title',
       render: (text: string) => <Text className="font-black text-on-surface text-base">{text}</Text>,
     },
     {
-      title: 'Deskripsi Cakupan',
+      title: 'Deskripsi',
       dataIndex: 'deskripsi',
       key: 'deskripsi',
       render: (text: string) => <Text className="text-on-surface/50 text-xs italic">{text || '-'}</Text>,
-    },
-    {
-      title: 'Total Konten',
-      key: 'totalContent',
-      render: () => <Tag color="blue" className="rounded-lg border-none font-bold">0 Konten</Tag>,
-    },
-    {
-      title: 'Total Paket',
-      key: 'totalPackage',
-      render: () => <Tag color="cyan" className="rounded-lg border-none font-bold">0 Paket</Tag>,
     },
     {
       title: 'Aksi',
       key: 'action',
       width: 100,
       align: 'right' as const,
-      render: (_: any, record: Grade) => (
+      render: (_: any, record: EducationLevel) => (
         <Space size="small">
           <Button type="text" icon={<EditOutlined className="text-primary" />} onClick={() => handleEdit(record)} />
           <Popconfirm
-            title="Hapus Tingkat Kelas"
+            title="Hapus Tingkat Pendidikan"
             description="Tindakan ini tidak dapat dibatalkan, ingin menghapus?"
             onConfirm={() => handleDelete(record.id)}
             okText="Hapus"
@@ -148,15 +125,15 @@ const AdminClasses: React.FC = () => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 text-center sm:text-left">
             <div>
               <Breadcrumb 
-                items={[{ title: 'Master Data' }, { title: 'Tingkat Kelas' }]}
+                items={[{ title: 'Master Data' }, { title: 'Tingkat Pendidikan' }]}
                 className="mb-2 uppercase text-[10px] font-black tracking-widest opacity-40 justify-center sm:justify-start"
               />
               <Title level={2} className="!m-0 !font-manrope !font-black !text-2xl dark:text-zinc-100 flex items-center gap-3 justify-center sm:justify-start">
-                <BankOutlined className="text-primary" /> Management Kelas
+                <BankOutlined className="text-primary" /> Management Tingkat Pendidikan
               </Title>
             </div>
             <Button type="primary" size="large" icon={<PlusOutlined />} onClick={handleAdd} className="rounded-2xl h-12 px-8 font-black shadow-xl shadow-primary/20">
-              Buat Kelas
+              Buat Tingkat Pendidikan
             </Button>
           </div>
 
@@ -194,7 +171,7 @@ const AdminClasses: React.FC = () => {
       </div>
 
       <Modal
-        title={<Title level={4} className="!m-0 !font-manrope !font-black">{editingId ? 'Edit Pengaturan Kelas' : 'Kelas Baru'}</Title>}
+        title={<Title level={4} className="!m-0 !font-manrope !font-black">{editingId ? 'Edit Tingkat Pendidikan' : 'Tingkat Pendidikan Baru'}</Title>}
         open={isModalOpen}
         onCancel={() => setIsModalOpen(false)}
         footer={null}
@@ -202,15 +179,8 @@ const AdminClasses: React.FC = () => {
         centered
       >
         <Form form={form} layout="vertical" onFinish={onFinish} className="mt-6">
-          <Form.Item name="education_level_id" label={<Text className="font-bold text-xs uppercase opacity-50">Tingkat Pendidikan</Text>} rules={[{ required: true, message: 'Pilih tingkat pendidikan!' }]}>
-            <Select
-              placeholder="Pilih tingkat pendidikan"
-              className="h-11 [&_.ant-select-selector]:!rounded-xl"
-              options={educationLevels.map(el => ({ value: el.id, label: el.title }))}
-            />
-          </Form.Item>
-          <Form.Item name="title" label={<Text className="font-bold text-xs uppercase opacity-50">Label Kelas</Text>} rules={[{ required: true }]}>
-            <Input placeholder="Cth: Kelas 12 SMA" className="h-11 rounded-xl" />
+          <Form.Item name="title" label={<Text className="font-bold text-xs uppercase opacity-50">Tingkat Pendidikan</Text>} rules={[{ required: true }]}>
+            <Input placeholder="Cth: SMA" className="h-11 rounded-xl" />
           </Form.Item>
           <Form.Item name="description" label={<Text className="font-bold text-xs uppercase opacity-50">Keterangan</Text>}>
             <Input.TextArea rows={3} placeholder="Deskripsi singkat..." className="rounded-xl" />
@@ -225,4 +195,4 @@ const AdminClasses: React.FC = () => {
   );
 };
 
-export default AdminClasses;
+export default AdminEducationLevels;

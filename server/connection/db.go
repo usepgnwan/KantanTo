@@ -40,6 +40,7 @@ func ConnectDB() {
 	err = DB.AutoMigrate(
 		&model.Mapel{},
 		&model.Category{},
+		&model.EducationLevel{},
 		&model.Grade{},
 		&model.Setting{},
 		&model.Role{},
@@ -58,6 +59,8 @@ func ConnectDB() {
 		&model.UserMaterialProgress{},
 		&model.MenuLog{},
 		&model.ExampleExam{},
+		&model.ContactMessage{},
+		&model.PasswordResetToken{},
 	)
 	if err != nil {
 		log.Fatal("Failed to migrate database:", err)
