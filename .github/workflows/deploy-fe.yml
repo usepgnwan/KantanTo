@@ -39,35 +39,36 @@ jobs:
     - name: Compress Build
       run: tar -czf build.tar.gz -C apps/frontend build
 
-    - name: Copy Build to VPS
+    - name: Deploy to VPS via Native SSH
       env:
-        SSH_KEY: ${{ secrets.SERVER_SSH_KEY }}
-        HOST: ${{ secrets.SERVER_HOST }}
-        USER: ${{ secrets.SERVER_USERNAME }}
+        SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        SSH_HOST: ${{ secrets.SERVER_HOST }}
+        SSH_USER: ${{ secrets.SERVER_USERNAME }}
       run: |
-        mkdir -p ~/.ssh
-        echo "$SSH_KEY" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        ssh-keyscan -H $HOST >> ~/.ssh/known_hosts
-        scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa build.tar.gz $USER@$HOST:/var/www/KantanTo/apps/frontend/
+        echo "Installing SSH Client..."
+        sudo apt-get update && sudo apt-get install -y openssh-client
 
-    - name: Restart Frontend Service
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USERNAME }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
-        script: |
-          cd /var/www/KantanTo/apps/frontend
-          
-          # Ekstrak file build hasil transfer dan hapus zip-nya
-          tar -xzf build.tar.gz
-          rm build.tar.gz
-          
-          # Matikan proses serve lama
-          pkill -f "serve -s build" || true
-          
-          # Jalankan ulang frontend
-          nohup npm run preview > frontend.log 2>&1 &
-          
-          echo "Frontend berhasil di-restart dengan npm run preview!"
+        echo "Setting up SSH..."
+        mkdir -p ~/.ssh
+        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -p 22 $SSH_HOST >> ~/.ssh/known_hosts
+
+        echo "Transferring build artifact..."
+        scp -o StrictHostKeyChecking=no -P 22 -i ~/.ssh/id_rsa build.tar.gz $SSH_USER@$SSH_HOST:/var/www/KantanTo/apps/frontend/
+
+        echo "Connecting to server and deploying..."
+        ssh -o StrictHostKeyChecking=no -p 22 -i ~/.ssh/id_rsa $SSH_USER@$SSH_HOST 'bash -s' << 'EOF'
+        set -e
+        cd /var/www/KantanTo/apps/frontend
+        
+        echo "Extracting files..."
+        tar -xzf build.tar.gz
+        rm build.tar.gz
+        
+        echo "Restarting service..."
+        pkill -f "serve -s build" || true
+        nohup npm run preview > frontend.log 2>&1 &
+        
+        echo "Frontend berhasil di-restart dengan npm run preview!"
+        EOF
