@@ -1,0 +1,64 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'server/**'
+      - '.github/workflows/deploy-be.yml'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+        cache-dependency-path: server/go.sum
+
+    - name: Build Backend
+      working-directory: ./server
+      run: |
+        go mod download
+        GOOS=linux GOARCH=amd64 go build -o kantanto-be main.go
+
+    - name: Deploy to VPS via Native SSH
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        SSH_HOST: ${{ secrets.SERVER_HOST }}
+        SSH_USER: ${{ secrets.SERVER_USERNAME }}
+        ENV_BE: ${{ secrets.ENV_BE }}
+      run: |
+        echo "Installing SSH Client..."
+        sudo apt-get update && sudo apt-get install -y openssh-client
+
+        echo "Setting up SSH..."
+        mkdir -p ~/.ssh
+        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -p 22 $SSH_HOST >> ~/.ssh/known_hosts
+
+        echo "Creating .env file locally..."
+        echo "$ENV_BE" > server/.env
+
+        echo "Transferring backend binary and .env..."
+        scp -o StrictHostKeyChecking=no -P 22 -i ~/.ssh/id_rsa server/kantanto-be server/.env $SSH_USER@$SSH_HOST:/var/www/KantanTo/server/
+
+        echo "Connecting to server and deploying..."
+        ssh -o StrictHostKeyChecking=no -p 22 -i ~/.ssh/id_rsa $SSH_USER@$SSH_HOST 'bash -s' << 'EOF'
+        set -e
+        cd /var/www/KantanTo/server
+        
+        echo "Making binary executable..."
+        chmod +x kantanto-be
+        
+        echo "Restarting backend service..."
+        pkill -f "./kantanto-be" || true
+        nohup ./kantanto-be > backend.log 2>&1 &
+        
+        echo "Backend berhasil di-restart!"
+        EOF
