@@ -1,17 +1,6 @@
-const CACHE_NAME = 'rifaya-pwa-cache-v1';
+const CACHE_NAME = 'rifaya-pwa-cache-v2';
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll([
-        '/',
-        '/index.html',
-        '/manifest.json',
-        '/logo192.png',
-        '/logo512.png'
-      ]);
-    })
-  );
   self.skipWaiting();
 });
 
@@ -31,12 +20,32 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
+  // Hanya intercept request GET
+  if (e.request.method !== 'GET') return;
+
   e.respondWith(
-    caches.match(e.request).then((response) => {
-      return response || fetch(e.request);
-    }).catch(() => {
-      // Fallback for offline if fetch fails
-      return caches.match('/');
-    })
+    fetch(e.request)
+      .then((response) => {
+        // Clone response dan simpan ke cache untuk update terbaru
+        if (response && response.status === 200) {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(e.request, responseToCache);
+          });
+        }
+        return response;
+      })
+      .catch(() => {
+        // Jika offline/gagal ambil dari network, baru fallback ke cache
+        return caches.match(e.request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          // Fallback routing React jika buka halaman spesifik saat offline
+          if (e.request.mode === 'navigate') {
+            return caches.match('/');
+          }
+        });
+      })
   );
 });

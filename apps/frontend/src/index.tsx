@@ -19,6 +19,15 @@ if ('serviceWorker' in navigator) {
   }).catch(err => {
     console.log('SW registration failed:', err);
   });
+
+  // Otomatis me-reload halaman ketika Service Worker versi baru mengambil alih
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!refreshing) {
+      refreshing = true;
+      window.location.reload();
+    }
+  });
 }
 
 reportWebVitals();
