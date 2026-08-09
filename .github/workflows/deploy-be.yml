@@ -46,7 +46,8 @@ jobs:
         echo "$ENV_BE" > server/.env
 
         echo "Transferring backend binary and .env..."
-        scp -o StrictHostKeyChecking=no -P 22 -i ~/.ssh/id_rsa server/kantanto-be server/.env $SSH_USER@$SSH_HOST:/var/www/KantanTo/server/
+        cat server/.env | ssh -o StrictHostKeyChecking=no -p 22 -i ~/.ssh/id_rsa $SSH_USER@$SSH_HOST "cat > /var/www/KantanTo/server/.env"
+        gzip -c server/kantanto-be | ssh -o StrictHostKeyChecking=no -p 22 -i ~/.ssh/id_rsa $SSH_USER@$SSH_HOST "gzip -d > /var/www/KantanTo/server/kantanto-be"
 
         echo "Connecting to server and deploying..."
         ssh -o StrictHostKeyChecking=no -p 22 -i ~/.ssh/id_rsa $SSH_USER@$SSH_HOST 'bash -s' << 'EOF'
