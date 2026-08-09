@@ -10,6 +10,7 @@ import FeaturesGrid from '../components/organisms/FeaturesGrid';
 import InteractiveWidgets from '../components/organisms/InteractiveWidgets';
 import CustomerReviews from '../components/organisms/CustomerReviews';
 import ContactForm from '../components/organisms/ContactForm';
+import FloatingWhatsApp from '../components/atoms/FloatingWhatsApp';
 
 import { getPackages, PackageListItem } from '../services/packageService';
 import { recordMenuLogAPI } from '../services/logService';
@@ -153,9 +154,9 @@ const IndexPage: React.FC = () => {
       {/* CTA Final */}
       <section className="py-24 bg-gradient-to-br from-primary to-primary-container text-white relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl translate-x-1/2 -translate-y-1/2" />
-        <div className="max-w-4xl mx-auto px-4 text-center relative z-10">
-          <Title level={2} className="!text-white !text-3xl md:!text-5xl mb-8">Siap Bersaing di SNBT 2024?</Title>
-          <Paragraph className="text-white/80 text-lg mb-10 max-w-xl mx-auto">
+        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center z-10 py-20">
+          <Title level={2} className="!text-white !text-3xl md:!text-5xl mb-8">Siap Bersaing di SNBT {new Date().getFullYear()}?</Title>
+          <Paragraph className="text-white/80 text-lg mb-10 max-w-2xl mx-auto">
             Bergabunglah dengan ribuan pejuang PTN lainnya dan mulailah latihan intensif hari ini.
           </Paragraph>
           <button className="bg-white text-primary px-12 py-4 rounded-full font-bold text-lg hover:scale-105 transition-all shadow-xl">
@@ -163,6 +164,8 @@ const IndexPage: React.FC = () => {
           </button>
         </div>
       </section>
+
+      <FloatingWhatsApp />
     </AppLayout>
   );
 };

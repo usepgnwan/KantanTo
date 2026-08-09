@@ -15,7 +15,7 @@ import {
 } from '@ant-design/icons';
 import { getPackageQuestions, submitExam, PackageQuestionPayload, getPackageBySlug } from '../services/packageService';
 import { useAuth } from '../context/AuthContext';
-import { renderLatex } from '../utils/latex';
+import { renderQuillHtml as renderLatex } from '../utils/renderContent';
 
 const { Title, Paragraph, Text } = Typography;
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AdminLayout from '../../layouts/AdminLayout';
 import KantanEditor from '../../components/atoms/KantanEditor';
+import { renderContent, renderQuillHtml } from '../../utils/renderContent';
 import {
   deletePackageMaterial,
   deletePackageVideo,
@@ -74,27 +75,6 @@ interface VideoMaterial {
 }
 
 // ─── HELPERS ───────────────────
-declare global { interface Window { katex?: any; renderMathInElement?: any; } }
-
-const renderKaTeX = (latex: string, displayMode = false): string => {
-  if (window.katex) {
-    try { return window.katex.renderToString(latex, { displayMode, throwOnError: false }); }
-    catch { return latex; }
-  }
-  return `<span class="font-mono bg-blue-50 text-blue-700 px-1 rounded text-sm">${displayMode ? '$$' : '$'}${latex}${displayMode ? '$$' : '$'}</span>`;
-};
-
-const renderContent = (raw: string): string =>
-  raw
-    .replace(/\$\$([^$]+)\$\$/g, (_, l) => `<div class="my-4 flex justify-center overflow-x-auto text-on-surface dark:text-zinc-100">${renderKaTeX(l, true)}</div>`)
-    .replace(/\$([^$\n]+)\$/g, (_, l) => renderKaTeX(l, false))
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/_(.+?)_/g, '<em>$1</em>')
-    .replace(/^### (.+)$/gm, '<h3 class="text-xl font-black font-manrope mt-6 mb-3">$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2 class="text-2xl font-black font-manrope mt-8 mb-4">$1</h2>')
-    .replace(/^- (.+)$/gm, '<li class="ml-5 mb-1 list-disc">$1</li>')
-    .replace(/`(.+?)`/g, '<code class="bg-surface-low dark:bg-zinc-800 px-1.5 py-0.5 rounded text-sm font-mono text-primary">$1</code>')
-    .replace(/\n{2,}/g, '</p><p class="mb-4 leading-loose">');
 
 const stripHtml = (value: string): string =>
   value.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();

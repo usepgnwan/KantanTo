@@ -433,7 +433,7 @@ const AdminMaterialForm: React.FC = () => {
                       <Col xs={24} sm={16}>
                         <Form.Item name="judul" label={<span className="font-bold text-sm">Judul Artikel</span>}
                           rules={[{ required: true, message: 'Judul wajib diisi' }]}>
-                          <Input placeholder="Cth: Tips Lolos UTBK-SNBT 2024" className="rounded-xl h-12 text-base font-bold" size="large" />
+                          <Input placeholder={`Cth: Tips Lolos UTBK-SNBT ${new Date().getFullYear()}`} className="rounded-xl h-12 text-base font-bold" size="large" />
                         </Form.Item>
                       </Col>
                       <Col xs={24} sm={8}>
