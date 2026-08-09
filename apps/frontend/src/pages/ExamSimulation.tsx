@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { 
+import {
   Typography, Button, Card, Row, Col, Space, Tag, Modal, Drawer, Checkbox, Spin, message
 } from 'antd';
-import { 
-  ClockCircleOutlined, 
-  CloseOutlined, 
-  LeftOutlined, 
+import {
+  ClockCircleOutlined,
+  CloseOutlined,
+  LeftOutlined,
   RightOutlined,
   AppstoreOutlined,
   WarningOutlined,
@@ -31,6 +31,7 @@ const ExamSimulation: React.FC = () => {
   const [timeRemaining, setTimeRemaining] = useState(15 * 60); // Default 15 minutes, will be overridden by package duration
   const [isMapVisible, setIsMapVisible] = useState(false);
   const [isExitModalVisible, setIsExitModalVisible] = useState(false);
+  const [textSize, setTextSize] = useState<number>(16);
 
   // Map of questionId -> array of selected option indexes
   // For nested questions, we'll store sub_question ID -> array of selected option indexes
@@ -41,10 +42,40 @@ const ExamSimulation: React.FC = () => {
   }, [answers]);
   const [doubtfulQuestions, setDoubtfulQuestions] = useState<Record<string, boolean>>({});
 
+  const getSizeClasses = (size: number) => {
+    switch (size) {
+      case 16: return {
+        containerPadding: 'p-5 gap-5',
+        circleSize: 'w-11 h-11 text-base',
+        nestedPadding: 'p-4 gap-4',
+        nestedCircleSize: 'w-8 h-8 text-sm',
+      };
+      case 14: return {
+        containerPadding: 'p-4 gap-4',
+        circleSize: 'w-9 h-9 text-sm',
+        nestedPadding: 'p-3 gap-3',
+        nestedCircleSize: 'w-7 h-7 text-xs',
+      };
+      case 12: return {
+        containerPadding: 'p-3 gap-3',
+        circleSize: 'w-8 h-8 text-xs',
+        nestedPadding: 'p-2 gap-2',
+        nestedCircleSize: 'w-6 h-6 text-[10px]',
+      };
+      default: return {
+        containerPadding: 'p-5 gap-5',
+        circleSize: 'w-11 h-11 text-base',
+        nestedPadding: 'p-4 gap-4',
+        nestedCircleSize: 'w-8 h-8 text-sm',
+      };
+    }
+  };
+  const sizeClasses = getSizeClasses(textSize);
+
   useEffect(() => {
     if (!slug) return;
     setLoading(true);
-    
+
     Promise.all([
       getPackageQuestions(slug),
       getPackageBySlug(slug)
@@ -104,7 +135,7 @@ const ExamSimulation: React.FC = () => {
   const submitToBackend = async () => {
     if (!slug || !payload) return;
     setSubmitting(true);
-    
+
     // Format answers from string map to number map for backend
     const formattedAnswers: Record<number, number[]> = {};
     Object.keys(answersRef.current).forEach(k => {
@@ -169,13 +200,13 @@ const ExamSimulation: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-surface flex flex-col font-sans transition-colors duration-500">
-      
+
       {/* EXAM HEADER */}
       <header className="bg-white border-b border-surface-container h-16 flex items-center justify-between px-4 sm:px-8 shrink-0 relative z-30">
         <div className="flex items-center gap-4">
-          <Button 
-            type="text" 
-            icon={<CloseOutlined />} 
+          <Button
+            type="text"
+            icon={<CloseOutlined />}
             className="text-on-surface/40 hover:text-red-500 hover:bg-red-50"
             onClick={() => setIsExitModalVisible(true)}
           />
@@ -194,8 +225,28 @@ const ExamSimulation: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-4">
-          <Button 
-            type="text" 
+          <div className="hidden sm:flex items-center bg-surface-low border border-surface-container rounded-lg p-1 mr-2">
+            <Button
+              type={textSize === 16 ? 'primary' : 'text'}
+              size="small"
+              className="font-bold !text-[16px] w-8 h-8 flex items-center justify-center p-0"
+              onClick={() => setTextSize(16)}
+            >A</Button>
+            <Button
+              type={textSize === 14 ? 'primary' : 'text'}
+              size="small"
+              className="font-bold !text-[14px] w-8 h-8 flex items-center justify-center p-0"
+              onClick={() => setTextSize(14)}
+            >A</Button>
+            <Button
+              type={textSize === 12 ? 'primary' : 'text'}
+              size="small"
+              className="font-bold !text-[12px] w-8 h-8 flex items-center justify-center p-0"
+              onClick={() => setTextSize(12)}
+            >A</Button>
+          </div>
+          <Button
+            type="text"
             className="hidden sm:flex font-bold text-on-surface/60 items-center"
             onClick={() => setIsMapVisible(true)}
             icon={<AppstoreOutlined />}
@@ -220,7 +271,8 @@ const ExamSimulation: React.FC = () => {
               <Tag color="blue" className="mb-4 rounded-full border-none font-bold px-3">{currentData.title || 'Skenario'}</Tag>
               <Title level={4} className="!font-manrope !font-black !text-xl mt-0">Skenario Kasus</Title>
               <div
-                className="prose prose-lg prose-p:text-on-surface/80 prose-p:leading-loose"
+                className="prose prose-p:text-on-surface/80 prose-p:leading-loose"
+                style={{ fontSize: `${textSize}px` }}
                 dangerouslySetInnerHTML={{ __html: renderLatex(currentData.question) }}
               />
             </div>
@@ -239,7 +291,7 @@ const ExamSimulation: React.FC = () => {
                   const currentAnsArr = answers[sub.id] || [];
                   return (
                     <div key={sub.id} className="border-b border-surface-container pb-8 last:border-0">
-                      <Paragraph className="text-lg leading-relaxed text-on-surface font-medium mb-6">
+                      <Paragraph className="leading-relaxed text-on-surface font-medium mb-6" style={{ fontSize: `${textSize}px` }}>
                         <span className="font-black mr-2">{sIndex + 1}.</span>
                         <span dangerouslySetInnerHTML={{ __html: renderLatex(sub.question) }} />
                       </Paragraph>
@@ -251,13 +303,14 @@ const ExamSimulation: React.FC = () => {
                             <div
                               key={idx}
                               onClick={() => handleSelectOption(sub.id, sub.type || 'single', idx)}
-                              className={`p-4 rounded-xl flex items-center gap-4 cursor-pointer transition-all border ${isSelected ? 'border-primary bg-primary/5 shadow-[0_0_0_2px_rgba(0,83,221,0.2)]' : 'border-surface-container bg-surface-lowest hover:border-primary/50'}`}
+                              className={`rounded-xl flex items-center cursor-pointer transition-all border ${sizeClasses.nestedPadding} ${isSelected ? 'border-primary bg-primary/5 shadow-[0_0_0_2px_rgba(0,83,221,0.2)]' : 'border-surface-container bg-surface-lowest hover:border-primary/50'}`}
                             >
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold shrink-0 transition-colors ${isSelected ? 'bg-primary text-white' : 'bg-surface-low text-on-surface/60'}`}>
+                              <div className={`rounded-full flex items-center justify-center font-bold shrink-0 transition-colors ${sizeClasses.nestedCircleSize} ${isSelected ? 'bg-primary text-white' : 'bg-surface-low text-on-surface/60'}`}>
                                 {label}
                               </div>
                               <span
-                                className={`text-base font-medium ${isSelected ? 'text-primary' : 'text-on-surface/80'}`}
+                                className={`font-medium ${isSelected ? 'text-primary' : 'text-on-surface/80'}`}
+                                style={{ fontSize: `${textSize}px` }}
                                 dangerouslySetInnerHTML={{ __html: renderLatex(opt) }}
                               />
                             </div>
@@ -304,7 +357,8 @@ const ExamSimulation: React.FC = () => {
                 <Tag color="blue" className="mb-4 rounded-full border-none font-bold px-3">{currentData.title}</Tag>
               )}
               <div
-                className="prose prose-xl prose-p:text-on-surface/90 prose-p:leading-loose max-w-none text-on-surface text-lg font-medium"
+                className="prose prose-p:text-on-surface/90 prose-p:leading-loose max-w-none text-on-surface font-medium"
+                style={{ fontSize: `${textSize}px` }}
                 dangerouslySetInnerHTML={{ __html: renderLatex(currentData.question) }}
               />
             </div>
@@ -320,7 +374,7 @@ const ExamSimulation: React.FC = () => {
                     key={idx}
                     onClick={() => handleSelectOption(currentData.id, currentData.type, idx)}
                     className={`
-                      p-5 rounded-2xl flex items-center gap-5 cursor-pointer transition-all border-2
+                      rounded-2xl flex items-center cursor-pointer transition-all border-2 ${sizeClasses.containerPadding}
                       ${isSelected
                         ? 'border-primary bg-primary/5 shadow-[0_0_0_3px_rgba(0,83,221,0.15)]'
                         : 'border-surface-container bg-white hover:border-primary/40 hover:bg-primary/[0.02]'
@@ -328,14 +382,15 @@ const ExamSimulation: React.FC = () => {
                     `}
                   >
                     <div className={`
-                      w-11 h-11 flex items-center justify-center font-black text-base shrink-0 transition-colors
+                      flex items-center justify-center font-black shrink-0 transition-colors ${sizeClasses.circleSize}
                       ${currentData.type === 'multiple' ? 'rounded-lg' : 'rounded-full'}
                       ${isSelected ? 'bg-primary text-white' : 'bg-surface-low text-on-surface/60'}
                     `}>
                       {isSelected && currentData.type === 'multiple' ? '✓' : label}
                     </div>
                     <span
-                      className={`text-base font-medium leading-relaxed ${isSelected ? 'text-primary' : 'text-on-surface/80'}`}
+                      className={`font-medium leading-relaxed ${isSelected ? 'text-primary' : 'text-on-surface/80'}`}
+                      style={{ fontSize: `${textSize}px` }}
                       dangerouslySetInnerHTML={{ __html: renderLatex(opt) }}
                     />
                   </div>
@@ -363,7 +418,7 @@ const ExamSimulation: React.FC = () => {
       {/* EXAM FOOTER */}
       <footer className="bg-white border-t border-surface-container p-4 shrink-0 relative z-30">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Button 
+          <Button
             size="large"
             type="text"
             icon={<LeftOutlined />}
@@ -375,7 +430,7 @@ const ExamSimulation: React.FC = () => {
           </Button>
 
           {/* Mobile Peta Soal Trigger */}
-          <Button 
+          <Button
             type="dashed"
             className="sm:hidden font-bold"
             onClick={() => setIsMapVisible(true)}
@@ -384,7 +439,7 @@ const ExamSimulation: React.FC = () => {
             Peta Soal
           </Button>
 
-          <Button 
+          <Button
             size="large"
             type="primary"
             icon={<RightOutlined />}
@@ -407,14 +462,14 @@ const ExamSimulation: React.FC = () => {
         width={320}
       >
         <div className="flex gap-4 items-center mb-6 text-xs text-on-surface/60">
-           <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-primary rounded-full"></div> Selesai</span>
-           <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-yellow-400 rounded-full"></div> Ragu-ragu</span>
-           <span className="flex items-center gap-1.5"><div className="w-3 h-3 border border-surface-container rounded-full"></div> Kosong</span>
+          <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-primary rounded-full"></div> Selesai</span>
+          <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-yellow-400 rounded-full"></div> Ragu-ragu</span>
+          <span className="flex items-center gap-1.5"><div className="w-3 h-3 border border-surface-container rounded-full"></div> Kosong</span>
         </div>
         <div className="grid grid-cols-5 gap-3">
           {questions.map((q, i) => {
             const num = i + 1;
-            
+
             // Check if answered. For nested, must have at least one subquestion answered.
             let isAnswered = false;
             if (q.type === 'nested' && q.sub_questions) {
@@ -425,7 +480,7 @@ const ExamSimulation: React.FC = () => {
 
             const isDoubtful = doubtfulQuestions[q.id];
             const isCurrent = currentQuestionIndex === i;
-            
+
             return (
               <button
                 key={q.id}
@@ -436,9 +491,9 @@ const ExamSimulation: React.FC = () => {
                 className={`
                   aspect-square rounded-xl flex items-center justify-center font-bold text-sm transition-all
                   ${isCurrent ? 'ring-2 ring-primary scale-110 shadow-md' : ''}
-                  ${isDoubtful ? 'bg-yellow-400 text-yellow-900 border-yellow-500' 
-                    : isAnswered ? 'bg-primary text-white border-primary' 
-                    : 'bg-white text-on-surface border border-surface-container hover:bg-surface-low'
+                  ${isDoubtful ? 'bg-yellow-400 text-yellow-900 border-yellow-500'
+                    : isAnswered ? 'bg-primary text-white border-primary'
+                      : 'bg-white text-on-surface border border-surface-container hover:bg-surface-low'
                   }
                 `}
               >
@@ -460,7 +515,7 @@ const ExamSimulation: React.FC = () => {
       >
         <div className="text-center py-6">
           <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
-             <WarningOutlined className="text-red-500 text-3xl" />
+            <WarningOutlined className="text-red-500 text-3xl" />
           </div>
           <Title level={4} className="!font-black !font-manrope mb-2">Akhiri Simulasi?</Title>
           <Paragraph className="text-on-surface/60 mb-8">
