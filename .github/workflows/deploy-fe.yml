@@ -33,6 +33,7 @@ jobs:
         REACT_APP_SECRET_BACKEND: ${{ secrets.REACT_APP_SECRET_BACKEND }}
         REACT_APP_OAUTH_CLIENT_ID: ${{ secrets.REACT_APP_OAUTH_CLIENT_ID }}
         REACT_APP_OAUTH_REDIRECT: ${{ secrets.REACT_APP_OAUTH_REDIRECT }}
+        
       run: npm run build
 
     - name: Copy Build to VPS
