@@ -12,6 +12,8 @@ import (
 
 func InitRouting(e *echo.Echo) {
 	e.Static("/uploads", "uploads")
+	e.GET("/sitemap.xml", controller.GenerateSitemap)
+
 	// Swagger Endpoint with Basic Auth
 	swaggerGroup := e.Group("/swagger")
 	swaggerGroup.Use(echoMiddleware.BasicAuth(func(username, password string, c echo.Context) (bool, error) {

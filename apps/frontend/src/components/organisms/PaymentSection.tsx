@@ -1,16 +1,16 @@
 import React from 'react';
 import { Typography, Card, Button, Badge, Space } from 'antd';
-import { 
-  CopyOutlined, 
-  WhatsAppOutlined, 
-  UserOutlined, 
-  PhoneOutlined, 
-  MailOutlined, 
+import {
+  CopyOutlined,
+  WhatsAppOutlined,
+  UserOutlined,
+  PhoneOutlined,
+  MailOutlined,
   ShoppingOutlined,
   QrcodeOutlined,
   InfoCircleOutlined
 } from '@ant-design/icons';
-import qrisPlaceholder from '../../assets/qris-placeholder.png';
+import qrisPlaceholder from '../../assets/qris-placeholder.jpeg';
 
 const { Title, Text } = Typography;
 
