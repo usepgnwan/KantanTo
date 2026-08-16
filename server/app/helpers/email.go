@@ -13,6 +13,7 @@ import (
 	"gopkg.in/gomail.v2"
 )
 
+// tes
 // cleanEnv membersihkan tanda kutip dan spasi dari nilai environment variable
 func cleanEnv(key string) string {
 	val := os.Getenv(key)
@@ -97,5 +98,3 @@ func SendEmail(to string, subject string, body string) error {
 	writeEmailLog("SUCCESS", fmt.Sprintf("Email sent to %s | Subject: %s", to, subject))
 	return nil
 }
-
-
