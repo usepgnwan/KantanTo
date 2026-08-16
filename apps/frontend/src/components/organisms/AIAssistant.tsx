@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Input, Modal, Typography, message, Tooltip } from 'antd';
-import { RobotOutlined, SendOutlined, CloseOutlined } from '@ant-design/icons';
+import { RobotOutlined, SendOutlined, CloseOutlined, FastForwardOutlined } from '@ant-design/icons';
 import axios from 'axios';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 
 const { Text } = Typography;
 
@@ -9,9 +11,46 @@ interface AIAssistantProps {
   onApply: (content: string) => void;
 }
 
-const backendUrl = process.env.REACT_APP_LINK_BACKEND?.replace('/api', '') || 'http://127.0.0.1:3026';
-
+const backendUrl = process.env.REACT_APP_LINK_BACKEND || 'http://127.0.0.1:3026/api';
 const secretKey = process.env.REACT_APP_SECRET_BACKEND || 'Z9ToSwagger1413999';
+
+const renderPreviewContent = (html: string): string => {
+  if (!html) return '';
+  
+  let processedHtml = html;
+
+  // 1. Convert Quill formula spans (<span class="ql-formula" data-value="..."></span>)
+  processedHtml = processedHtml.replace(/<span[^>]*class="ql-formula"[^>]*data-value="([^"]+)"[^>]*>.*?<\/span>/g, (match, latex) => {
+    try {
+      const decodedLatex = latex.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+      return katex.renderToString(decodedLatex, { throwOnError: false, displayMode: false });
+    } catch (e) {
+      return match;
+    }
+  });
+
+  // 2. Convert Block Markdown Math $$ ... $$
+  processedHtml = processedHtml.replace(/\$\$([\s\S]+?)\$\$/g, (match, latex) => {
+    try {
+      const decodedLatex = latex.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+      return `<div class="my-3 flex justify-center overflow-x-auto">${katex.renderToString(decodedLatex, { throwOnError: false, displayMode: true })}</div>`;
+    } catch (e) {
+      return match;
+    }
+  });
+
+  // 3. Convert Inline Markdown Math $ ... $
+  processedHtml = processedHtml.replace(/\$([^$\n]+?)\$/g, (match, latex) => {
+    try {
+      const decodedLatex = latex.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+      return katex.renderToString(decodedLatex, { throwOnError: false, displayMode: false });
+    } catch (e) {
+      return match;
+    }
+  });
+
+  return processedHtml;
+};
 
 const AIAssistant: React.FC<AIAssistantProps> = ({ onApply }) => {
   const [open, setOpen] = useState(false);
@@ -26,13 +65,27 @@ const AIAssistant: React.FC<AIAssistantProps> = ({ onApply }) => {
     if (isTyping && aiResponse) {
       let i = 0;
       const interval = setInterval(() => {
-        setDisplayedResponse(aiResponse.slice(0, i + 1));
+        // Fast-forward past complete HTML tags so HTML structure remains valid during typing
+        if (aiResponse[i] === '<') {
+          const closeIndex = aiResponse.indexOf('>', i);
+          if (closeIndex !== -1) {
+            i = closeIndex;
+          }
+        } else if (aiResponse[i] === '&') {
+          const semiIndex = aiResponse.indexOf(';', i);
+          if (semiIndex !== -1 && semiIndex - i < 10) {
+            i = semiIndex;
+          }
+        }
+
         i++;
-        if (i === aiResponse.length) {
+        setDisplayedResponse(aiResponse.slice(0, i));
+
+        if (i >= aiResponse.length) {
           clearInterval(interval);
           setIsTyping(false);
         }
-      }, 15); // Kecepatan ngetik
+      }, 15); // Typing speed
       return () => clearInterval(interval);
     }
   }, [isTyping, aiResponse]);
@@ -64,7 +117,7 @@ Berikut adalah permintaan user:
 ${prompt}`;
 
       const response = await axios.post(
-        `${backendUrl}/api/ai/chat`,
+        `${backendUrl.replace(/\/+$/, '')}/ai/chat`,
         { prompt: systemPrompt },
         { 
           headers: { 
@@ -116,7 +169,7 @@ ${prompt}`;
         open={open}
         onCancel={handleClose}
         footer={null}
-        width={450}
+        width={550}
         closeIcon={<CloseOutlined />}
         style={{
           top: 'auto',
@@ -154,9 +207,17 @@ ${prompt}`;
             </>
           ) : (
             <div className="flex flex-col">
-              <div className="bg-surface-low/30 dark:bg-zinc-800/50 rounded-xl p-4 mb-4 text-sm whitespace-pre-wrap font-sans text-on-surface/80 dark:text-zinc-300 max-h-[350px] overflow-y-auto">
-                {displayedResponse}
-                {isTyping && <span className="animate-pulse font-bold text-indigo-500">|</span>}
+              {/* Rendered HTML Container */}
+              <div className="ai-rendered-preview bg-white dark:bg-zinc-800/90 border border-indigo-100 dark:border-zinc-700/60 rounded-2xl p-5 mb-4 text-sm font-sans text-on-surface/90 dark:text-zinc-200 max-h-[380px] overflow-y-auto shadow-inner leading-relaxed">
+                <div 
+                  className="ai-content-body inline"
+                  dangerouslySetInnerHTML={{ __html: renderPreviewContent(displayedResponse) }} 
+                />
+                {isTyping && (
+                  <span className="inline-block animate-pulse font-bold text-indigo-500 text-base ml-1">
+                    ●
+                  </span>
+                )}
               </div>
               
               <div className="flex gap-2">
@@ -167,6 +228,18 @@ ${prompt}`;
                 >
                   Tanya Ulang
                 </Button>
+                {isTyping && (
+                  <Button
+                    icon={<FastForwardOutlined />}
+                    onClick={() => {
+                      setDisplayedResponse(aiResponse);
+                      setIsTyping(false);
+                    }}
+                    className="rounded-xl h-11 px-4 text-indigo-600 border-indigo-200 hover:border-indigo-400"
+                  >
+                    Lewati
+                  </Button>
+                )}
                 <Button 
                   type="primary" 
                   onClick={() => { 
@@ -197,6 +270,22 @@ ${prompt}`;
             animation-timing-function: cubic-bezier(0,0,0.2,1);
           }
         }
+        .ai-rendered-preview h1 { font-size: 1.35rem; font-weight: 800; margin: 0.75rem 0 0.4rem 0; color: #1e1b4b; line-height: 1.3; }
+        .ai-rendered-preview h2 { font-size: 1.2rem; font-weight: 700; margin: 0.65rem 0 0.35rem 0; color: #312e81; line-height: 1.35; }
+        .ai-rendered-preview h3 { font-size: 1.05rem; font-weight: 700; margin: 0.55rem 0 0.3rem 0; color: #3730a3; line-height: 1.4; }
+        .ai-rendered-preview p { margin-bottom: 0.6rem; line-height: 1.6; }
+        .ai-rendered-preview ul { list-style-type: disc; padding-left: 1.4rem; margin-bottom: 0.6rem; }
+        .ai-rendered-preview ol { list-style-type: decimal; padding-left: 1.4rem; margin-bottom: 0.6rem; }
+        .ai-rendered-preview li { margin-bottom: 0.2rem; line-height: 1.5; }
+        .ai-rendered-preview table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.85rem; }
+        .ai-rendered-preview th, .ai-rendered-preview td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; }
+        .ai-rendered-preview th { background-color: #f8fafc; font-weight: 600; color: #1e293b; }
+        .ai-rendered-preview .ql-align-center { text-align: center; }
+        .ai-rendered-preview .ql-align-right { text-align: right; }
+        .ai-rendered-preview .ql-align-justify { text-align: justify; }
+        .ai-rendered-preview blockquote { border-left: 3px solid #6366f1; padding-left: 0.75rem; margin: 0.6rem 0; color: #4b5563; font-style: italic; }
+        .ai-rendered-preview strong { font-weight: 700; color: #0f172a; }
+        .ai-rendered-preview code { background-color: #f1f5f9; padding: 2px 5px; border-radius: 4px; font-family: monospace; font-size: 0.85em; color: #4338ca; }
       `}</style>
     </>
   );
