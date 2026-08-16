@@ -17,94 +17,51 @@ import {
 import { getArtikel, createArtikel, updateArtikel, deleteArtikel, Artikel } from '../../services/artikelService';
 import { getCategories } from '../../services/categoryService';
 import { useAuth } from '../../context/AuthContext';
+import KantanEditor from '../../components/atoms/KantanEditor';
+import AIAssistant from '../../components/organisms/AIAssistant';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 
 const { Title, Text, Paragraph } = Typography;
 const backendUrl = process.env.REACT_APP_LINK_BACKEND?.replace('/api', '') || 'http://127.0.0.1:3026';
 
-// ─── KaTeX helper ─────────────────────────────────────────────
-declare global { interface Window { katex?: any; renderMathInElement?: any; } }
-const renderKaTeX = (latex: string, displayMode = false): string => {
-  if (window.katex) {
-    try { return window.katex.renderToString(latex, { displayMode, throwOnError: false }); }
-    catch { return latex; }
-  }
-  return `<span class="katex-placeholder font-mono bg-blue-50 text-blue-700 px-1 rounded text-sm">${displayMode ? '$$' : '$'}${latex}${displayMode ? '$$' : '$'}</span>`;
+const renderPreviewContent = (html: string) => {
+  if (!html) return html;
+  
+  let processedHtml = html;
+
+  // 1. Convert Quill formula spans
+  processedHtml = processedHtml.replace(/<span[^>]*class="ql-formula"[^>]*data-value="([^"]+)"[^>]*>.*?<\/span>/g, (match, latex) => {
+    try {
+      const decodedLatex = latex.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+      return katex.renderToString(decodedLatex, { throwOnError: false, displayMode: false });
+    } catch (e) {
+      return match;
+    }
+  });
+
+  // 2. Convert Block Markdown Math $$ ... $$
+  processedHtml = processedHtml.replace(/\$\$([\s\S]+?)\$\$/g, (match, latex) => {
+    try {
+      const decodedLatex = latex.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+      return `<div class="my-4 flex justify-center overflow-x-auto">${katex.renderToString(decodedLatex, { throwOnError: false, displayMode: true })}</div>`;
+    } catch (e) {
+      return match;
+    }
+  });
+
+  // 3. Convert Inline Markdown Math $ ... $
+  processedHtml = processedHtml.replace(/\$([^$\n]+?)\$/g, (match, latex) => {
+    try {
+      const decodedLatex = latex.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+      return katex.renderToString(decodedLatex, { throwOnError: false, displayMode: false });
+    } catch (e) {
+      return match;
+    }
+  });
+
+  return processedHtml;
 };
-
-const renderContent = (raw: string): string =>
-  raw
-    .replace(/\$\$([^$]+)\$\$/g, (_, latex) => `<div class="my-4 flex justify-center overflow-x-auto">${renderKaTeX(latex, true)}</div>`)
-    .replace(/\$([^$\n]+)\$/g, (_, latex) => renderKaTeX(latex, false))
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/_(.+?)_/g, '<em>$1</em>')
-    .replace(/^### (.+)$/gm, '<h3 class="text-xl font-black font-manrope mt-6 mb-3">$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2 class="text-2xl font-black font-manrope mt-8 mb-4">$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1 class="text-3xl font-black font-manrope mt-10 mb-4">$1</h1>')
-    .replace(/^- (.+)$/gm, '<li class="ml-6 mb-1 list-disc">$1</li>')
-    .replace(/^(\d+)\. (.+)$/gm, '<li class="ml-6 mb-1 list-decimal">$2</li>')
-    .replace(/`(.+?)`/g, '<code class="bg-surface-low dark:bg-zinc-800 px-1.5 py-0.5 rounded text-sm font-mono text-primary">$1</code>')
-    .replace(/\n{2,}/g, '</p><p class="mb-4 leading-loose">');
-
-// ─── Math Modal ───────────────────────────────────────────────
-const MathModal: React.FC<{ open: boolean; onInsert: (tex: string, block: boolean) => void; onClose: () => void }> = ({ open, onInsert, onClose }) => {
-  const [latex, setLatex] = useState('');
-  const [isBlock, setIsBlock] = useState(false);
-  const [preview, setPreview] = useState('');
-  useEffect(() => { if (latex) setPreview(renderKaTeX(latex, isBlock)); }, [latex, isBlock]);
-  const commonFormulas = [
-    { label: 'Pecahan', tex: '\\frac{a}{b}' }, { label: 'Akar', tex: '\\sqrt{x}' },
-    { label: 'Pangkat', tex: 'x^{n}' }, { label: 'Sigma', tex: '\\sum_{i=1}^{n} x_i' },
-    { label: 'Integral', tex: '\\int_{a}^{b} f(x)\\,dx' }, { label: 'Limit', tex: '\\lim_{x \\to \\infty} f(x)' },
-    { label: 'Log', tex: '\\log_{a}(b)' }, { label: 'Pi', tex: '\\pi r^2' },
-  ];
-  return (
-    <Modal open={open} onCancel={onClose} title={<div className="flex items-center gap-2 font-manrope font-black"><FunctionOutlined className="text-primary" /> Sisipkan Rumus Matematika (LaTeX)</div>}
-      footer={[
-        <Button key="cancel" onClick={onClose}>Batal</Button>,
-        <Button key="insert" type="primary" icon={<CheckCircleOutlined />}
-          onClick={() => { if (latex.trim()) { onInsert(latex.trim(), isBlock); onClose(); setLatex(''); } }}
-          className="rounded-xl font-bold shadow-md shadow-primary/20">Sisipkan Rumus</Button>,
-      ]} width={640}>
-      <div className="space-y-4 py-2">
-        <div>
-          <Text className="block text-xs uppercase font-black tracking-widest text-on-surface/40 mb-2">Template Cepat</Text>
-          <div className="flex flex-wrap gap-2">
-            {commonFormulas.map((f) => (
-              <button key={f.label} onClick={() => setLatex(f.tex)}
-                className="px-3 py-1 rounded-full bg-primary/10 text-primary font-bold text-xs hover:bg-primary/20 transition-all border border-primary/20">{f.label}</button>
-            ))}
-          </div>
-        </div>
-        <div>
-          <Text className="block text-xs uppercase font-black tracking-widest text-on-surface/40 mb-2">Kode LaTeX</Text>
-          <Input.TextArea rows={3} value={latex} onChange={(e) => setLatex(e.target.value)}
-            placeholder="\frac{-b \pm \sqrt{b^2 - 4ac}}{2a}" className="rounded-xl font-mono text-sm" />
-        </div>
-        <div className="flex items-center gap-3">
-          <Switch size="small" checked={isBlock} onChange={setIsBlock} />
-          <Text className="text-sm font-bold">Tampilan Block (di baris sendiri)</Text>
-        </div>
-        {latex && (
-          <div>
-            <Text className="block text-xs uppercase font-black tracking-widest text-on-surface/40 mb-2">Pratinjau</Text>
-            <div className="p-4 rounded-2xl bg-surface-low dark:bg-zinc-800 border border-on-surface/10 overflow-x-auto min-h-[60px] flex items-center justify-center"
-              dangerouslySetInnerHTML={{ __html: `<p class="mb-0">${preview}</p>` }} />
-          </div>
-        )}
-      </div>
-    </Modal>
-  );
-};
-
-// ─── Toolbar Button ───────────────────────────────────────────
-const ToolBtn: React.FC<{ icon: React.ReactNode; label: string; onClick: () => void }> = ({ icon, label, onClick }) => (
-  <Tooltip title={label} mouseEnterDelay={0.5}>
-    <button onClick={onClick}
-      className="w-8 h-8 rounded-lg flex items-center justify-center text-sm transition-all text-on-surface/60 hover:bg-surface-low dark:hover:bg-zinc-700 hover:text-on-surface">
-      {icon}
-    </button>
-  </Tooltip>
-);
 
 // ─── Main Component ───────────────────────────────────────────
 const AdminMaterialForm: React.FC = () => {
@@ -123,7 +80,6 @@ const AdminMaterialForm: React.FC = () => {
   const [form] = Form.useForm();
   const [body, setBody] = useState('');
   const [previewMode, setPreviewMode] = useState(false);
-  const [mathModalOpen, setMathModalOpen] = useState(false);
   const [saved, setSaved] = useState(false);
 
   // File states
@@ -131,8 +87,6 @@ const AdminMaterialForm: React.FC = () => {
   const [thumbnailPreview, setThumbnailPreview] = useState<string>('');
   const [berkasFile, setBerkasFile] = useState<File | null>(null);
   const [berkasName, setBerkasName] = useState<string>('');
-
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ─── Fetch data ────────────────────────────────────────────
   const fetchData = useCallback(async () => {
@@ -250,47 +204,7 @@ const AdminMaterialForm: React.FC = () => {
   };
 
   // ─── Editor helpers ────────────────────────────────────────
-  const insertAtCursor = useCallback((before: string, after = '') => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    const selected = body.substring(start, end);
-    const newBody = body.substring(0, start) + before + selected + after + body.substring(end);
-    setBody(newBody);
-    setTimeout(() => { ta.focus(); ta.setSelectionRange(start + before.length, start + before.length + selected.length); }, 0);
-  }, [body]);
-
-  const insertMath = (tex: string, block: boolean) => {
-    if (block) { insertAtCursor('\n\n$$' + tex + '$$\n\n'); }
-    else {
-      insertAtCursor('$', '$');
-      const ta = textareaRef.current;
-      if (!ta) return;
-      const cursor = ta.selectionStart;
-      setBody(prev => prev.substring(0, cursor) + tex + prev.substring(cursor));
-    }
-  };
-
-  useEffect(() => {
-    if (previewMode && window.renderMathInElement) {
-      setTimeout(() => {
-        const el = document.getElementById('material-preview');
-        if (el) window.renderMathInElement(el, { delimiters: [{ left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false }] });
-      }, 100);
-    }
-  }, [previewMode, body]);
-
-  const toolbar = [
-    { icon: <BoldOutlined />, label: 'Bold (**text**)', action: () => insertAtCursor('**', '**') },
-    { icon: <ItalicOutlined />, label: 'Italic (_text_)', action: () => insertAtCursor('_', '_') },
-    { icon: <UnderlineOutlined />, label: 'Heading ##', action: () => insertAtCursor('\n## ', '') },
-    { icon: <OrderedListOutlined />, label: 'Ordered list', action: () => insertAtCursor('\n1. ', '') },
-    { icon: <UnorderedListOutlined />, label: 'Unordered list', action: () => insertAtCursor('\n- ', '') },
-    { icon: <CodeOutlined />, label: 'Inline kode', action: () => insertAtCursor('`', '`') },
-    { icon: <AlignCenterOutlined />, label: 'Heading ###', action: () => insertAtCursor('\n### ', '') },
-    { icon: <FunctionOutlined />, label: 'Rumus Matematika', action: () => setMathModalOpen(true) },
-  ];
+  // No longer needed, KantanEditor handles it.
 
   // ─── LIST VIEW ─────────────────────────────────────────────
   if (view === 'list') {
@@ -463,28 +377,13 @@ const AdminMaterialForm: React.FC = () => {
                 </Card>
 
                 {/* Rich Editor */}
-                <Card className="weightless-card border-none bg-white dark:bg-zinc-900 shadow-md p-0 overflow-hidden">
-                  <div className="flex items-center gap-1 flex-wrap px-4 py-3 border-b border-on-surface/5 dark:border-white/5 bg-surface-low/50 dark:bg-zinc-800/50">
-                    {toolbar.map((t, i) => (
-                      <React.Fragment key={i}>
-                        {i === 7 && <div className="w-px h-5 bg-on-surface/10 dark:bg-white/10 mx-1" />}
-                        <ToolBtn icon={t.icon} label={t.label} onClick={t.action} />
-                      </React.Fragment>
-                    ))}
-                    <div className="ml-auto flex items-center gap-1">
-                      <Tag className="rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 border-none font-bold text-[10px] px-2">Markdown + LaTeX</Tag>
-                    </div>
-                  </div>
-                  <textarea ref={textareaRef} value={body}
-                    onChange={(e) => { setBody(e.target.value); setSaved(false); }}
-                    className="w-full bg-white dark:bg-zinc-900 text-on-surface dark:text-zinc-100 font-sans text-base p-8 outline-none resize-none leading-relaxed"
-                    style={{ minHeight: '500px' }}
-                    placeholder={"Tulis artikel blog Anda di sini...\n\nGunakan **bold**, _italic_, ## heading"} />
-                  <div className="px-4 py-2 border-t border-on-surface/5 dark:border-white/5 bg-surface-low/30 dark:bg-zinc-800/30 flex flex-wrap gap-3">
-                    {['**bold**', '_italic_', '## Heading', '`kode`', '$rumus$', '$$blok$$', '- list'].map((hint) => (
-                      <code key={hint} className="text-[10px] text-on-surface/40 font-mono">{hint}</code>
-                    ))}
-                  </div>
+                <Card className="weightless-card border-none bg-white dark:bg-zinc-900 shadow-md p-4 overflow-hidden">
+                  <KantanEditor
+                    value={body}
+                    onChange={(val) => { setBody(val); setSaved(false); }}
+                    placeholder="Tulis artikel blog Anda di sini..."
+                    rows={12}
+                  />
                 </Card>
 
                 {/* Thumbnail Upload */}
@@ -575,8 +474,8 @@ const AdminMaterialForm: React.FC = () => {
                       </Text>
                       <Divider className="border-on-surface/10 mb-6" />
                       <div id="material-preview"
-                        className="prose prose-lg dark:prose-invert max-w-none font-sans text-on-surface/80 dark:text-zinc-300 leading-loose"
-                        dangerouslySetInnerHTML={{ __html: `<p class="mb-4 leading-loose">${renderContent(body)}</p>` }} />
+                        className="prose prose-lg dark:prose-invert max-w-none font-sans text-on-surface/80 dark:text-zinc-300 leading-loose kantan-quill kantan-quill-preview"
+                        dangerouslySetInnerHTML={{ __html: renderPreviewContent(body) }} />
                     </div>
                   </Card>
                 </div>
@@ -585,8 +484,14 @@ const AdminMaterialForm: React.FC = () => {
           </Row>
         </div>
       </div>
-
-      <MathModal open={mathModalOpen} onInsert={insertMath} onClose={() => setMathModalOpen(false)} />
+      
+      {/* AI Assistant Floating Button */}
+      {view === 'editor' && (
+        <AIAssistant onApply={(content) => {
+          setBody(content);
+          setSaved(false);
+        }} />
+      )}
     </AdminLayout>
   );
 };

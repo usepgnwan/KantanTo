@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Typography, Row, Col, Card, Tag, Space, Button, Empty, Spin } from 'antd';
-import { UserOutlined, CheckCircleFilled } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { UserOutlined, CheckCircleFilled, ArrowRightOutlined, StarFilled } from '@ant-design/icons';
+import { useNavigate, Link } from 'react-router-dom';
 
 import AppLayout from '../layouts/AppLayout';
 import HeroSection from '../components/organisms/HeroSection';
@@ -13,9 +13,11 @@ import ContactForm from '../components/organisms/ContactForm';
 import FloatingWhatsApp from '../components/atoms/FloatingWhatsApp';
 
 import { getPackages, PackageListItem } from '../services/packageService';
+import { getArtikel, Artikel } from '../services/artikelService';
 import { recordMenuLogAPI } from '../services/logService';
 import { useAuth } from '../context/AuthContext';
 
+const backendUrl = process.env.REACT_APP_LINK_BACKEND?.replace('/api', '') || 'http://127.0.0.1:3026';
 const { Title, Paragraph, Text } = Typography;
 
 const IndexPage: React.FC = () => {
@@ -23,6 +25,9 @@ const IndexPage: React.FC = () => {
   const { user } = useAuth();
   const [packages, setPackages] = useState<PackageListItem[]>([]);
   const [loadingPackages, setLoadingPackages] = useState(true);
+
+  const [blogs, setBlogs] = useState<Artikel[]>([]);
+  const [loadingBlogs, setLoadingBlogs] = useState(true);
 
   const handlePackageClick = (pkg: PackageListItem) => {
     const device = window.innerWidth < 768 ? 'mobile' : 'web';
@@ -53,6 +58,19 @@ const IndexPage: React.FC = () => {
         if (mounted) {
           setLoadingPackages(false);
         }
+      });
+
+    getArtikel(1, 5, '', 'publish')
+      .then((res) => {
+        if (mounted) {
+          setBlogs(res.list?.rows || []);
+        }
+      })
+      .catch(() => {
+        if (mounted) setBlogs([]);
+      })
+      .finally(() => {
+        if (mounted) setLoadingBlogs(false);
       });
 
     return () => {
@@ -147,6 +165,89 @@ const IndexPage: React.FC = () => {
         </div>
       </section>
 
+      {/* Top 5 Blogs Section */}
+      <section className="py-24 bg-white dark:bg-zinc-900 transition-colors duration-500">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-12 sm:mb-16 gap-6">
+            <div>
+              <Text className="text-[10px] uppercase font-black tracking-[0.3em] text-primary block mb-3 sm:mb-4">Kantan Insight</Text>
+              <Title level={2} className="!text-3xl sm:!text-4xl !font-manrope !m-0">Artikel &amp; Berita Terbaru</Title>
+            </div>
+            <Button type="link" onClick={() => navigate('/blog')} className="hidden sm:flex font-bold px-0 text-base h-auto">
+              Lihat Semua Artikel <ArrowRightOutlined />
+            </Button>
+          </div>
+
+          <Spin spinning={loadingBlogs}>
+            {blogs.length > 0 ? (
+              <Row gutter={[32, 32]}>
+                {/* Headline (1st post) */}
+                <Col xs={24} lg={12}>
+                  <Card 
+                    className="border-none group overflow-hidden rounded-[24px] sm:rounded-[32px] shadow-xl hover:shadow-2xl transition-all shadow-primary/5 bg-surface-low/30 h-full p-0 cursor-pointer flex flex-col" 
+                    bodyStyle={{ padding: 0, flex: 1, display: 'flex', flexDirection: 'column' }}
+                    onClick={() => navigate(`/blog/${blogs[0].slug}`)}
+                  >
+                    <div className="aspect-video sm:aspect-[16/10] overflow-hidden relative shrink-0">
+                      <img src={blogs[0].thumbnail ? `${backendUrl}${blogs[0].thumbnail}` : 'https://images.unsplash.com/photo-1434031211128-095490e7e7e9?auto=format&fit=crop&q=80&w=800'} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" alt={blogs[0].judul} />
+                      <div className="absolute top-4 left-4 bg-yellow-400 text-yellow-900 text-[9px] font-black uppercase px-3 py-1 rounded-full flex items-center gap-1 shadow-md">
+                        <StarFilled className="text-[8px]" /> Terbaru
+                      </div>
+                    </div>
+                    <div className="p-6 sm:p-8 flex flex-col flex-1">
+                      <Tag className="rounded-full bg-primary/10 text-primary border-none font-bold text-[9px] px-3 uppercase tracking-tighter mb-4 w-fit">
+                        {blogs[0].category?.title || 'Umum'}
+                      </Tag>
+                      <Title level={3} className="!font-manrope !font-black !mb-4 leading-tight group-hover:text-primary transition-colors line-clamp-2">
+                        {blogs[0].judul}
+                      </Title>
+                      <Paragraph className="text-on-surface/60 line-clamp-2 sm:line-clamp-3 mb-0 text-sm sm:text-base">
+                        {blogs[0].deskripsi}
+                      </Paragraph>
+                    </div>
+                  </Card>
+                </Col>
+                
+                {/* 4 other posts */}
+                <Col xs={24} lg={12}>
+                  <div className="flex flex-col gap-4 sm:gap-6 h-full justify-start">
+                    {blogs.slice(1, 5).map(post => (
+                      <div key={post.id} className="flex gap-3 sm:gap-5 group cursor-pointer bg-white dark:bg-zinc-800/50 p-2 sm:p-3 rounded-2xl sm:rounded-[20px] hover:shadow-lg transition-all" onClick={() => navigate(`/blog/${post.slug}`)}>
+                        <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl sm:rounded-2xl overflow-hidden shrink-0">
+                          <img src={post.thumbnail ? `${backendUrl}${post.thumbnail}` : 'https://images.unsplash.com/photo-1434031211128-095490e7e7e9?auto=format&fit=crop&q=80&w=800'} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={post.judul} />
+                        </div>
+                        <div className="flex flex-col justify-center flex-1 py-1 sm:py-2 pr-2">
+                          <Space className="mb-1 sm:mb-2 flex-wrap gap-y-1">
+                            <Text className="text-[9px] sm:text-[10px] text-primary font-black uppercase tracking-widest bg-primary/10 px-2 py-0.5 rounded-md">
+                              {post.category?.title || 'Umum'}
+                            </Text>
+                            <Text className="text-[9px] sm:text-[10px] text-on-surface/40 font-bold">
+                              {new Date(post.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </Text>
+                          </Space>
+                          <Title level={5} className="!font-manrope !font-black !m-0 !text-sm sm:!text-base group-hover:text-primary transition-colors line-clamp-2 leading-snug">
+                            {post.judul}
+                          </Title>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Col>
+              </Row>
+            ) : (
+              <Empty description="Belum ada artikel" />
+            )}
+            
+            {/* Mobile View All Button */}
+            <div className="mt-8 text-center sm:hidden">
+              <Button type="primary" block className="h-12 rounded-xl font-bold shadow-md shadow-primary/20" onClick={() => navigate('/blog')}>
+                Lihat Semua Artikel
+              </Button>
+            </div>
+          </Spin>
+        </div>
+      </section>
+
       <CustomerReviews />
       
       <ContactForm />
@@ -155,7 +256,7 @@ const IndexPage: React.FC = () => {
       <section className="py-24 bg-gradient-to-br from-primary to-primary-container text-white relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl translate-x-1/2 -translate-y-1/2" />
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center z-10 py-20">
-          <Title level={2} className="!text-white !text-3xl md:!text-5xl mb-8">Siap Bersaing di SNBT {new Date().getFullYear()}?</Title>
+          <Title level={2} className="!text-white !text-3xl md:!text-5xl mb-8">Mulai Tryout Saat Ini</Title>
           <Paragraph className="text-white/80 text-lg mb-10 max-w-2xl mx-auto">
             Bergabunglah dengan ribuan pejuang PTN lainnya dan mulailah latihan intensif hari ini.
           </Paragraph>
