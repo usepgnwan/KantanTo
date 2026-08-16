@@ -37,3 +37,4 @@ pnpm-debug.log*
 .cache/
 .npm/
 .pnpm-store/
+/build
