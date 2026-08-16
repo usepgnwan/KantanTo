@@ -7,7 +7,7 @@ import { getArtikel, Artikel } from '../services/artikelService';
 
 const { Title, Text, Paragraph } = Typography;
 
-const backendUrl = process.env.REACT_APP_LINK_BACKEND?.replace('/api', '') || 'http://127.0.0.1:3026';
+const backendUrl = process.env.REACT_APP_LINK_BACKEND?.replace(/\/api\/?$/, '') || 'http://127.0.0.1:3026';
 
 const BlogPage: React.FC = () => {
   const [posts, setPosts] = useState<Artikel[]>([]);

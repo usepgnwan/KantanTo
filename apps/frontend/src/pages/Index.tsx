@@ -17,7 +17,7 @@ import { getArtikel, Artikel } from '../services/artikelService';
 import { recordMenuLogAPI } from '../services/logService';
 import { useAuth } from '../context/AuthContext';
 
-const backendUrl = process.env.REACT_APP_LINK_BACKEND?.replace('/api', '') || 'http://127.0.0.1:3026';
+const backendUrl = process.env.REACT_APP_LINK_BACKEND?.replace(/\/api\/?$/, '') || 'http://127.0.0.1:3026';
 const { Title, Paragraph, Text } = Typography;
 
 const IndexPage: React.FC = () => {

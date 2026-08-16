@@ -8,7 +8,7 @@ import { getArtikelBySlug, Artikel } from '../services/artikelService';
 
 const { Title, Text, Paragraph } = Typography;
 
-const backendUrl = process.env.REACT_APP_LINK_BACKEND?.replace('/api', '') || 'http://127.0.0.1:3026';
+const backendUrl = process.env.REACT_APP_LINK_BACKEND?.replace(/\/api\/?$/, '') || 'http://127.0.0.1:3026';
 
 declare global { interface Window { katex?: any; renderMathInElement?: any; } }
 
