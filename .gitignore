@@ -5,6 +5,10 @@ node_modules/
 # Build outputs
 .next/
 out/
+build/
+dist/
+apps/frontend/build/
+apps/backend/build/
 
 # Environment files
 .env

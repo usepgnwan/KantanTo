@@ -3,6 +3,9 @@ node_modules/
 **/node_modules/
 
 # Build outputs
+
+apps/frontend/build/
+apps/backend/build/
 .next/
 out/
 
@@ -37,4 +40,3 @@ pnpm-debug.log*
 .cache/
 .npm/
 .pnpm-store/
-/build

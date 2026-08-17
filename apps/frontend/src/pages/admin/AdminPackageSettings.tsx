@@ -93,6 +93,108 @@ const normalizeCorrectForType = (type: QuestionType, correct: number | number[] 
   return indexes[0] ?? 0;
 };
 
+// ─── COMPONENT: Sub-Question Editor ─────────────────────────
+interface SubQuestionEditorProps {
+  sub: SubQuestion;
+  index: number;
+  onUpdate: (updatedSub: SubQuestion) => void;
+  onDelete: () => void;
+}
+
+const SubQuestionEditor: React.FC<SubQuestionEditorProps> = React.memo(({
+  sub,
+  index,
+  onUpdate,
+  onDelete,
+}) => (
+  <div className="p-5 bg-white dark:bg-zinc-800/80 rounded-xl border border-on-surface/5 mb-6 relative group shadow-sm">
+    <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center gap-3">
+        <Tag className="rounded-lg bg-primary text-white border-none font-black px-4 py-1">Pertanyaan {index + 1}</Tag>
+        <div className="flex items-center gap-2 px-3 py-1 bg-on-surface/5 rounded-lg border border-on-surface/10">
+          <Text className="text-[10px] font-black uppercase text-on-surface/40">Poin</Text>
+          <InputNumber
+            size="small"
+            min={0}
+            value={sub.points}
+            onChange={val => onUpdate({ ...sub, points: Number(val) || 0 })}
+            className="w-16 rounded-lg font-bold text-xs"
+            controls={false}
+          />
+        </div>
+      </div>
+      <Button
+        danger
+        type="text"
+        icon={<DeleteOutlined />}
+        size="small"
+        className="hover:bg-red-50 dark:hover:bg-red-900/20"
+        onClick={onDelete}
+      />
+    </div>
+
+    <div className="mb-6">
+      <KantanEditor
+        value={sub.question}
+        onChange={val => onUpdate({ ...sub, question: val })}
+        placeholder="Tulis pertanyaan sub-soal di sini..."
+        rows={3}
+        label={`Pertanyaan #${index + 1}`}
+      />
+      {sub.question && (
+        <div className="mt-3 p-3 rounded-lg bg-surface-low/20 dark:bg-zinc-900/30 border border-dashed border-on-surface/10">
+          <div className="prose prose-xs dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: renderContent(sub.question) }} />
+        </div>
+      )}
+    </div>
+
+    <div className="mb-6">
+      <Text className="text-[10px] font-black uppercase text-on-surface/40 block mb-2">Pembahasan Singkat Sub-Soal</Text>
+      <KantanEditor
+        value={sub.discussion}
+        onChange={val => onUpdate({ ...sub, discussion: val })}
+        placeholder="Tulis pembahasan singkat sub-soal di sini..."
+        rows={3}
+        label={`Pembahasan #${index + 1}`}
+      />
+      {sub.discussion && (
+        <div className="mt-3 p-3 rounded-lg bg-green-500/5 dark:bg-green-900/10 border border-green-500/20">
+          <div className="prose prose-xs dark:prose-invert max-w-none text-green-700 dark:text-green-300" dangerouslySetInnerHTML={{ __html: renderContent(sub.discussion) }} />
+        </div>
+      )}
+    </div>
+
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {sub.options.map((opt, oi) => (
+        <div key={oi} className="flex flex-col gap-2">
+          <div className="flex items-start gap-2">
+            <div
+              onClick={() => onUpdate({ ...sub, correct: oi })}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs cursor-pointer border-2 shadow-sm transition-all shrink-0 mt-1
+                ${sub.correct === oi ? 'bg-green-500 border-green-500 text-white' : 'bg-white dark:bg-zinc-700 border-on-surface/10 text-on-surface/40'}`}
+            >
+              {String.fromCharCode(65 + oi)}
+            </div>
+            <KantanEditor
+              value={opt}
+              onChange={val => {
+                const nextOptions = sub.options.map((o, idx) => (idx === oi ? val : o));
+                onUpdate({ ...sub, options: nextOptions });
+              }}
+              placeholder={`Opsi ${String.fromCharCode(65 + oi)}`}
+              rows={2}
+              className="flex-1"
+            />
+          </div>
+          {(opt.includes('$') || opt.includes('<')) && (
+            <div className="ml-10 px-3 py-1 bg-primary/5 rounded-lg border-l-2 border-primary/20 text-[11px] prose-tight" dangerouslySetInnerHTML={{ __html: renderContent(opt) }} />
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
+));
+
 // ─── MAIN COMPONENT ──────────────────────────────────────────
 const AdminPackageSettings: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -390,105 +492,6 @@ const AdminPackageSettings: React.FC = () => {
     });
   };
 
-  // ── COMPONENT: Sub-Question Editor ──
-  const SubQuestionEditor: React.FC<{ sub: SubQuestion, index: number }> = ({ sub, index }) => (
-    <div className="p-5 bg-white dark:bg-zinc-800/80 rounded-xl border border-on-surface/5 mb-6 relative group shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <Tag className="rounded-lg bg-primary text-white border-none font-black px-4 py-1">Pertanyaan {index + 1}</Tag>
-          <div className="flex items-center gap-2 px-3 py-1 bg-on-surface/5 rounded-lg border border-on-surface/10">
-            <Text className="text-[10px] font-black uppercase text-on-surface/40">Poin</Text>
-            <InputNumber
-              size="small"
-              min={0}
-              value={sub.points}
-              onChange={val => {
-                const next = activeQ.subQuestions?.map(s => s.id === sub.id ? { ...s, points: Number(val) || 0 } : s);
-                updateActiveQ({ subQuestions: next });
-              }}
-              className="w-16 rounded-lg font-bold text-xs"
-              controls={false}
-            />
-          </div>
-        </div>
-        <Button danger type="text" icon={<DeleteOutlined />} size="small" className="hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => {
-          updateActiveQ({ subQuestions: activeQ.subQuestions?.filter(s => s.id !== sub.id) });
-        }} />
-      </div>
-
-      <div className="mb-6">
-        <KantanEditor
-          value={sub.question}
-          onChange={val => {
-            const next = activeQ.subQuestions?.map(s => s.id === sub.id ? { ...s, question: val } : s);
-            updateActiveQ({ subQuestions: next });
-          }}
-          placeholder="Tulis pertanyaan sub-soal di sini..."
-          rows={3}
-          label={`Pertanyaan #${index + 1}`}
-        />
-        {sub.question && (
-            <div className="mt-3 p-3 rounded-lg bg-surface-low/20 dark:bg-zinc-900/30 border border-dashed border-on-surface/10">
-            <div className="prose prose-xs dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: renderContent(sub.question) }} />
-          </div>
-        )}
-      </div>
-
-      <div className="mb-6">
-        <Text className="text-[10px] font-black uppercase text-on-surface/40 block mb-2">Pembahasan Singkat Sub-Soal</Text>
-        <KantanEditor
-          value={sub.discussion}
-          onChange={val => {
-            const next = activeQ.subQuestions?.map(s => s.id === sub.id ? { ...s, discussion: val } : s);
-            updateActiveQ({ subQuestions: next });
-          }}
-          placeholder="Tulis pembahasan singkat sub-soal di sini..."
-          rows={3}
-          label={`Pembahasan #${index + 1}`}
-        />
-        {sub.discussion && (
-            <div className="mt-3 p-3 rounded-lg bg-green-500/5 dark:bg-green-900/10 border border-dashed border-green-500/20">
-            <div className="prose prose-xs dark:prose-invert max-w-none text-green-700 dark:text-green-300" dangerouslySetInnerHTML={{ __html: renderContent(sub.discussion) }} />
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {sub.options.map((opt, oi) => (
-          <div key={oi} className="flex flex-col gap-2">
-            <div className="flex items-start gap-2">
-              <div
-                onClick={() => {
-                  const next = activeQ.subQuestions?.map(s => s.id === sub.id ? { ...s, correct: oi } : s);
-                  updateActiveQ({ subQuestions: next });
-                }}
-                className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs cursor-pointer border-2 shadow-sm transition-all shrink-0 mt-1
-                  ${sub.correct === oi ? 'bg-green-500 border-green-500 text-white' : 'bg-white dark:bg-zinc-700 border-on-surface/10 text-on-surface/40'}`}
-              >
-                {String.fromCharCode(65 + oi)}
-              </div>
-              <KantanEditor
-                value={opt}
-                onChange={val => {
-                  const next = activeQ.subQuestions?.map(s => s.id === sub.id ? {
-                    ...s, options: s.options.map((o, idx) => idx === oi ? val : o)
-                  } : s);
-                  updateActiveQ({ subQuestions: next });
-                }}
-                placeholder={`Opsi ${String.fromCharCode(65 + oi)}`}
-                rows={2}
-                className="flex-1"
-              />
-            </div>
-            {(opt.includes('$') || opt.includes('<')) && (
-              <div className="ml-10 px-3 py-1 bg-primary/5 rounded-lg border-l-2 border-primary/20 text-[11px] prose-tight" dangerouslySetInnerHTML={{ __html: renderContent(opt) }} />
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
   const tabItems = [
     {
       key: 'soal',
@@ -691,7 +694,18 @@ const AdminPackageSettings: React.FC = () => {
                     </div>
                     <div className="space-y-4">
                       {activeQ.subQuestions?.map((sub, si) => (
-                        <SubQuestionEditor key={sub.id} sub={sub} index={si} />
+                        <SubQuestionEditor
+                          key={sub.id || String(si)}
+                          sub={sub}
+                          index={si}
+                          onUpdate={updatedSub => {
+                            const next = (activeQ.subQuestions || []).map(s => s.id === sub.id ? updatedSub : s);
+                            updateActiveQ({ subQuestions: next });
+                          }}
+                          onDelete={() => {
+                            updateActiveQ({ subQuestions: activeQ.subQuestions?.filter(s => s.id !== sub.id) });
+                          }}
+                        />
                       ))}
                     </div>
                   </div>
