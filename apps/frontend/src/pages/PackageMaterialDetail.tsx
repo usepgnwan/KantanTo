@@ -220,7 +220,7 @@ const PackageMaterialDetailPage: React.FC = () => {
                           <div
                             id="materi-content"
                             className="prose prose-lg dark:prose-invert max-w-none font-sans text-on-surface/80 dark:text-zinc-300"
-                            dangerouslySetInnerHTML={{ __html: `<p class="mb-5 leading-loose">${renderContent(material.content)}</p>` }}
+                            dangerouslySetInnerHTML={{ __html: renderContent(material.content) }}
                           />
 
                           {/* PDF attachments */}

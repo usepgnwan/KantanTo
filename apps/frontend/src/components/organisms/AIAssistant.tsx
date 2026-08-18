@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button, Input, Modal, Typography, message, Tooltip } from 'antd';
 import { RobotOutlined, SendOutlined, CloseOutlined, FastForwardOutlined } from '@ant-design/icons';
 import axios from 'axios';
-import katex from 'katex';
-import 'katex/dist/katex.min.css';
+import { renderContent } from '../../utils/renderContent';
 
 const { Text } = Typography;
 
@@ -13,44 +12,6 @@ interface AIAssistantProps {
 
 const backendUrl = process.env.REACT_APP_LINK_BACKEND || 'http://127.0.0.1:3026/api';
 const secretKey = process.env.REACT_APP_SECRET_BACKEND || 'Z9ToSwagger1413999';
-
-const renderPreviewContent = (html: string): string => {
-  if (!html) return '';
-  
-  let processedHtml = html;
-
-  // 1. Convert Quill formula spans (<span class="ql-formula" data-value="..."></span>)
-  processedHtml = processedHtml.replace(/<span[^>]*class="ql-formula"[^>]*data-value="([^"]+)"[^>]*>.*?<\/span>/g, (match, latex) => {
-    try {
-      const decodedLatex = latex.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-      return katex.renderToString(decodedLatex, { throwOnError: false, displayMode: false });
-    } catch (e) {
-      return match;
-    }
-  });
-
-  // 2. Convert Block Markdown Math $$ ... $$
-  processedHtml = processedHtml.replace(/\$\$([\s\S]+?)\$\$/g, (match, latex) => {
-    try {
-      const decodedLatex = latex.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-      return `<div class="my-3 flex justify-center overflow-x-auto">${katex.renderToString(decodedLatex, { throwOnError: false, displayMode: true })}</div>`;
-    } catch (e) {
-      return match;
-    }
-  });
-
-  // 3. Convert Inline Markdown Math $ ... $
-  processedHtml = processedHtml.replace(/\$([^$\n]+?)\$/g, (match, latex) => {
-    try {
-      const decodedLatex = latex.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-      return katex.renderToString(decodedLatex, { throwOnError: false, displayMode: false });
-    } catch (e) {
-      return match;
-    }
-  });
-
-  return processedHtml;
-};
 
 const AIAssistant: React.FC<AIAssistantProps> = ({ onApply }) => {
   const [open, setOpen] = useState(false);
@@ -211,7 +172,7 @@ ${prompt}`;
               <div className="ai-rendered-preview bg-white dark:bg-zinc-800/90 border border-indigo-100 dark:border-zinc-700/60 rounded-2xl p-5 mb-4 text-sm font-sans text-on-surface/90 dark:text-zinc-200 max-h-[380px] overflow-y-auto shadow-inner leading-relaxed">
                 <div 
                   className="ai-content-body inline"
-                  dangerouslySetInnerHTML={{ __html: renderPreviewContent(displayedResponse) }} 
+                  dangerouslySetInnerHTML={{ __html: renderContent(displayedResponse) }} 
                 />
                 {isTyping && (
                   <span className="inline-block animate-pulse font-bold text-indigo-500 text-base ml-1">

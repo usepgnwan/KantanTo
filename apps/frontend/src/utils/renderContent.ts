@@ -84,22 +84,41 @@ export const replaceQlFormulas = (html: string): string => {
 /**
  * Process all LaTeX in text or HTML:
  * 1. Quill formula spans
- * 2. Block LaTeX $$...$$
- * 3. Inline LaTeX $...$
+ * 2. Block LaTeX: $$...$$ and \[...\]
+ * 3. Inline LaTeX: $...$ and \(...\)
  */
 export const processLatex = (content: string): string => {
   if (!content) return '';
 
   let result = replaceQlFormulas(content);
 
-  // Block LaTeX $$...$$ → centered display math (supports multiline)
+  // 1. Block LaTeX enclosed in <p>...</p> (Quill paragraph wrapper cleanup)
   result = result.replace(
-    /\$\$([\s\S]+?)\$\$/g,
-    (_, l) => `<div class="my-4 sm:my-6 flex justify-center overflow-x-auto">${renderKaTeX(l, true)}</div>`
+    /<p>\s*\$\$([\s\S]+?)\$\$\s*<\/p>/gi,
+    (_, l) => `<div class="katex-display-wrapper my-3 sm:my-5 flex justify-center overflow-x-auto">${renderKaTeX(l, true)}</div>`
+  );
+  result = result.replace(
+    /<p>\s*\\\[([\s\S]+?)\\\]\s*<\/p>/gi,
+    (_, l) => `<div class="katex-display-wrapper my-3 sm:my-5 flex justify-center overflow-x-auto">${renderKaTeX(l, true)}</div>`
   );
 
-  // Inline LaTeX $...$ → inline math
-  result = result.replace(/\$([^$\n]+?)\$/g, (_, l) => renderKaTeX(l, false));
+  // 2. Block LaTeX $$...$$ → centered display math (supports multiline)
+  result = result.replace(
+    /\$\$([\s\S]+?)\$\$/g,
+    (_, l) => `<div class="katex-display-wrapper my-3 sm:my-5 flex justify-center overflow-x-auto">${renderKaTeX(l, true)}</div>`
+  );
+
+  // 3. Block LaTeX \[...\] → centered display math
+  result = result.replace(
+    /\\\[([\s\S]+?)\\\]/g,
+    (_, l) => `<div class="katex-display-wrapper my-3 sm:my-5 flex justify-center overflow-x-auto">${renderKaTeX(l, true)}</div>`
+  );
+
+  // 4. Inline LaTeX \(...\) → inline math
+  result = result.replace(/\\\(([\s\S]+?)\\\)/g, (_, l) => renderKaTeX(l, false));
+
+  // 5. Inline LaTeX $...$ → inline math
+  result = result.replace(/(?<!\\)\$([^$\n]+?)(?<!\\)\$/g, (_, l) => renderKaTeX(l, false));
 
   return result;
 };
@@ -114,8 +133,8 @@ const isHtml = (str: string): boolean => {
 /**
  * Universal content renderer that handles:
  * 1. Quill HTML content & formula embeds
- * 2. Block LaTeX: $$...$$
- * 3. Inline LaTeX: $...$
+ * 2. Block LaTeX: $$...$$ & \[...\]
+ * 3. Inline LaTeX: $...$ & \(...\)
  * 4. Markdown formatting (headings, lists, bold, italics, code, paragraphs)
  */
 export const renderContent = (raw: string): string => {

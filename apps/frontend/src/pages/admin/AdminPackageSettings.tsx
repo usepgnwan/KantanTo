@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AdminLayout from '../../layouts/AdminLayout';
 import KantanEditor from '../../components/atoms/KantanEditor';
-import { renderContent, renderQuillHtml } from '../../utils/renderContent';
+import { renderContent } from '../../utils/renderContent';
 import {
   deletePackageMaterial,
   deletePackageVideo,
@@ -23,7 +23,7 @@ import {
   ArrowLeftOutlined, ExperimentOutlined, FileSearchOutlined,
   VideoCameraOutlined, PlusOutlined, DeleteOutlined,
   FilePdfOutlined, SaveOutlined, EyeOutlined,
-  CopyOutlined,
+  CopyOutlined, CheckCircleFilled,
 } from '@ant-design/icons';
 import type { UploadFile } from 'antd';
 
@@ -107,7 +107,7 @@ const SubQuestionEditor: React.FC<SubQuestionEditorProps> = React.memo(({
   onUpdate,
   onDelete,
 }) => (
-  <div className="p-5 bg-white dark:bg-zinc-800/80 rounded-xl border border-on-surface/5 mb-6 relative group shadow-sm">
+  <div className="p-5 bg-white dark:bg-zinc-800/80 rounded-2xl border border-on-surface/5 mb-6 relative group shadow-sm">
     <div className="flex items-center justify-between mb-4">
       <div className="flex items-center gap-3">
         <Tag className="rounded-lg bg-primary text-white border-none font-black px-4 py-1">Pertanyaan {index + 1}</Tag>
@@ -141,9 +141,13 @@ const SubQuestionEditor: React.FC<SubQuestionEditorProps> = React.memo(({
         rows={3}
         label={`Pertanyaan #${index + 1}`}
       />
-      {sub.question && (
-        <div className="mt-3 p-3 rounded-lg bg-surface-low/20 dark:bg-zinc-900/30 border border-dashed border-on-surface/10">
-          <div className="prose prose-xs dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: renderContent(sub.question) }} />
+      {hasPreviewContent(sub.question) && (
+        <div className="mt-3 p-4 rounded-xl bg-surface-low/30 dark:bg-zinc-900/40 border border-on-surface/5">
+          <div className="flex items-center justify-between mb-2">
+            <Text className="text-[10px] font-black uppercase text-on-surface/40 tracking-wider">Live Preview Sub-Pertanyaan (LaTeX)</Text>
+            <Tag color="blue" className="rounded-full border-none text-[8px] font-black uppercase m-0">KaTeX</Tag>
+          </div>
+          <div className="blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none font-sans text-on-surface/90 dark:text-zinc-200" dangerouslySetInnerHTML={{ __html: renderContent(sub.question) }} />
         </div>
       )}
     </div>
@@ -157,9 +161,13 @@ const SubQuestionEditor: React.FC<SubQuestionEditorProps> = React.memo(({
         rows={3}
         label={`Pembahasan #${index + 1}`}
       />
-      {sub.discussion && (
-        <div className="mt-3 p-3 rounded-lg bg-green-500/5 dark:bg-green-900/10 border border-green-500/20">
-          <div className="prose prose-xs dark:prose-invert max-w-none text-green-700 dark:text-green-300" dangerouslySetInnerHTML={{ __html: renderContent(sub.discussion) }} />
+      {hasPreviewContent(sub.discussion) && (
+        <div className="mt-3 p-4 rounded-xl bg-green-500/5 dark:bg-green-900/10 border border-green-500/20">
+          <div className="flex items-center justify-between mb-2">
+            <Text className="text-[10px] font-black uppercase text-green-600/70 dark:text-green-400/70 tracking-wider">Preview Pembahasan Sub-Soal (LaTeX)</Text>
+            <Tag color="green" className="rounded-full border-none text-[8px] font-black uppercase m-0">KaTeX</Tag>
+          </div>
+          <div className="blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none text-green-800 dark:text-green-300" dangerouslySetInnerHTML={{ __html: renderContent(sub.discussion) }} />
         </div>
       )}
     </div>
@@ -186,8 +194,11 @@ const SubQuestionEditor: React.FC<SubQuestionEditorProps> = React.memo(({
               className="flex-1"
             />
           </div>
-          {(opt.includes('$') || opt.includes('<')) && (
-            <div className="ml-10 px-3 py-1 bg-primary/5 rounded-lg border-l-2 border-primary/20 text-[11px] prose-tight" dangerouslySetInnerHTML={{ __html: renderContent(opt) }} />
+          {hasPreviewContent(opt) && (
+            <div className="ml-10 px-3 py-1.5 bg-primary/5 rounded-xl border border-primary/10 text-xs blog-content kantan-quill-preview prose prose-xs dark:prose-invert max-w-none kantan-option-math">
+              <span className="font-bold text-primary mr-1.5 text-xs">{String.fromCharCode(65 + oi)}.</span>
+              <div className="inline-block" dangerouslySetInnerHTML={{ __html: renderContent(opt) }} />
+            </div>
           )}
         </div>
       ))}
@@ -206,7 +217,20 @@ const AdminPackageSettings: React.FC = () => {
     { id: '1', type: 'single', title: '', question: 'Contoh pertanyaan pertama...', discussion: '', options: ['', '', '', '', ''], correct: 0, discussionRefs: [], points: 1, scoringMethod: 'all_or_nothing' },
   ]);
   const [activeQIndex, setActiveQIndex] = useState(0);
-  const activeQ = questions[activeQIndex];
+  const activeQ = questions[activeQIndex] || {
+    id: '1',
+    type: 'single',
+    title: '',
+    question: '',
+    discussion: '',
+    options: ['', '', '', '', ''],
+    correct: 0,
+    discussionRefs: [],
+    points: 1,
+    scoringMethod: 'all_or_nothing',
+  };
+
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
 
   const getScenarioPoints = (question: Question) =>
     (question.subQuestions || []).reduce((sum, sub) => sum + (Number(sub.points) || 0), 0);
@@ -290,13 +314,6 @@ const AdminPackageSettings: React.FC = () => {
       });
   }, [id]);
 
-  // ── STATE: Materials ──
-  // const [materials] = useState<Material[]>([
-  //   { id: 'm1', title: 'Konsep Turunan Dasar' },
-  //   { id: 'm2', title: 'Aplikasi Integral dalam Luas' },
-  //   { id: 'm3', title: 'Strategi Eliminasi Jawaban' },
-  // ]);
-
   // ── ACTIONS: Questions ──
   const addQuestion = () => {
     const newQ: Question = {
@@ -322,6 +339,21 @@ const AdminPackageSettings: React.FC = () => {
   const addSubQuestion = () => {
     const sub: SubQuestion = { id: Date.now().toString(), type: 'single', question: '', discussion: '', options: ['', '', '', '', ''], correct: 0, points: 1 };
     updateActiveQ({ subQuestions: [...(activeQ.subQuestions || []), sub] });
+  };
+
+  const duplicateActiveQuestion = () => {
+    const cloned: Question = {
+      ...JSON.parse(JSON.stringify(activeQ)),
+      id: Date.now().toString(),
+      title: activeQ.title ? `${activeQ.title} (Salinan)` : '',
+    };
+    setQuestions(prev => {
+      const next = [...prev];
+      next.splice(activeQIndex + 1, 0, cloned);
+      return next;
+    });
+    setActiveQIndex(activeQIndex + 1);
+    message.success(`Soal #${activeQIndex + 1} berhasil diduplikasi!`);
   };
 
   const saveActiveQuestion = async () => {
@@ -544,9 +576,9 @@ const AdminPackageSettings: React.FC = () => {
                     <Select
                       className="w-full rounded-xl"
                       style={{ height: 44 }}
-                        value={activeQ.type}
-                        onChange={val => updateActiveQ({
-                          type: val as QuestionType,
+                      value={activeQ.type}
+                      onChange={val => updateActiveQ({
+                        type: val as QuestionType,
                         correct: val === 'multiple' ? getCorrectIndexes(activeQ.correct) : normalizeCorrectForType(val as QuestionType, activeQ.correct),
                         points: val === 'nested' ? getScenarioPoints(activeQ) : activeQ.points || 1,
                         scoringMethod: val === 'multiple' ? activeQ.scoringMethod : 'all_or_nothing',
@@ -613,10 +645,13 @@ const AdminPackageSettings: React.FC = () => {
                     rows={activeQ.type === 'nested' ? 10 : 5}
                     label="Rich Question Editor"
                   />
-                  {activeQ.question && (
-                    <div className="mt-4 p-4 rounded-2xl bg-surface-low/30 dark:bg-zinc-800/50 border border-on-surface/5">
-                      <Text className="text-[10px] font-black uppercase text-on-surface/30 block mb-2">Live Preview Pertanyaan</Text>
-                      <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: renderContent(activeQ.question) }} />
+                  {hasPreviewContent(activeQ.question) && (
+                    <div className="mt-4 p-5 rounded-2xl bg-surface-low/30 dark:bg-zinc-800/50 border border-on-surface/5">
+                      <div className="flex items-center justify-between mb-3">
+                        <Text className="text-[10px] font-black uppercase tracking-wider text-primary">Live Preview Pertanyaan (LaTeX Rendered)</Text>
+                        <Tag color="blue" className="rounded-full border-none text-[8px] font-black uppercase">Rendered KaTeX</Tag>
+                      </div>
+                      <div className="blog-content kantan-quill-preview prose prose-base dark:prose-invert max-w-none font-sans text-on-surface/90 dark:text-zinc-200 leading-relaxed" dangerouslySetInnerHTML={{ __html: renderContent(activeQ.question) }} />
                     </div>
                   )}
                 </div>
@@ -630,10 +665,13 @@ const AdminPackageSettings: React.FC = () => {
                     rows={4}
                     label="Discussion Editor"
                   />
-                  <div className="mt-4 p-4 rounded-2xl bg-green-500/5 dark:bg-green-900/10 border border-green-500/20 min-h-[88px]">
-                    <Text className="text-[10px] font-black uppercase text-green-600/50 block mb-2">Preview Pembahasan</Text>
+                  <div className="mt-4 p-5 rounded-2xl bg-green-500/5 dark:bg-green-900/10 border border-green-500/20 min-h-[88px]">
+                    <div className="flex items-center justify-between mb-3">
+                      <Text className="text-[10px] font-black uppercase tracking-wider text-green-600 dark:text-green-400">Preview Pembahasan (LaTeX Rendered)</Text>
+                      <Tag color="green" className="rounded-full border-none text-[8px] font-black uppercase">KaTeX</Tag>
+                    </div>
                     {hasPreviewContent(activeQ.discussion) ? (
-                      <div className="prose prose-sm dark:prose-invert max-w-none text-green-700 dark:text-green-300" dangerouslySetInnerHTML={{ __html: renderContent(activeQ.discussion) }} />
+                      <div className="blog-content kantan-quill-preview prose prose-base dark:prose-invert max-w-none text-green-800 dark:text-green-300 leading-relaxed" dangerouslySetInnerHTML={{ __html: renderContent(activeQ.discussion) }} />
                     ) : (
                       <Text className="text-xs text-on-surface/40 font-bold">Preview pembahasan akan muncul di sini.</Text>
                     )}
@@ -644,46 +682,56 @@ const AdminPackageSettings: React.FC = () => {
                   <div className="space-y-4">
                     <Text className="text-xs font-black uppercase tracking-widest text-on-surface/40 block mb-2">Opsi Jawaban & Kunci</Text>
                     <div className="grid grid-cols-1 gap-4">
-                      {activeQ.options.map((opt, i) => (
-                        <div key={i} className="flex items-start gap-4 group">
-                          {activeQ.type === 'single' ? (
-                            <Radio
-                              checked={activeQ.correct === i}
-                              onChange={() => toggleCorrect(i)}
-                              className="scale-125 mt-3"
-                            />
-                          ) : (
-                            <Checkbox
-                              checked={getCorrectIndexes(activeQ.correct).includes(i)}
-                              onChange={() => toggleCorrect(i)}
-                              className="scale-125 mt-3"
-                            />
-                          )}
-                          <div className={`flex-1 flex flex-col p-1 rounded-lg border-2 transition-all 
-                            ${(activeQ.type === 'single' ? activeQ.correct === i : getCorrectIndexes(activeQ.correct).includes(i))
-                              ? 'bg-green-50/50 dark:bg-green-900/10 border-green-500/50'
-                              : 'bg-surface-low/50 dark:bg-zinc-800 border-transparent hover:border-on-surface/5'}`}>
-                            <div className="flex items-start gap-3">
-                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-black text-sm shrink-0 border-2 mt-1
-                                 ${(activeQ.type === 'single' ? activeQ.correct === i : getCorrectIndexes(activeQ.correct).includes(i))
-                                  ? 'bg-green-500 border-green-500 text-white'
-                                  : 'bg-white dark:bg-zinc-700 border-on-surface/10 text-on-surface/40'}`}>
-                                {String.fromCharCode(65 + i)}
-                              </div>
-                              <KantanEditor
-                                value={opt}
-                                onChange={val => updateOption(i, val)}
-                                placeholder={`Pilihan ${String.fromCharCode(65 + i)}`}
-                                rows={2}
-                                className="flex-1"
+                      {activeQ.options.map((opt, i) => {
+                        const isCorrect = activeQ.type === 'single' ? activeQ.correct === i : getCorrectIndexes(activeQ.correct).includes(i);
+                        return (
+                          <div key={i} className="flex items-start gap-4 group">
+                            {activeQ.type === 'single' ? (
+                              <Radio
+                                checked={activeQ.correct === i}
+                                onChange={() => toggleCorrect(i)}
+                                className="scale-125 mt-3"
                               />
-                            </div>
-                            {(opt.includes('$') || opt.includes('<')) && (
-                              <div className="mx-4 mb-2 p-2 bg-white/40 dark:bg-black/20 rounded-lg border border-primary/5 text-sm prose-sm" dangerouslySetInnerHTML={{ __html: renderContent(opt) }} />
+                            ) : (
+                              <Checkbox
+                                checked={getCorrectIndexes(activeQ.correct).includes(i)}
+                                onChange={() => toggleCorrect(i)}
+                                className="scale-125 mt-3"
+                              />
                             )}
+                            <div className={`flex-1 flex flex-col p-2.5 rounded-2xl border-2 transition-all 
+                              ${isCorrect
+                                ? 'bg-green-50/60 dark:bg-green-900/15 border-green-500/50 shadow-sm'
+                                : 'bg-surface-low/50 dark:bg-zinc-800/80 border-transparent hover:border-on-surface/10'}`}>
+                              <div className="flex items-start gap-3">
+                                <div
+                                  onClick={() => toggleCorrect(i)}
+                                  className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm shrink-0 border-2 mt-1 cursor-pointer transition-all
+                                   ${isCorrect
+                                    ? 'bg-green-500 border-green-500 text-white shadow-md shadow-green-500/20'
+                                    : 'bg-white dark:bg-zinc-700 border-on-surface/10 text-on-surface/40 hover:border-primary/40'}`}>
+                                  {String.fromCharCode(65 + i)}
+                                </div>
+                                <div className="flex-1">
+                                  <KantanEditor
+                                    value={opt}
+                                    onChange={val => updateOption(i, val)}
+                                    placeholder={`Pilihan ${String.fromCharCode(65 + i)}`}
+                                    rows={2}
+                                    className="w-full"
+                                  />
+                                </div>
+                              </div>
+                              {hasPreviewContent(opt) && (
+                                <div className="ml-13 mt-2 px-3.5 py-2 bg-white/70 dark:bg-black/30 rounded-xl border border-primary/10 text-sm blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none kantan-option-math">
+                                  <span className="font-bold text-primary mr-2 text-xs">{String.fromCharCode(65 + i)}.</span>
+                                  <div className="inline-block" dangerouslySetInnerHTML={{ __html: renderContent(opt) }} />
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ) : (
@@ -715,8 +763,8 @@ const AdminPackageSettings: React.FC = () => {
 
                 <div className="flex items-center justify-between">
                   <Space>
-                    <Button icon={<CopyOutlined />} className="rounded-xl font-bold h-11 px-6">Duplikat</Button>
-                    <Button icon={<EyeOutlined />} className="rounded-xl font-bold h-11 px-6">Pratinjau</Button>
+                    <Button icon={<CopyOutlined />} onClick={duplicateActiveQuestion} className="rounded-xl font-bold h-11 px-6">Duplikat</Button>
+                    <Button icon={<EyeOutlined />} onClick={() => setPreviewModalOpen(true)} className="rounded-xl font-bold h-11 px-6">Pratinjau</Button>
                   </Space>
                   <Button type="primary" icon={<SaveOutlined />} size="large" className="rounded-2xl h-12 px-10 font-black shadow-xl shadow-primary/20"
                     onClick={saveActiveQuestion}>
@@ -726,6 +774,156 @@ const AdminPackageSettings: React.FC = () => {
               </Card>
             </Col>
           </Row>
+
+          {/* ── PRATINJAU MODAL (STUDENT PERSPECTIVE) ── */}
+          <Modal
+            open={previewModalOpen}
+            onCancel={() => setPreviewModalOpen(false)}
+            footer={[
+              <Button key="close" type="primary" className="rounded-xl font-bold px-6" onClick={() => setPreviewModalOpen(false)}>
+                Tutup Pratinjau
+              </Button>
+            ]}
+            width={780}
+            title={
+              <div className="flex items-center gap-3">
+                <Tag className="rounded-full px-3 py-0.5 text-xs font-black border-none bg-primary/10 text-primary">
+                  Pratinjau Soal #{activeQIndex + 1}
+                </Tag>
+                <Tag color="blue" className="rounded-full border-none font-bold text-xs capitalize">
+                  {activeQ.type === 'single' ? 'Single Choice' : activeQ.type === 'multiple' ? 'Multiple Choice' : 'Scenario Based'}
+                </Tag>
+                <Text className="text-xs text-on-surface/50 font-bold ml-auto mr-4">{getEffectivePoints(activeQ)} Poin</Text>
+              </div>
+            }
+          >
+            <div className="py-4 space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+              {/* Scenario Passage (if nested) */}
+              {activeQ.type === 'nested' && (
+                <div className="bg-surface-low/40 dark:bg-zinc-800/50 rounded-2xl p-6 border border-on-surface/5">
+                  <Tag color="blue" className="mb-3 rounded-full border-none font-bold text-xs">{activeQ.title || 'Skenario Kasus'}</Tag>
+                  <div
+                    className="blog-content kantan-quill-preview prose prose-base dark:prose-invert max-w-none text-on-surface/90 dark:text-zinc-200 leading-relaxed font-sans"
+                    dangerouslySetInnerHTML={{ __html: renderContent(activeQ.question) }}
+                  />
+                </div>
+              )}
+
+              {/* Main Question (if not nested) */}
+              {activeQ.type !== 'nested' && (
+                <div className="bg-white dark:bg-zinc-800/40 rounded-2xl p-6 border border-on-surface/10 shadow-sm">
+                  {activeQ.title && (
+                    <Tag color="blue" className="mb-3 rounded-full border-none font-bold text-xs">{activeQ.title}</Tag>
+                  )}
+                  <div
+                    className="blog-content kantan-quill-preview prose prose-base dark:prose-invert max-w-none text-on-surface/90 dark:text-zinc-200 leading-relaxed font-sans"
+                    dangerouslySetInnerHTML={{ __html: renderContent(activeQ.question) }}
+                  />
+                </div>
+              )}
+
+              {/* Options (if not nested) */}
+              {activeQ.type !== 'nested' && (
+                <div className="space-y-3">
+                  <Text className="text-xs font-black uppercase tracking-wider text-on-surface/40 block mb-1">Pilihan Jawaban:</Text>
+                  {activeQ.options.map((opt, oi) => {
+                    if (!opt && !hasPreviewContent(opt)) return null;
+                    const isCorrect = activeQ.type === 'single' ? activeQ.correct === oi : getCorrectIndexes(activeQ.correct).includes(oi);
+                    return (
+                      <div
+                        key={oi}
+                        className={`p-4 rounded-2xl border-2 flex items-start gap-3 transition-all ${
+                          isCorrect
+                            ? 'bg-green-50 dark:bg-green-900/20 border-green-500 text-green-900 dark:text-green-200'
+                            : 'bg-white dark:bg-zinc-800 border-on-surface/10 text-on-surface/80'
+                        }`}
+                      >
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${
+                            isCorrect ? 'bg-green-500 text-white' : 'bg-surface-low dark:bg-zinc-700 text-on-surface/60'
+                          }`}
+                        >
+                          {String.fromCharCode(65 + oi)}
+                        </div>
+                        <div className="flex-1 pt-1 blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none font-sans" dangerouslySetInnerHTML={{ __html: renderContent(opt) }} />
+                        {isCorrect && (
+                          <Tag color="success" className="rounded-full border-none font-bold text-xs flex items-center gap-1 shrink-0 m-0">
+                            <CheckCircleFilled /> Kunci Jawaban
+                          </Tag>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Sub-questions (if nested) */}
+              {activeQ.type === 'nested' && (
+                <div className="space-y-6">
+                  {activeQ.subQuestions?.map((sub, si) => (
+                    <div key={sub.id || si} className="p-5 rounded-2xl bg-white dark:bg-zinc-800/40 border border-on-surface/10 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Tag className="rounded-lg bg-primary text-white border-none font-black text-xs px-3 py-0.5">
+                          Sub-Soal #{si + 1}
+                        </Tag>
+                        <Text className="text-xs font-bold text-on-surface/50">{sub.points} Poin</Text>
+                      </div>
+                      <div
+                        className="blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none text-on-surface/90 dark:text-zinc-200 font-sans"
+                        dangerouslySetInnerHTML={{ __html: renderContent(sub.question) }}
+                      />
+                      <div className="space-y-2">
+                        {sub.options.map((opt, oi) => {
+                          if (!opt && !hasPreviewContent(opt)) return null;
+                          const isCorrect = sub.correct === oi;
+                          return (
+                            <div
+                              key={oi}
+                              className={`p-3 rounded-xl border flex items-start gap-3 ${
+                                isCorrect
+                                  ? 'bg-green-50 dark:bg-green-900/20 border-green-500'
+                                  : 'bg-surface-low/30 dark:bg-zinc-800 border-on-surface/5'
+                              }`}
+                            >
+                              <div
+                                className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+                                  isCorrect ? 'bg-green-500 text-white' : 'bg-surface-low dark:bg-zinc-700 text-on-surface/60'
+                                }`}
+                              >
+                                {String.fromCharCode(65 + oi)}
+                              </div>
+                              <div className="flex-1 blog-content kantan-quill-preview prose prose-xs dark:prose-invert max-w-none font-sans" dangerouslySetInnerHTML={{ __html: renderContent(opt) }} />
+                              {isCorrect && <Tag color="success" className="rounded-full border-none font-bold text-[10px]">Kunci</Tag>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {hasPreviewContent(sub.discussion) && (
+                        <div className="p-3.5 rounded-xl bg-green-500/5 dark:bg-green-900/10 border border-green-500/20 text-xs">
+                          <Text className="text-[10px] font-black uppercase text-green-600 block mb-1">Pembahasan Sub-Soal:</Text>
+                          <div className="blog-content kantan-quill-preview prose prose-xs dark:prose-invert max-w-none text-green-800 dark:text-green-300" dangerouslySetInnerHTML={{ __html: renderContent(sub.discussion) }} />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Explanation (Discussion) Box */}
+              {hasPreviewContent(activeQ.discussion) && (
+                <div className="bg-green-500/5 dark:bg-green-900/10 rounded-2xl p-5 border border-green-500/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircleFilled className="text-green-500 text-base" />
+                    <Text className="font-bold text-sm text-green-700 dark:text-green-400">Pembahasan & Penjelasan Soal:</Text>
+                  </div>
+                  <div
+                    className="blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none text-green-800 dark:text-green-300 font-sans leading-relaxed"
+                    dangerouslySetInnerHTML={{ __html: renderContent(activeQ.discussion) }}
+                  />
+                </div>
+              )}
+            </div>
+          </Modal>
         </div>
       )
     },
@@ -819,7 +1017,7 @@ const AdminPackageSettings: React.FC = () => {
                     {previewMode && (
                       <Col xs={24} lg={12}>
                         <Card className="sticky top-6 rounded-[2rem] border-none shadow-2xl p-6 bg-white dark:bg-zinc-900 shadow-primary/5 h-[600px] overflow-y-auto">
-                          <div className="prose dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: renderContent(activeM.content) }} />
+                          <div className="blog-content kantan-quill-preview prose dark:prose-invert max-w-none font-sans leading-relaxed" dangerouslySetInnerHTML={{ __html: renderContent(activeM.content) }} />
                         </Card>
                       </Col>
                     )}
@@ -843,7 +1041,7 @@ const AdminPackageSettings: React.FC = () => {
                       multiple
                       fileList={pdfFiles}
                       onChange={({ fileList }) => setPdfFiles(fileList)}
-                      beforeUpload={() => false} // Prevent auto-upload for demo
+                      beforeUpload={() => false}
                       className="bg-white/50 dark:bg-zinc-800/50 rounded-2xl border-none p-8"
                     >
                       <p className="ant-upload-drag-icon">
@@ -988,10 +1186,10 @@ const AdminPackageSettings: React.FC = () => {
                       placeholder="Tuliskan ringkasan, bab yang dibahas, atau poin-poin penting dari video ini..."
                       label={`Editing Description: ${activeV.title}`}
                     />
-                    {activeV.description && (
+                    {hasPreviewContent(activeV.description) && (
                       <div className="mt-4 p-5 rounded-[2rem] bg-surface-low/30 dark:bg-zinc-800/50 border border-on-surface/5">
                         <Text className="text-[10px] font-black uppercase text-on-surface/30 block mb-3">Pratinjau Deskripsi</Text>
-                        <div className="prose prose-sm dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: renderContent(activeV.description) }} />
+                        <div className="blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none font-sans" dangerouslySetInnerHTML={{ __html: renderContent(activeV.description) }} />
                       </div>
                     )}
                   </div>
