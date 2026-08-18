@@ -5,38 +5,11 @@ import { CalendarOutlined, ClockCircleOutlined, UserOutlined, ArrowLeftOutlined,
 import { useParams, Link } from 'react-router-dom';
 
 import { getArtikelBySlug, Artikel } from '../services/artikelService';
+import { renderContent } from '../utils/renderContent';
 
 const { Title, Text, Paragraph } = Typography;
 
-
 const backendUrl = process.env.REACT_APP_LINK_BACKEND?.replace(/\/api\/?$/, '') || 'http://127.0.0.1:3026';
-
-declare global { interface Window { katex?: any; renderMathInElement?: any; } }
-
-const renderKaTeX = (latex: string, displayMode = false): string => {
-   if (window.katex) {
-      try {
-         return window.katex.renderToString(latex, { displayMode, throwOnError: false });
-      } catch { return latex; }
-   }
-   return `<span class="font-mono bg-blue-50 text-blue-700 px-1 rounded text-sm">${displayMode ? '$$' : '$'}${latex}${displayMode ? '$$' : '$'}</span>`;
-};
-
-const renderContent = (raw: string): string => {
-   if (!raw) return '';
-   return raw
-      .replace(/\$\$([^$]+)\$\$/g, (_, latex) => `<div class="my-6 py-4 flex justify-center overflow-x-auto">${renderKaTeX(latex, true)}</div>`)
-      .replace(/\$([^$\n]+)\$/g, (_, latex) => renderKaTeX(latex, false))
-      .replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-on-surface dark:text-zinc-100">$1</strong>')
-      .replace(/_(.+?)_/g, '<em>$1</em>')
-      .replace(/^### (.+)$/gm, '<h3 class="text-xl font-black font-manrope mt-8 mb-3 text-on-surface dark:text-zinc-100">$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2 class="text-2xl font-black font-manrope mt-10 mb-4 text-on-surface dark:text-zinc-100">$2</h2>')
-      .replace(/^# (.+)$/gm, '<h1 class="text-3xl font-black font-manrope mt-12 mb-5 text-on-surface dark:text-zinc-100">$3</h1>')
-      .replace(/^- (.+)$/gm, '<li class="ml-6 mb-2 list-disc leading-relaxed">$1</li>')
-      .replace(/^(\d+)\. (.+)$/gm, '<li class="ml-6 mb-2 list-decimal leading-relaxed">$2</li>')
-      .replace(/`(.+?)`/g, '<code class="bg-surface-low dark:bg-zinc-800 px-2 py-0.5 rounded-md text-sm font-mono text-primary">$1</code>')
-      .replace(/\n{2,}/g, '</p><p class="mb-5 leading-loose">');
-};
 
 const BlogDetail: React.FC = () => {
    const { slug } = useParams<{ slug: string }>();
@@ -58,22 +31,6 @@ const BlogDetail: React.FC = () => {
       };
       fetchData();
    }, [slug]);
-
-   // Trigger KaTeX re-render on content change
-   React.useEffect(() => {
-      if (window.renderMathInElement && post) {
-         const el = document.getElementById('blog-detail-content');
-         if (el) {
-            window.renderMathInElement(el, {
-               delimiters: [
-                  { left: '$$', right: '$$', display: true },
-                  { left: '$', right: '$', display: false },
-               ],
-               throwOnError: false,
-            });
-         }
-      }
-   }, [post]);
 
    const formatDate = (dateStr: string) => {
       try {
@@ -114,7 +71,7 @@ const BlogDetail: React.FC = () => {
                         </Space>
                      </Space>
 
-                     <Title level={1} className="!text-4xl md:!text-5xl !font-black !font-manrope !leading-tight mb-10">
+                     <Title level={1} className="!text-3xl md:!text-5xl !font-black !font-manrope !leading-tight mb-10">
                         {post.judul}
                      </Title>
 
@@ -131,14 +88,16 @@ const BlogDetail: React.FC = () => {
                         <Button shape="circle" icon={<ShareAltOutlined />} className="border-on-surface/10" />
                      </div>
 
-                     <div className="rounded-[40px] overflow-hidden mb-16 shadow-2xl relative">
-                        <img src={thumbnailUrl(post.thumbnail)} className="w-full object-cover aspect-video md:aspect-[21/9]" alt="Banner" />
-                     </div>
+                     {post.thumbnail && (
+                        <div className="rounded-[40px] overflow-hidden mb-16 shadow-2xl relative">
+                           <img src={thumbnailUrl(post.thumbnail)} className="w-full object-cover aspect-video md:aspect-[21/9]" alt="Banner" />
+                        </div>
+                     )}
 
                      <div
                         id="blog-detail-content"
-                        className="blog-content text-lg leading-[1.8] text-on-surface/80 dark:text-zinc-300"
-                        dangerouslySetInnerHTML={{ __html: `<p class="mb-5 leading-loose">${renderContent(post.konten)}</p>` }}
+                        className="blog-content prose prose-lg dark:prose-invert max-w-none font-sans text-lg leading-[1.8] text-on-surface/80 dark:text-zinc-300 kantan-quill kantan-quill-preview"
+                        dangerouslySetInnerHTML={{ __html: renderContent(post.konten) }}
                      />
 
                      <Divider className="my-20" />
@@ -170,27 +129,93 @@ const BlogDetail: React.FC = () => {
          </div>
 
          <style>{`
+        .blog-content h1 {
+          font-family: 'Manrope', sans-serif;
+          font-weight: 900;
+          font-size: 2rem;
+          margin-top: 2.5rem;
+          margin-bottom: 1.25rem;
+          color: #0f172a;
+          line-height: 1.3;
+        }
         .blog-content h2 {
           font-family: 'Manrope', sans-serif;
           font-weight: 800;
-          margin-top: 3rem;
-          margin-bottom: 1.5rem;
-          color: #000;
+          font-size: 1.5rem;
+          margin-top: 2rem;
+          margin-bottom: 1rem;
+          color: #0f172a;
+          line-height: 1.35;
+        }
+        .blog-content h3 {
+          font-family: 'Manrope', sans-serif;
+          font-weight: 700;
+          font-size: 1.25rem;
+          margin-top: 1.5rem;
+          margin-bottom: 0.75rem;
+          color: #0f172a;
+        }
+        .blog-content p {
+          margin-bottom: 1.25rem;
+          line-height: 1.8;
+        }
+        .blog-content ul {
+          list-style-type: disc;
+          margin-left: 1.5rem;
+          margin-bottom: 1.25rem;
+        }
+        .blog-content ol {
+          list-style-type: decimal;
+          margin-left: 1.5rem;
+          margin-bottom: 1.25rem;
+        }
+        .blog-content li {
+          margin-bottom: 0.5rem;
+          line-height: 1.7;
         }
         .blog-content blockquote {
-          margin: 3rem 0;
-          padding: 2rem;
+          margin: 2rem 0;
+          padding: 1.5rem 2rem;
           background: #f0f7ff;
-          border-radius: 2rem;
-          font-size: 1.5rem;
-          font-weight: 700;
-          line-height: 1.4;
+          border-radius: 1.5rem;
+          font-size: 1.25rem;
+          font-weight: 600;
+          line-height: 1.5;
           color: #0060ad;
           font-style: italic;
-          border-left: 8px solid #0060ad;
+          border-left: 6px solid #0060ad;
         }
-        .dark .blog-content h2 { color: #fff; }
-        .dark .blog-content blockquote { background: #1a202c; color: #3b82f6; border-left-color: #3b82f6; }
+        .blog-content .katex-display {
+          margin: 1.5rem 0 !important;
+          overflow-x: auto;
+          overflow-y: hidden;
+          padding: 0.5rem 0;
+        }
+        .blog-content .katex {
+          font-size: 1.1em;
+        }
+        .blog-content table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 1.5rem 0;
+          border-radius: 0.75rem;
+          overflow: hidden;
+        }
+        .blog-content th, .blog-content td {
+          border: 1px solid #e2e8f0;
+          padding: 0.75rem 1rem;
+          text-align: left;
+        }
+        .blog-content th {
+          background: #f8fafc;
+          font-weight: bold;
+        }
+        .dark .blog-content h1,
+        .dark .blog-content h2,
+        .dark .blog-content h3 { color: #f8fafc; }
+        .dark .blog-content blockquote { background: #1a202c; color: #68abff; border-left-color: #68abff; }
+        .dark .blog-content th, .dark .blog-content td { border-color: #27272a; }
+        .dark .blog-content th { background: #27272a; }
       `}</style>
       </AppLayout>
    );

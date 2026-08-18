@@ -3,11 +3,35 @@ import 'katex/dist/katex.min.css';
 import 'katex/dist/contrib/mhchem.js';
 
 /**
+ * Decode HTML entities and URI encoding commonly found in LaTeX formulas.
+ */
+export const decodeLatex = (latex: string): string => {
+  if (!latex) return '';
+  let decoded = latex
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+
+  if (decoded.includes('%')) {
+    try {
+      decoded = decodeURIComponent(decoded);
+    } catch {
+      // ignore URI decode error
+    }
+  }
+  return decoded;
+};
+
+/**
  * Render a single LaTeX expression to HTML via KaTeX.
  */
-const renderKaTeX = (latex: string, displayMode = false): string => {
+export const renderKaTeX = (latex: string, displayMode = false): string => {
   try {
-    return katex.renderToString(latex, { displayMode, throwOnError: false });
+    const decoded = decodeLatex(latex);
+    return katex.renderToString(decoded, { displayMode, throwOnError: false });
   } catch {
     return latex;
   }
@@ -15,50 +39,97 @@ const renderKaTeX = (latex: string, displayMode = false): string => {
 
 /**
  * Replace Quill formula embeds (<span class="ql-formula" data-value="...">) with
- * freshly rendered KaTeX. Uses a real DOM element to reliably parse nested HTML.
+ * freshly rendered KaTeX. Uses a real DOM element when available for reliable parsing,
+ * with robust regex fallbacks.
  */
-const replaceQlFormulas = (html: string): string => {
+export const replaceQlFormulas = (html: string): string => {
   if (!html || !html.includes('ql-formula')) return html;
 
-  const div = document.createElement('div');
-  div.innerHTML = html;
+  if (typeof document !== 'undefined') {
+    try {
+      const div = document.createElement('div');
+      div.innerHTML = html;
+      const formulaSpans = div.querySelectorAll('span.ql-formula, span[data-value].ql-formula');
+      if (formulaSpans.length > 0) {
+        formulaSpans.forEach(span => {
+          const rawValue = span.getAttribute('data-value') || '';
+          const decoded = decodeLatex(rawValue);
+          const rendered = renderKaTeX(decoded, false);
+          const wrapper = document.createElement('span');
+          wrapper.className = 'katex-formula-wrapper inline-block';
+          wrapper.innerHTML = rendered;
+          span.parentNode?.replaceChild(wrapper, span);
+        });
+        return div.innerHTML;
+      }
+    } catch {
+      // fallback to regex if DOM parsing fails
+    }
+  }
 
-  const formulaSpans = div.querySelectorAll('span.ql-formula[data-value]');
-  if (formulaSpans.length === 0) return html;
+  // Regex fallback for non-DOM or fallback situations:
+  let result = html;
+  result = result.replace(
+    /<span[^>]*class=["'][^"']*ql-formula[^"']*["'][^>]*data-value=["']([\s\S]*?)["'][^>]*>[\s\S]*?<\/span>/gi,
+    (_, latex) => renderKaTeX(latex, false)
+  );
+  result = result.replace(
+    /<span[^>]*data-value=["']([\s\S]*?)["'][^>]*class=["'][^"']*ql-formula[^"']*["'][^>]*>[\s\S]*?<\/span>/gi,
+    (_, latex) => renderKaTeX(latex, false)
+  );
 
-  formulaSpans.forEach(span => {
-    const rawValue = span.getAttribute('data-value') || '';
-    const latex = rawValue.includes('%') ? decodeURIComponent(rawValue) : rawValue;
-    const rendered = renderKaTeX(latex, false);
-    const wrapper = document.createElement('span');
-    wrapper.innerHTML = rendered;
-    span.parentNode?.replaceChild(wrapper, span);
-  });
+  return result;
+};
 
-  return div.innerHTML;
+/**
+ * Process all LaTeX in text or HTML:
+ * 1. Quill formula spans
+ * 2. Block LaTeX $$...$$
+ * 3. Inline LaTeX $...$
+ */
+export const processLatex = (content: string): string => {
+  if (!content) return '';
+
+  let result = replaceQlFormulas(content);
+
+  // Block LaTeX $$...$$ → centered display math (supports multiline)
+  result = result.replace(
+    /\$\$([\s\S]+?)\$\$/g,
+    (_, l) => `<div class="my-4 sm:my-6 flex justify-center overflow-x-auto">${renderKaTeX(l, true)}</div>`
+  );
+
+  // Inline LaTeX $...$ → inline math
+  result = result.replace(/\$([^$\n]+?)\$/g, (_, l) => renderKaTeX(l, false));
+
+  return result;
+};
+
+/**
+ * Check if the input string contains HTML tags.
+ */
+const isHtml = (str: string): boolean => {
+  return /<\/?(?:p|h[1-6]|ul|ol|li|div|table|tr|td|th|blockquote|span|strong|em|b|i|br|a|img)[>\s/]/i.test(str);
 };
 
 /**
  * Universal content renderer that handles:
- * 1. Quill formula embeds: <span class="ql-formula" data-value="LATEX">…</span>
+ * 1. Quill HTML content & formula embeds
  * 2. Block LaTeX: $$...$$
  * 3. Inline LaTeX: $...$
- * 4. Basic Markdown-like formatting (bold, italic, headings, lists, code)
+ * 4. Markdown formatting (headings, lists, bold, italics, code, paragraphs)
  */
 export const renderContent = (raw: string): string => {
   if (!raw) return '<p>Belum ada konten.</p>';
 
-  let result = replaceQlFormulas(raw);
+  const withMath = processLatex(raw);
 
-  // Block LaTeX $$...$$ → centered display math
-  result = result.replace(
-    /\$\$([^$]+)\$\$/g,
-    (_, l) => `<div class="my-6 py-4 flex justify-center overflow-x-auto">${renderKaTeX(l, true)}</div>`
-  );
-  // Inline LaTeX $...$ → inline math
-  result = result.replace(/\$([^$\n]+)\$/g, (_, l) => renderKaTeX(l, false));
-  // Markdown-ish formatting
-  result = result
+  // If the content is already HTML from Quill, return it with math processed
+  if (isHtml(raw)) {
+    return withMath;
+  }
+
+  // Otherwise, apply Markdown parsing
+  let result = withMath
     .replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-on-surface dark:text-zinc-100">$1</strong>')
     .replace(/_(.+?)_/g, '<em>$1</em>')
     .replace(/^### (.+)$/gm, '<h3 class="text-xl font-black font-manrope mt-8 mb-3 text-on-surface dark:text-zinc-100">$1</h3>')
@@ -69,7 +140,7 @@ export const renderContent = (raw: string): string => {
     .replace(/`(.+?)`/g, '<code class="bg-surface-low dark:bg-zinc-800 px-2 py-0.5 rounded-md text-sm font-mono text-primary">$1</code>')
     .replace(/\n{2,}/g, '</p><p class="mb-5 leading-loose">');
 
-  return result;
+  return `<p class="mb-5 leading-loose">${result}</p>`;
 };
 
 /**
@@ -78,14 +149,5 @@ export const renderContent = (raw: string): string => {
  */
 export const renderQuillHtml = (html: string): string => {
   if (!html) return '';
-
-  let result = replaceQlFormulas(html);
-
-  result = result.replace(
-    /\$\$([^$]+)\$\$/g,
-    (_, l) => `<div class="my-3 flex justify-center overflow-x-auto">${renderKaTeX(l, true)}</div>`
-  );
-  result = result.replace(/\$([^$\n]+)\$/g, (_, l) => renderKaTeX(l, false));
-
-  return result;
+  return processLatex(html);
 };
