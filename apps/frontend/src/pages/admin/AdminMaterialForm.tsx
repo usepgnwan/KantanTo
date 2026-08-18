@@ -19,49 +19,10 @@ import { getCategories } from '../../services/categoryService';
 import { useAuth } from '../../context/AuthContext';
 import KantanEditor from '../../components/atoms/KantanEditor';
 import AIAssistant from '../../components/organisms/AIAssistant';
-import katex from 'katex';
-import 'katex/dist/katex.min.css';
+import { renderContent } from '../../utils/renderContent';
 
 const { Title, Text, Paragraph } = Typography;
 const backendUrl = process.env.REACT_APP_LINK_BACKEND?.replace(/\/api\/?$/, '') || 'http://127.0.0.1:3026';
-
-const renderPreviewContent = (html: string) => {
-  if (!html) return html;
-  
-  let processedHtml = html;
-
-  // 1. Convert Quill formula spans
-  processedHtml = processedHtml.replace(/<span[^>]*class="ql-formula"[^>]*data-value="([^"]+)"[^>]*>.*?<\/span>/g, (match, latex) => {
-    try {
-      const decodedLatex = latex.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-      return katex.renderToString(decodedLatex, { throwOnError: false, displayMode: false });
-    } catch (e) {
-      return match;
-    }
-  });
-
-  // 2. Convert Block Markdown Math $$ ... $$
-  processedHtml = processedHtml.replace(/\$\$([\s\S]+?)\$\$/g, (match, latex) => {
-    try {
-      const decodedLatex = latex.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-      return `<div class="my-4 flex justify-center overflow-x-auto">${katex.renderToString(decodedLatex, { throwOnError: false, displayMode: true })}</div>`;
-    } catch (e) {
-      return match;
-    }
-  });
-
-  // 3. Convert Inline Markdown Math $ ... $
-  processedHtml = processedHtml.replace(/\$([^$\n]+?)\$/g, (match, latex) => {
-    try {
-      const decodedLatex = latex.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-      return katex.renderToString(decodedLatex, { throwOnError: false, displayMode: false });
-    } catch (e) {
-      return match;
-    }
-  });
-
-  return processedHtml;
-};
 
 // ─── Main Component ───────────────────────────────────────────
 const AdminMaterialForm: React.FC = () => {
@@ -475,7 +436,7 @@ const AdminMaterialForm: React.FC = () => {
                       <Divider className="border-on-surface/10 mb-6" />
                       <div id="material-preview"
                         className="prose prose-lg dark:prose-invert max-w-none font-sans text-on-surface/80 dark:text-zinc-300 leading-loose kantan-quill kantan-quill-preview"
-                        dangerouslySetInnerHTML={{ __html: renderPreviewContent(body) }} />
+                        dangerouslySetInnerHTML={{ __html: renderContent(body) }} />
                     </div>
                   </Card>
                 </div>
@@ -487,7 +448,7 @@ const AdminMaterialForm: React.FC = () => {
       
       {/* AI Assistant Floating Button */}
       {view === 'editor' && (
-        <AIAssistant onApply={(content) => {
+        <AIAssistant onApply={(content: string) => {
           setBody(content);
           setSaved(false);
         }} />

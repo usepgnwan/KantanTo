@@ -11,35 +11,9 @@ import {
   FilePdfOutlined,
 } from '@ant-design/icons';
 import AppLayout from '../layouts/AppLayout';
+import { renderContent } from '../utils/renderContent';
 
 const { Title, Text } = Typography;
-
-declare global { interface Window { katex?: any; renderMathInElement?: any; } }
-
-// ── Same renderer as AdminMaterialForm ───────────────────────
-const renderKaTeX = (latex: string, displayMode = false): string => {
-  if (window.katex) {
-    try {
-      return window.katex.renderToString(latex, { displayMode, throwOnError: false });
-    } catch { return latex; }
-  }
-  return `<span class="font-mono bg-blue-50 text-blue-700 px-1 rounded text-sm">${displayMode ? '$$' : '$'}${latex}${displayMode ? '$$' : '$'}</span>`;
-};
-
-const renderContent = (raw: string): string => {
-  return raw
-    .replace(/\$\$([^$]+)\$\$/g, (_, latex) => `<div class="my-6 py-4 flex justify-center overflow-x-auto">${renderKaTeX(latex, true)}</div>`)
-    .replace(/\$([^$\n]+)\$/g, (_, latex) => renderKaTeX(latex, false))
-    .replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-on-surface dark:text-zinc-100">$1</strong>')
-    .replace(/_(.+?)_/g, '<em>$1</em>')
-    .replace(/^### (.+)$/gm, '<h3 class="text-xl font-black font-manrope mt-8 mb-3 text-on-surface dark:text-zinc-100">$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2 class="text-2xl font-black font-manrope mt-10 mb-4 text-on-surface dark:text-zinc-100">$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1 class="text-3xl font-black font-manrope mt-12 mb-5 text-on-surface dark:text-zinc-100">$1</h1>')
-    .replace(/^- (.+)$/gm, '<li class="ml-6 mb-2 list-disc leading-relaxed">$1</li>')
-    .replace(/^(\d+)\. (.+)$/gm, '<li class="ml-6 mb-2 list-decimal leading-relaxed">$2</li>')
-    .replace(/`(.+?)`/g, '<code class="bg-surface-low dark:bg-zinc-800 px-2 py-0.5 rounded-md text-sm font-mono text-primary">$1</code>')
-    .replace(/\n{2,}/g, '</p><p class="mb-5 leading-loose">');
-};
 
 // ── Mock data (later replaced by API) ────────────────────────
 const syllabusItems = [
@@ -120,10 +94,10 @@ const MaterialDetail: React.FC = () => {
 
   // Trigger KaTeX re-render on content change
   useEffect(() => {
-    if (window.renderMathInElement) {
+    if ((window as any).renderMathInElement) {
       const el = document.getElementById('materi-content');
       if (el) {
-        window.renderMathInElement(el, {
+        (window as any).renderMathInElement(el, {
           delimiters: [
             { left: '$$', right: '$$', display: true },
             { left: '$', right: '$', display: false },
@@ -219,8 +193,8 @@ const MaterialDetail: React.FC = () => {
                     {/* Rendered Body */}
                     <div
                       id="materi-content"
-                      className="prose prose-lg dark:prose-invert max-w-none font-sans text-on-surface/80 dark:text-zinc-300"
-                      dangerouslySetInnerHTML={{ __html: `<p class="mb-5 leading-loose">${renderContent(meta.body)}</p>` }}
+                      className="blog-content kantan-quill-preview prose prose-lg dark:prose-invert max-w-none font-sans text-on-surface/80 dark:text-zinc-300 leading-loose"
+                      dangerouslySetInnerHTML={{ __html: renderContent(meta.body) }}
                     />
 
                     {/* PDF attachments */}

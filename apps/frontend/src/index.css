@@ -57,10 +57,8 @@
   }
 
   .weightless-card {
-    /* Ganti hover:border-primary/20 dengan hex code manual atau hilangkan transparansinya */
     @apply bg-surface dark:bg-surface-low border border-border-color shadow-sm hover:shadow-xl transition-all duration-500 rounded-2xl overflow-hidden;
 
-    /* Gunakan cara manual jika tetap ingin ada transparansi */
     &:hover {
       border-color: rgba(0, 96, 173, 0.2);
     }
@@ -83,7 +81,6 @@
   }
 
   /* ── Quill Bubble Toolbar Fix ─────────────────────── */
-  /* Pastikan bubble tooltip tidak kepotong oleh overflow parent */
   .ql-bubble .ql-tooltip {
     z-index: 9999 !important;
     position: fixed !important;
@@ -106,7 +103,7 @@
     text-align: justify !important;
   }
 
-  /* ── KaTeX Math Display Fixes ─────────────────────── */
+  /* ── KaTeX Math Display Fixes & Blog Styles ────────── */
   .katex-display {
     margin: 1.25rem 0 !important;
     overflow-x: auto !important;
@@ -118,10 +115,35 @@
     vertical-align: middle;
     padding: 0 2px;
   }
-  .katex-block-wrapper {
+  .katex-block-wrapper,
+  .katex-display-wrapper {
     display: flex;
     justify-content: center;
     margin: 1.25rem 0;
     overflow-x: auto;
+  }
+
+  /* ── Blog & Quill Math/Content Preview Styles ──────── */
+  .blog-content,
+  .kantan-quill-preview {
+    word-break: break-word;
+  }
+
+  .blog-content .katex,
+  .kantan-quill-preview .katex {
+    font-size: 1.05em;
+  }
+
+  .kantan-option-math {
+    display: block;
+  }
+
+  .kantan-option-math p {
+    margin: 0 !important;
+    display: inline-block;
+  }
+  
+  .kantan-option-math .katex-display-wrapper {
+    margin: 0.5rem 0 !important;
   }
 }
