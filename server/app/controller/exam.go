@@ -85,8 +85,8 @@ func SubmitExam(c echo.Context) error {
 			selected = []int{}
 		}
 
-		if q.Type == "nested" || q.Type == "scenario" {
-			// Scenario Based: Independent Scoring for each sub-question
+		if q.Type == "nested" || q.Type == "scenario" || q.Type == "table" {
+			// Scenario / Table Based: Independent Scoring for each sub-question
 			for _, sub := range q.SubQuestions {
 				subSelected, hasSubAns := req.Answers[sub.ClientID] // Frontend sends ClientID keys
 				if !hasSubAns {
@@ -95,9 +95,12 @@ func SubmitExam(c echo.Context) error {
 
 				subCorrect := parseCorrectJSON(sub.CorrectJSON)
 
-				// Calculate totalIncorrect from sub-question options
+				// Calculate totalIncorrect from sub-question options or parent options (for table)
 				var subOpts []string
 				json.Unmarshal([]byte(sub.OptionsJSON), &subOpts)
+				if len(subOpts) == 0 && q.Type == "table" {
+					json.Unmarshal([]byte(q.OptionsJSON), &subOpts)
+				}
 				totalIncorrect := len(subOpts) - len(subCorrect)
 				if totalIncorrect < 0 {
 					totalIncorrect = 0
@@ -282,11 +285,37 @@ func GetExamSession(c echo.Context) error {
 		CorrectAnswers []int    `json:"correct_answers"`
 		Discussion     string   `json:"discussion"`
 		// Scenario context
-		ParentQuestion string `json:"parent_question,omitempty"`
-		ParentTitle    string `json:"parent_title,omitempty"`
+		ParentQuestion string   `json:"parent_question,omitempty"`
+		ParentTitle    string   `json:"parent_title,omitempty"`
+		ParentType     string   `json:"parent_type,omitempty"`
+		ParentOptions  []string `json:"parent_options,omitempty"`
 	}
 
 	var enrichedAnswers []AnswerDetail
+
+	// Track which question_ids have already been "expanded" from current sub-questions
+	// so we don't process them twice (once per stored answer row).
+	expandedTableQuestions := map[uint]bool{}
+
+	// Build a lookup: question_id -> list of stored answers, for matching later
+	type storedAns struct {
+		subQuestionID uint
+		selectedOpts  []int
+	}
+	storedAnswersByQuestion := map[uint][]storedAns{}
+	for _, ans := range session.Answers {
+		if ans.SubQuestionID != nil {
+			var opts []int
+			json.Unmarshal([]byte(ans.SelectedOptionsJSON), &opts)
+			if opts == nil {
+				opts = []int{}
+			}
+			storedAnswersByQuestion[ans.QuestionID] = append(storedAnswersByQuestion[ans.QuestionID], storedAns{
+				subQuestionID: *ans.SubQuestionID,
+				selectedOpts:  opts,
+			})
+		}
+	}
 
 	for _, ans := range session.Answers {
 		detail := AnswerDetail{
@@ -304,32 +333,148 @@ func GetExamSession(c echo.Context) error {
 		}
 
 		if ans.SubQuestionID != nil {
-			// Sub-question: fetch both the sub-question and its parent
-			var sub model.PackageSubQuestion
-			if err := connection.DB.Where("id = ?", *ans.SubQuestionID).First(&sub).Error; err == nil {
-				detail.QuestionText = sub.Question
-				detail.QuestionType = sub.Type
-				detail.Discussion = sub.Discussion
-				detail.MaxPoints = sub.Points
+			// ── Sub-question answer ──────────────────────────────────────────────
+			// Fetch parent question first to decide how to handle this
+			var parent model.PackageQuestion
+			parentFound := connection.DB.Preload("SubQuestions", func(db *gorm.DB) *gorm.DB {
+				return db.Order("id asc")
+			}).Where("id = ?", ans.QuestionID).First(&parent).Error == nil
 
-				var opts []string
-				json.Unmarshal([]byte(sub.OptionsJSON), &opts)
-				detail.Options = opts
+			if parentFound && parent.Type == "table" {
+				// TABLE TYPE: always rebuild from CURRENT sub-questions of the parent.
+				// Only process each parent question once (skip duplicate answer rows).
+				if expandedTableQuestions[ans.QuestionID] {
+					continue
+				}
+				expandedTableQuestions[ans.QuestionID] = true
 
-				detail.CorrectAnswers = parseCorrectJSON(sub.CorrectJSON)
+				var parentOpts []string
+				json.Unmarshal([]byte(parent.OptionsJSON), &parentOpts)
+				if len(parentOpts) == 0 {
+					parentOpts = []string{"Benar", "Salah"}
+				}
+
+				// Build a map of subQuestionID -> storedAnswer for this parent
+				answerMap := map[uint]storedAns{}
+				for _, sa := range storedAnswersByQuestion[ans.QuestionID] {
+					answerMap[sa.subQuestionID] = sa
+				}
+
+				for _, sub := range parent.SubQuestions {
+					subCorrect := parseCorrectJSON(sub.CorrectJSON)
+					var subOpts []string
+					json.Unmarshal([]byte(sub.OptionsJSON), &subOpts)
+					if len(subOpts) == 0 {
+						subOpts = parentOpts
+					}
+
+					// Check if this sub-question was answered in the session
+					sa, wasAnswered := answerMap[sub.ID]
+					selectedOpts := []int{}
+					if wasAnswered {
+						selectedOpts = sa.selectedOpts
+					}
+
+					// Recalculate score live
+					totalIncorrect := len(subOpts) - len(subCorrect)
+					if totalIncorrect < 0 {
+						totalIncorrect = 0
+					}
+					pts, isCorrect := calculateScoreMulti(sub.Type, selectedOpts, subCorrect, sub.Points, "all_or_nothing", totalIncorrect)
+
+					subID := sub.ID
+					subDetail := AnswerDetail{
+						ID:              ans.ID,
+						QuestionID:      parent.ID,
+						SubQuestionID:   &subID,
+						SelectedOptions: selectedOpts,
+						IsCorrect:       isCorrect,
+						PointsEarned:    pts,
+						MaxPoints:       sub.Points,
+						QuestionText:    sub.Question,
+						QuestionTitle:   parent.Title,
+						QuestionType:    sub.Type,
+						Options:         subOpts,
+						CorrectAnswers:  subCorrect,
+						Discussion:      sub.Discussion,
+						ParentQuestion:  parent.Question,
+						ParentTitle:     parent.Title,
+						ParentType:      parent.Type,
+						ParentOptions:   parentOpts,
+					}
+					enrichedAnswers = append(enrichedAnswers, subDetail)
+				}
+				continue
 			}
 
-			// Fetch parent question for context
-			var parent model.PackageQuestion
-			if err := connection.DB.Where("id = ?", ans.QuestionID).First(&parent).Error; err == nil {
+			if parentFound {
+				// Non-table sub-question (nested/scenario): use stored sub-question data
 				detail.ParentQuestion = parent.Question
 				detail.ParentTitle = parent.Title
 				detail.QuestionTitle = parent.Title
+				detail.ParentType = parent.Type
+
+				var parentOpts []string
+				json.Unmarshal([]byte(parent.OptionsJSON), &parentOpts)
+				detail.ParentOptions = parentOpts
+
+				var sub model.PackageSubQuestion
+				if err := connection.DB.Where("id = ?", *ans.SubQuestionID).First(&sub).Error; err == nil {
+					detail.QuestionText = sub.Question
+					detail.QuestionType = sub.Type
+					detail.Discussion = sub.Discussion
+					detail.MaxPoints = sub.Points
+
+					var opts []string
+					json.Unmarshal([]byte(sub.OptionsJSON), &opts)
+					if len(opts) == 0 && len(parentOpts) > 0 {
+						opts = parentOpts
+					}
+					detail.Options = opts
+					detail.CorrectAnswers = parseCorrectJSON(sub.CorrectJSON)
+				}
 			}
 		} else {
-			// Regular question
+			// ── No SubQuestionID: regular question OR legacy unexpanded table/nested ──
 			var q model.PackageQuestion
-			if err := connection.DB.Where("id = ?", ans.QuestionID).First(&q).Error; err == nil {
+			if err := connection.DB.Preload("SubQuestions", func(db *gorm.DB) *gorm.DB {
+				return db.Order("id asc")
+			}).Where("id = ?", ans.QuestionID).First(&q).Error; err == nil {
+				if (q.Type == "table" || q.Type == "nested" || q.Type == "scenario") && len(q.SubQuestions) > 0 {
+					var parentOpts []string
+					json.Unmarshal([]byte(q.OptionsJSON), &parentOpts)
+					for _, sub := range q.SubQuestions {
+						var subOpts []string
+						json.Unmarshal([]byte(sub.OptionsJSON), &subOpts)
+						if (len(subOpts) == 0 || q.Type == "table") && len(parentOpts) > 0 {
+							subOpts = parentOpts
+						}
+						subCorrect := parseCorrectJSON(sub.CorrectJSON)
+						subID := sub.ID
+						subDetail := AnswerDetail{
+							ID:              ans.ID,
+							QuestionID:      q.ID,
+							SubQuestionID:   &subID,
+							SelectedOptions: []int{},
+							IsCorrect:       false,
+							PointsEarned:    0,
+							MaxPoints:       sub.Points,
+							QuestionText:    sub.Question,
+							QuestionTitle:   q.Title,
+							QuestionType:    sub.Type,
+							Options:         subOpts,
+							CorrectAnswers:  subCorrect,
+							Discussion:      sub.Discussion,
+							ParentQuestion:  q.Question,
+							ParentTitle:     q.Title,
+							ParentType:      q.Type,
+							ParentOptions:   parentOpts,
+						}
+						enrichedAnswers = append(enrichedAnswers, subDetail)
+					}
+					continue
+				}
+
 				detail.QuestionText = q.Question
 				detail.QuestionTitle = q.Title
 				detail.QuestionType = q.Type
@@ -346,7 +491,6 @@ func GetExamSession(c echo.Context) error {
 		}
 
 		// Recalculate is_correct and points_earned live from current correct data
-		// (fixes stale DB values from before parseCorrectJSON fix)
 		if len(detail.CorrectAnswers) > 0 && detail.MaxPoints > 0 {
 			var totalOpts []string
 			for _, o := range detail.Options {

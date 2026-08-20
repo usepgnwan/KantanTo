@@ -201,6 +201,7 @@ const (
 	QuestionTypeSingle   = "single"
 	QuestionTypeMultiple = "multiple"
 	QuestionTypeNested   = "nested"
+	QuestionTypeTable    = "table"
 
 	ScoringAllOrNothing = "all_or_nothing"
 	ScoringPartial      = "partial"
@@ -689,7 +690,7 @@ func normalizeQuestionPayload(payload *packageQuestionPayload) {
 	if payload.ScoringMethod == "" {
 		payload.ScoringMethod = ScoringAllOrNothing
 	}
-	if payload.Type == QuestionTypeNested {
+	if payload.Type == QuestionTypeNested || payload.Type == QuestionTypeTable {
 		total := 0.0
 		for i := range payload.SubQuestions {
 			total += payload.SubQuestions[i].Points
@@ -769,7 +770,7 @@ func mapVideoResponse(video model.PackageVideo) packageVideoResponse {
 }
 
 func scoreByType(payload scoreRequest) float64 {
-	if payload.Type == QuestionTypeNested {
+	if payload.Type == QuestionTypeNested || payload.Type == QuestionTypeTable {
 		total := 0.0
 		for _, sub := range payload.SubQuestions {
 			total += scoreMultiple(sub.Type, sub.Points, ScoringAllOrNothing, sub.Options, sub.Correct, sub.Answer)

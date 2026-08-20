@@ -84,7 +84,7 @@ const IndexPage: React.FC = () => {
       <StatsBar />
       <FeaturesGrid />
       <InteractiveWidgets />
-      
+
       {/* Package Catalog - 4 Grid */}
       <section id="paket" className="py-24 bg-background dark:bg-zinc-800/10 transition-colors duration-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center mb-16">
@@ -183,8 +183,8 @@ const IndexPage: React.FC = () => {
               <Row gutter={[32, 32]}>
                 {/* Headline (1st post) */}
                 <Col xs={24} lg={12}>
-                  <Card 
-                    className="border-none group overflow-hidden rounded-[24px] sm:rounded-[32px] shadow-xl hover:shadow-2xl transition-all shadow-primary/5 bg-surface-low/30 h-full p-0 cursor-pointer flex flex-col" 
+                  <Card
+                    className="border-none group overflow-hidden rounded-[24px] sm:rounded-[32px] shadow-xl hover:shadow-2xl transition-all shadow-primary/5 bg-surface-low/30 h-full p-0 cursor-pointer flex flex-col"
                     bodyStyle={{ padding: 0, flex: 1, display: 'flex', flexDirection: 'column' }}
                     onClick={() => navigate(`/blog/${blogs[0].slug}`)}
                   >
@@ -207,7 +207,7 @@ const IndexPage: React.FC = () => {
                     </div>
                   </Card>
                 </Col>
-                
+
                 {/* 4 other posts */}
                 <Col xs={24} lg={12}>
                   <div className="flex flex-col gap-4 sm:gap-6 h-full justify-start">
@@ -237,7 +237,7 @@ const IndexPage: React.FC = () => {
             ) : (
               <Empty description="Belum ada artikel" />
             )}
-            
+
             {/* Mobile View All Button */}
             <div className="mt-8 text-center sm:hidden">
               <Button type="primary" block className="h-12 rounded-xl font-bold shadow-md shadow-primary/20" onClick={() => navigate('/blog')}>
@@ -249,7 +249,7 @@ const IndexPage: React.FC = () => {
       </section>
 
       <CustomerReviews />
-      
+
       <ContactForm />
 
       {/* CTA Final */}
@@ -258,7 +258,7 @@ const IndexPage: React.FC = () => {
         <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center z-10 py-20">
           <Title level={2} className="!text-white !text-3xl md:!text-5xl mb-8">Mulai Tryout Saat Ini</Title>
           <Paragraph className="text-white/80 text-lg mb-10 max-w-2xl mx-auto">
-            Bergabunglah dengan ribuan pejuang PTN lainnya dan mulailah latihan intensif hari ini.
+            Asah pemahaman materi dan raih nilai impianmu. Mulai latihan tryout intensif sekarang untuk persiapan ujian yang lebih matang!
           </Paragraph>
           <button className="bg-white text-primary px-12 py-4 rounded-full font-bold text-lg hover:scale-105 transition-all shadow-xl">
             Ikuti Tryout Sekarang

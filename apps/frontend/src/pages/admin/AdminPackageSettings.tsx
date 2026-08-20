@@ -30,7 +30,7 @@ import type { UploadFile } from 'antd';
 const { Title, Text } = Typography;
 
 // ─── TYPES ──────────────────────────────────────────────────
-type QuestionType = 'single' | 'multiple' | 'nested';
+type QuestionType = 'single' | 'multiple' | 'nested' | 'table';
 type ScoringMethod = 'all_or_nothing' | 'partial';
 
 interface SubQuestion {
@@ -206,6 +206,297 @@ const SubQuestionEditor: React.FC<SubQuestionEditorProps> = React.memo(({
   </div>
 ));
 
+// ─── COMPONENT: Table Question Editor ───────────────────────
+interface TableQuestionEditorProps {
+  question: Question;
+  onUpdate: (updatedQuestion: Partial<Question>) => void;
+}
+
+const TableQuestionEditor: React.FC<TableQuestionEditorProps> = React.memo(({
+  question,
+  onUpdate,
+}) => {
+  const columns = question.options && question.options.length >= 2 ? question.options : ['Benar', 'Salah'];
+  const statementTitle = question.title || 'Pernyataan';
+  const rows = question.subQuestions || [];
+
+  const handleUpdateColumnTitle = (colIdx: number, newTitle: string) => {
+    const nextCols = [...columns];
+    nextCols[colIdx] = newTitle;
+    onUpdate({ options: nextCols });
+  };
+
+  const handleAddColumn = () => {
+    const nextCols = [...columns, `Pilihan ${String.fromCharCode(65 + columns.length)}`];
+    onUpdate({ options: nextCols });
+  };
+
+  const handleRemoveColumn = (colIdx: number) => {
+    if (columns.length <= 2) {
+      message.warning('Minimal harus ada 2 kolom pilihan');
+      return;
+    }
+    const nextCols = columns.filter((_, idx) => idx !== colIdx);
+    const nextSubs = rows.map(sub => {
+      const currentCorrect = typeof sub.correct === 'number' ? sub.correct : 0;
+      let newCorrect = currentCorrect;
+      if (currentCorrect === colIdx) {
+        newCorrect = 0;
+      } else if (currentCorrect > colIdx) {
+        newCorrect = currentCorrect - 1;
+      }
+      return { ...sub, correct: newCorrect };
+    });
+    onUpdate({ options: nextCols, subQuestions: nextSubs });
+  };
+
+  const handleAddRow = () => {
+    const newRow: SubQuestion = {
+      id: Date.now().toString(),
+      type: 'single',
+      question: '',
+      discussion: '',
+      options: [],
+      correct: 0,
+      points: 1,
+    };
+    onUpdate({ subQuestions: [...rows, newRow] });
+  };
+
+  const handleUpdateRow = (rowIdx: number, updatedRow: Partial<SubQuestion>) => {
+    const nextSubs = rows.map((r, idx) => (idx === rowIdx ? { ...r, ...updatedRow } : r));
+    onUpdate({ subQuestions: nextSubs });
+  };
+
+  const handleDeleteRow = (rowIdx: number) => {
+    if (rows.length <= 1) {
+      message.warning('Minimal harus ada 1 baris pernyataan');
+      return;
+    }
+    const nextSubs = rows.filter((_, idx) => idx !== rowIdx);
+    onUpdate({ subQuestions: nextSubs });
+  };
+
+  return (
+    <div className="space-y-8">
+      {/* ── 1. HEADER & KOLOM CONFIGURATION ── */}
+      <div className="p-6 bg-surface-low/50 dark:bg-zinc-800/60 rounded-3xl border border-on-surface/10 space-y-6">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <Title level={5} className="!m-0 !font-manrope !font-black text-on-surface">
+              Pengaturan Kolom Tabel
+            </Title>
+            <Text className="text-xs text-on-surface/50">
+              Sesuaikan judul kolom pernyataan dan nama-nama opsi kolom jawaban secara dinamis.
+            </Text>
+          </div>
+          <Button
+            type="dashed"
+            icon={<PlusOutlined />}
+            size="small"
+            onClick={handleAddColumn}
+            className="rounded-xl font-bold text-xs"
+          >
+            Tambah Kolom Opsi
+          </Button>
+        </div>
+
+        <Row gutter={[16, 16]}>
+          {/* Judul Kolom Baris / Pernyataan */}
+          <Col xs={24} sm={10}>
+            <Text className="text-[10px] font-black uppercase tracking-wider text-on-surface/50 block mb-1">
+              Judul Kolom Pernyataan
+            </Text>
+            <Input
+              value={statementTitle}
+              onChange={e => onUpdate({ title: e.target.value })}
+              placeholder="Contoh: Pernyataan, Karakteristik, dll."
+              className="rounded-xl font-semibold h-10 bg-white dark:bg-zinc-700"
+            />
+          </Col>
+
+          {/* Kolom Opsi Jawaban */}
+          <Col xs={24} sm={14}>
+            <Text className="text-[10px] font-black uppercase tracking-wider text-on-surface/50 block mb-1">
+              Kolom Pilihan Jawaban ({columns.length} Kolom)
+            </Text>
+            <div className="flex flex-wrap gap-2">
+              {columns.map((colName, cIdx) => (
+                <div key={cIdx} className="flex items-center gap-1.5 bg-white dark:bg-zinc-700 p-1 pl-3 rounded-xl border border-on-surface/10 shadow-sm">
+                  <span className="font-black text-xs text-primary">{String.fromCharCode(65 + cIdx)}.</span>
+                  <Input
+                    value={colName}
+                    onChange={e => handleUpdateColumnTitle(cIdx, e.target.value)}
+                    placeholder={`Opsi ${String.fromCharCode(65 + cIdx)}`}
+                    className="border-none shadow-none font-bold text-xs h-8 w-24 px-1"
+                  />
+                  {columns.length > 2 && (
+                    <Button
+                      type="text"
+                      danger
+                      size="small"
+                      icon={<DeleteOutlined />}
+                      onClick={() => handleRemoveColumn(cIdx)}
+                      className="text-xs p-1 h-7 w-7"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </Col>
+        </Row>
+      </div>
+
+      {/* ── 2. DAFTAR BARIS PERNYATAAN / SUB-SOAL ── */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div>
+            <Title level={5} className="!m-0 !font-manrope !font-black text-on-surface">
+              Daftar Baris Pernyataan ({rows.length} Baris)
+            </Title>
+            <Text className="text-xs text-on-surface/50">
+              Tuliskan teks setiap baris pernyataan dan tentukan kolom jawaban yang benar.
+            </Text>
+          </div>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleAddRow}
+            className="rounded-xl font-bold shadow-md shadow-primary/20"
+          >
+            Tambah Baris Pernyataan
+          </Button>
+        </div>
+
+        <div className="space-y-6">
+          {rows.map((row, rIdx) => {
+            const currentCorrect = typeof row.correct === 'number' ? row.correct : 0;
+            return (
+              <div
+                key={row.id || String(rIdx)}
+                className="p-6 bg-white dark:bg-zinc-800/80 rounded-3xl border border-on-surface/10 shadow-sm space-y-5"
+              >
+                {/* Row Header */}
+                <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-on-surface/5">
+                  <div className="flex items-center gap-3">
+                    <Tag className="rounded-xl bg-primary text-white border-none font-black text-xs px-3 py-1">
+                      Baris #{rIdx + 1}
+                    </Tag>
+                    <div className="flex items-center gap-2 px-3 py-1 bg-surface-low dark:bg-zinc-700 rounded-xl border border-on-surface/5">
+                      <Text className="text-[10px] font-black uppercase text-on-surface/50">Poin</Text>
+                      <InputNumber
+                        size="small"
+                        min={0}
+                        value={row.points}
+                        onChange={val => handleUpdateRow(rIdx, { points: Number(val) || 0 })}
+                        className="w-16 rounded-lg font-bold text-xs"
+                        controls={false}
+                      />
+                    </div>
+                  </div>
+
+                  <Button
+                    danger
+                    type="text"
+                    icon={<DeleteOutlined />}
+                    size="small"
+                    onClick={() => handleDeleteRow(rIdx)}
+                    className="hover:bg-red-50 dark:hover:bg-red-900/20 font-bold"
+                  >
+                    Hapus Baris
+                  </Button>
+                </div>
+
+                {/* Row Statement Editor */}
+                <div>
+                  <Text className="text-[10px] font-black uppercase tracking-wider text-on-surface/40 block mb-1">
+                    Teks Pernyataan #{rIdx + 1}
+                  </Text>
+                  <KantanEditor
+                    value={row.question}
+                    onChange={val => handleUpdateRow(rIdx, { question: val })}
+                    placeholder={`Tuliskan pernyataan untuk baris ke-${rIdx + 1}...`}
+                    rows={3}
+                    label={`Pernyataan #${rIdx + 1}`}
+                  />
+                  {hasPreviewContent(row.question) && (
+                    <div className="mt-3 p-4 rounded-2xl bg-surface-low/30 dark:bg-zinc-900/40 border border-on-surface/5">
+                      <div className="flex items-center justify-between mb-2">
+                        <Text className="text-[10px] font-black uppercase text-primary tracking-wider">Preview Pernyataan (KaTeX)</Text>
+                        <Tag color="blue" className="rounded-full border-none text-[8px] font-black uppercase m-0">KaTeX</Tag>
+                      </div>
+                      <div className="blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none text-on-surface/90 dark:text-zinc-200 font-sans" dangerouslySetInnerHTML={{ __html: renderContent(row.question) }} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Kunci Jawaban (Radio Selector across Dynamic Columns) */}
+                <div className="p-4 rounded-2xl bg-surface-low/40 dark:bg-zinc-900/50 border border-on-surface/5">
+                  <Text className="text-[10px] font-black uppercase tracking-wider text-on-surface/50 block mb-3">
+                    Kunci Jawaban Benar Baris #{rIdx + 1}:
+                  </Text>
+                  <div className="flex flex-wrap items-center gap-3">
+                    {columns.map((colName, cIdx) => {
+                      const isSelected = currentCorrect === cIdx;
+                      return (
+                        <div
+                          key={cIdx}
+                          onClick={() => handleUpdateRow(rIdx, { correct: cIdx })}
+                          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-green-500/10 border-green-500 shadow-sm text-green-700 dark:text-green-300 font-bold'
+                              : 'bg-white dark:bg-zinc-800 border-on-surface/10 text-on-surface/70 hover:border-primary/40'
+                          }`}
+                        >
+                          <Radio
+                            checked={isSelected}
+                            onChange={() => handleUpdateRow(rIdx, { correct: cIdx })}
+                          />
+                          <span className="text-sm font-bold">
+                            {colName || `Opsi ${String.fromCharCode(65 + cIdx)}`}
+                          </span>
+                          {isSelected && (
+                            <Tag color="success" className="rounded-full border-none text-[9px] font-black uppercase m-0">
+                              Kunci
+                            </Tag>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Row Discussion */}
+                <div>
+                  <Text className="text-[10px] font-black uppercase tracking-wider text-on-surface/40 block mb-1">
+                    Pembahasan Baris #{rIdx + 1} (Opsional)
+                  </Text>
+                  <KantanEditor
+                    value={row.discussion}
+                    onChange={val => handleUpdateRow(rIdx, { discussion: val })}
+                    placeholder="Tuliskan alasan atau pembahasan untuk baris ini..."
+                    rows={2}
+                    label={`Pembahasan #${rIdx + 1}`}
+                  />
+                  {hasPreviewContent(row.discussion) && (
+                    <div className="mt-3 p-4 rounded-2xl bg-green-500/5 dark:bg-green-900/10 border border-green-500/20">
+                      <div className="flex items-center justify-between mb-2">
+                        <Text className="text-[10px] font-black uppercase text-green-600 dark:text-green-400 tracking-wider">Preview Pembahasan (KaTeX)</Text>
+                        <Tag color="green" className="rounded-full border-none text-[8px] font-black uppercase m-0">KaTeX</Tag>
+                      </div>
+                      <div className="blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none text-green-800 dark:text-green-300 font-sans" dangerouslySetInnerHTML={{ __html: renderContent(row.discussion) }} />
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+});
+
 // ─── MAIN COMPONENT ──────────────────────────────────────────
 const AdminPackageSettings: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -236,7 +527,7 @@ const AdminPackageSettings: React.FC = () => {
     (question.subQuestions || []).reduce((sum, sub) => sum + (Number(sub.points) || 0), 0);
 
   const getEffectivePoints = (question: Question) =>
-    question.type === 'nested' ? getScenarioPoints(question) : question.points;
+    (question.type === 'nested' || question.type === 'table') ? getScenarioPoints(question) : question.points;
 
   const serializeQuestion = (question: Question) => ({
     id: question.id,
@@ -260,23 +551,29 @@ const AdminPackageSettings: React.FC = () => {
     })),
   });
 
-  const deserializeQuestion = (question: any): Question => ({
-    id: question.id,
-    type: question.type,
-    title: question.title,
-    question: question.question,
-    discussion: question.discussion,
-    options: question.options,
-    correct: normalizeCorrectForType(question.type, question.correct),
-    discussionRefs: question.discussion_refs,
-    points: question.points,
-    scoringMethod: question.scoring_method || 'all_or_nothing',
-    subQuestions: (question.sub_questions || []).map((sub: any) => ({
-      ...sub,
-      type: sub.type || 'single',
-      correct: normalizeCorrectForType(sub.type || 'single', sub.correct),
-    })),
-  });
+  const deserializeQuestion = (question: any): Question => {
+    let opts = question.options || [];
+    if (question.type === 'table' && (!opts || opts.length < 2 || opts.every((o: string) => !o))) {
+      opts = ['Benar', 'Salah'];
+    }
+    return {
+      id: question.id,
+      type: question.type,
+      title: question.title || (question.type === 'table' ? 'Pernyataan' : ''),
+      question: question.question,
+      discussion: question.discussion,
+      options: opts,
+      correct: normalizeCorrectForType(question.type, question.correct),
+      discussionRefs: question.discussion_refs || [],
+      points: question.points,
+      scoringMethod: question.scoring_method || 'all_or_nothing',
+      subQuestions: (question.sub_questions || []).map((sub: any) => ({
+        ...sub,
+        type: sub.type || 'single',
+        correct: normalizeCorrectForType(sub.type || 'single', sub.correct),
+      })),
+    };
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -577,17 +874,52 @@ const AdminPackageSettings: React.FC = () => {
                       className="w-full rounded-xl"
                       style={{ height: 44 }}
                       value={activeQ.type}
-                      onChange={val => updateActiveQ({
-                        type: val as QuestionType,
-                        correct: val === 'multiple' ? getCorrectIndexes(activeQ.correct) : normalizeCorrectForType(val as QuestionType, activeQ.correct),
-                        points: val === 'nested' ? getScenarioPoints(activeQ) : activeQ.points || 1,
-                        scoringMethod: val === 'multiple' ? activeQ.scoringMethod : 'all_or_nothing',
-                        subQuestions: val === 'nested' ? [{ id: '1', type: 'single', question: '', discussion: '', options: ['', '', '', '', ''], correct: 0, points: 1 }] : undefined
-                      })}
+                      onChange={val => {
+                        const newType = val as QuestionType;
+                        let newOptions = activeQ.options;
+                        let newTitle = activeQ.title;
+                        let newSubQuestions = activeQ.subQuestions;
+
+                        if (newType === 'table') {
+                          newTitle = activeQ.title || 'Pernyataan';
+                          if (!newOptions || newOptions.length < 2 || newOptions.every(o => !o)) {
+                            newOptions = ['Benar', 'Salah'];
+                          } else {
+                            newOptions = newOptions.filter(o => o.trim() !== '');
+                            if (newOptions.length < 2) newOptions = ['Benar', 'Salah'];
+                          }
+                          if (!newSubQuestions || newSubQuestions.length === 0) {
+                            newSubQuestions = [
+                              { id: '1', type: 'single', question: '', discussion: '', options: [], correct: 0, points: 1 },
+                              { id: '2', type: 'single', question: '', discussion: '', options: [], correct: 1, points: 1 },
+                              { id: '3', type: 'single', question: '', discussion: '', options: [], correct: 0, points: 1 },
+                            ];
+                          }
+                        } else if (newType === 'nested') {
+                          if (!newSubQuestions || newSubQuestions.length === 0) {
+                            newSubQuestions = [{ id: '1', type: 'single', question: '', discussion: '', options: ['', '', '', '', ''], correct: 0, points: 1 }];
+                          }
+                        } else {
+                          if (!newOptions || newOptions.length < 2) {
+                            newOptions = ['', '', '', '', ''];
+                          }
+                        }
+
+                        updateActiveQ({
+                          type: newType,
+                          title: newTitle,
+                          options: newOptions,
+                          correct: newType === 'multiple' ? getCorrectIndexes(activeQ.correct) : normalizeCorrectForType(newType, activeQ.correct),
+                          points: (newType === 'nested' || newType === 'table') ? getScenarioPoints({ ...activeQ, subQuestions: newSubQuestions }) : activeQ.points || 1,
+                          scoringMethod: newType === 'multiple' ? activeQ.scoringMethod : 'all_or_nothing',
+                          subQuestions: newSubQuestions,
+                        });
+                      }}
                       options={[
                         { value: 'single', label: 'Single Choice' },
                         { value: 'multiple', label: 'Multiple Choice' },
                         { value: 'nested', label: 'Scenario Based' },
+                        { value: 'table', label: 'Tabel / Pernyataan' },
                       ]}
                     />
                   </Col>
@@ -598,14 +930,14 @@ const AdminPackageSettings: React.FC = () => {
                       style={{ height: 44, display: 'flex', alignItems: 'center' }}
                       value={getEffectivePoints(activeQ)}
                       min={0}
-                      disabled={activeQ.type === 'nested'}
+                      disabled={activeQ.type === 'nested' || activeQ.type === 'table'}
                       onChange={val => updateActiveQ({ points: Number(val) || 0 })}
-                      addonAfter={activeQ.type === 'nested' ? 'auto' : undefined}
+                      addonAfter={(activeQ.type === 'nested' || activeQ.type === 'table') ? 'auto' : undefined}
                       placeholder="1"
                     />
-                    {activeQ.type === 'nested' && (
+                    {(activeQ.type === 'nested' || activeQ.type === 'table') && (
                       <Text className="text-[10px] text-on-surface/40 font-bold mt-1 block">
-                        Total otomatis: {getScenarioPoints(activeQ)} poin dari sub-soal.
+                        Total otomatis: {getScenarioPoints(activeQ)} poin dari sub-soal / baris.
                       </Text>
                     )}
                     {activeQ.type === 'multiple' && (
@@ -636,13 +968,13 @@ const AdminPackageSettings: React.FC = () => {
 
                 <div className="mb-8">
                   <Text className="text-xs font-black uppercase tracking-widest text-on-surface/40 block mb-2">
-                    {activeQ.type === 'nested' ? 'Isi Cerita / Skenario' : 'Pertanyaan'}
+                    {activeQ.type === 'nested' ? 'Isi Cerita / Skenario' : activeQ.type === 'table' ? 'Petunjuk / Soal Utama' : 'Pertanyaan'}
                   </Text>
                   <KantanEditor
                     value={activeQ.question}
                     onChange={(val) => updateActiveQ({ question: val })}
-                    placeholder={activeQ.type === 'nested' ? 'Tuliskan cerita, paragraf, atau skenario di sini...' : 'Tuliskan teks pertanyaan...'}
-                    rows={activeQ.type === 'nested' ? 10 : 5}
+                    placeholder={activeQ.type === 'nested' ? 'Tuliskan cerita, paragraf, atau skenario di sini...' : activeQ.type === 'table' ? 'Tuliskan pengantar soal atau petunjuk tabel di sini...' : 'Tuliskan teks pertanyaan...'}
+                    rows={activeQ.type === 'nested' || activeQ.type === 'table' ? 8 : 5}
                     label="Rich Question Editor"
                   />
                   {hasPreviewContent(activeQ.question) && (
@@ -678,7 +1010,35 @@ const AdminPackageSettings: React.FC = () => {
                   </div>
                 </div>
 
-                {activeQ.type !== 'nested' ? (
+                {activeQ.type === 'table' ? (
+                  <TableQuestionEditor
+                    question={activeQ}
+                    onUpdate={updateActiveQ}
+                  />
+                ) : activeQ.type === 'nested' ? (
+                  <div className="mt-8">
+                    <div className="flex items-center justify-between mb-4">
+                      <Title level={5} className="!m-0 !font-manrope !font-black">Sub-Pertanyaan</Title>
+                      <Button type="primary" ghost icon={<PlusOutlined />} onClick={addSubQuestion} className="rounded-xl font-bold">Tambah Sub-Soal</Button>
+                    </div>
+                    <div className="space-y-4">
+                      {activeQ.subQuestions?.map((sub, si) => (
+                        <SubQuestionEditor
+                          key={sub.id || String(si)}
+                          sub={sub}
+                          index={si}
+                          onUpdate={updatedSub => {
+                            const next = (activeQ.subQuestions || []).map(s => s.id === sub.id ? updatedSub : s);
+                            updateActiveQ({ subQuestions: next });
+                          }}
+                          onDelete={() => {
+                            updateActiveQ({ subQuestions: activeQ.subQuestions?.filter(s => s.id !== sub.id) });
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : (
                   <div className="space-y-4">
                     <Text className="text-xs font-black uppercase tracking-widest text-on-surface/40 block mb-2">Opsi Jawaban & Kunci</Text>
                     <div className="grid grid-cols-1 gap-4">
@@ -734,29 +1094,6 @@ const AdminPackageSettings: React.FC = () => {
                       })}
                     </div>
                   </div>
-                ) : (
-                  <div className="mt-8">
-                    <div className="flex items-center justify-between mb-4">
-                      <Title level={5} className="!m-0 !font-manrope !font-black">Sub-Pertanyaan</Title>
-                      <Button type="primary" ghost icon={<PlusOutlined />} onClick={addSubQuestion} className="rounded-xl font-bold">Tambah Sub-Soal</Button>
-                    </div>
-                    <div className="space-y-4">
-                      {activeQ.subQuestions?.map((sub, si) => (
-                        <SubQuestionEditor
-                          key={sub.id || String(si)}
-                          sub={sub}
-                          index={si}
-                          onUpdate={updatedSub => {
-                            const next = (activeQ.subQuestions || []).map(s => s.id === sub.id ? updatedSub : s);
-                            updateActiveQ({ subQuestions: next });
-                          }}
-                          onDelete={() => {
-                            updateActiveQ({ subQuestions: activeQ.subQuestions?.filter(s => s.id !== sub.id) });
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
                 )}
 
                 <Divider className="my-10 border-on-surface/5" />
@@ -764,7 +1101,17 @@ const AdminPackageSettings: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <Space>
                     <Button icon={<CopyOutlined />} onClick={duplicateActiveQuestion} className="rounded-xl font-bold h-11 px-6">Duplikat</Button>
-                    <Button icon={<EyeOutlined />} onClick={() => setPreviewModalOpen(true)} className="rounded-xl font-bold h-11 px-6">Pratinjau</Button>
+                    <Button icon={<EyeOutlined />} onClick={async () => {
+                      if (!id) { setPreviewModalOpen(true); return; }
+                      try {
+                        const saved = await savePackageQuestion(id, serializeQuestion(activeQ));
+                        updateActiveQ(deserializeQuestion(saved));
+                        message.success('Data soal disimpan, membuka pratinjau...');
+                      } catch {
+                        message.warning('Pratinjau menggunakan data lokal (gagal sinkron ke server).');
+                      }
+                      setPreviewModalOpen(true);
+                    }} className="rounded-xl font-bold h-11 px-6">Pratinjau</Button>
                   </Space>
                   <Button type="primary" icon={<SaveOutlined />} size="large" className="rounded-2xl h-12 px-10 font-black shadow-xl shadow-primary/20"
                     onClick={saveActiveQuestion}>
@@ -791,7 +1138,7 @@ const AdminPackageSettings: React.FC = () => {
                   Pratinjau Soal #{activeQIndex + 1}
                 </Tag>
                 <Tag color="blue" className="rounded-full border-none font-bold text-xs capitalize">
-                  {activeQ.type === 'single' ? 'Single Choice' : activeQ.type === 'multiple' ? 'Multiple Choice' : 'Scenario Based'}
+                  {activeQ.type === 'single' ? 'Single Choice' : activeQ.type === 'multiple' ? 'Multiple Choice' : activeQ.type === 'table' ? 'Tabel / Pernyataan' : 'Scenario Based'}
                 </Tag>
                 <Text className="text-xs text-on-surface/50 font-bold ml-auto mr-4">{getEffectivePoints(activeQ)} Poin</Text>
               </div>
@@ -822,8 +1169,72 @@ const AdminPackageSettings: React.FC = () => {
                 </div>
               )}
 
-              {/* Options (if not nested) */}
-              {activeQ.type !== 'nested' && (
+              {/* Table Question Preview */}
+              {activeQ.type === 'table' && (
+                <div className="space-y-4">
+                  <div className="overflow-x-auto rounded-2xl border border-on-surface/10 bg-white dark:bg-zinc-900 shadow-sm">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-surface-low/70 dark:bg-zinc-800 border-b border-on-surface/10">
+                          <th className="p-4 font-black text-sm text-on-surface">
+                            {activeQ.title || 'Pernyataan'}
+                          </th>
+                          {(activeQ.options && activeQ.options.length > 0 ? activeQ.options : ['Benar', 'Salah']).map((col, ci) => (
+                            <th key={ci} className="p-4 font-black text-sm text-center text-on-surface w-32 border-l border-on-surface/10">
+                              {col}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-on-surface/5">
+                        {(activeQ.subQuestions || []).map((sub, si) => {
+                          const correctCol = typeof sub.correct === 'number' ? sub.correct : 0;
+                          const colList = activeQ.options && activeQ.options.length > 0 ? activeQ.options : ['Benar', 'Salah'];
+                          return (
+                            <tr key={sub.id || si} className="hover:bg-surface-low/20 transition-colors">
+                              <td className="p-4 align-middle">
+                                <div
+                                  className="blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none font-medium text-on-surface/90"
+                                  dangerouslySetInnerHTML={{ __html: renderContent(sub.question || `Pernyataan baris ke-${si + 1}`) }}
+                                />
+                                <div className="mt-1">
+                                  <span className="text-[10px] font-bold text-on-surface/40">{sub.points || 1} Poin</span>
+                                </div>
+                              </td>
+                              {colList.map((_, ci) => {
+                                const isKey = correctCol === ci;
+                                return (
+                                  <td key={ci} className="p-4 text-center align-middle border-l border-on-surface/10">
+                                    <div className="flex justify-center items-center gap-1">
+                                      <div
+                                        className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
+                                          isKey
+                                            ? 'border-green-500 bg-green-500 text-white shadow-sm'
+                                            : 'border-on-surface/20 bg-surface-low/50'
+                                        }`}
+                                      >
+                                        {isKey && <div className="w-2 h-2 rounded-full bg-white" />}
+                                      </div>
+                                      {isKey && (
+                                        <Tag color="success" className="rounded-full border-none text-[8px] font-black uppercase m-0">
+                                          Kunci
+                                        </Tag>
+                                      )}
+                                    </div>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Options (if single/multiple) */}
+              {(activeQ.type === 'single' || activeQ.type === 'multiple') && (
                 <div className="space-y-3">
                   <Text className="text-xs font-black uppercase tracking-wider text-on-surface/40 block mb-1">Pilihan Jawaban:</Text>
                   {activeQ.options.map((opt, oi) => {

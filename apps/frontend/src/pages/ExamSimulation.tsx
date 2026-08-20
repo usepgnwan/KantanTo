@@ -262,7 +262,122 @@ const ExamSimulation: React.FC = () => {
       {/* EXAM BODY */}
       <main className="flex-grow overflow-auto">
 
-        {currentData.type === 'nested' ? (
+        {currentData.type === 'table' ? (
+          /* ── TABLE / MATRIX ── split 40/60 layout */
+          <div className="max-w-7xl mx-auto h-full flex flex-col lg:flex-row">
+
+            {/* Left: Question text / prompt (40% width, sticky/independent scroll) */}
+            <div className="lg:w-[40%] p-6 lg:p-10 border-b lg:border-b-0 lg:border-r border-surface-container overflow-y-auto bg-white/50 flex flex-col">
+              <div className="flex items-center gap-2 mb-4 flex-wrap">
+                <Tag className="rounded-full px-4 py-1 text-sm font-black border-none bg-surface-low text-on-surface">
+                  Soal #{currentQuestionIndex + 1}
+                </Tag>
+                <Tag color="blue" className="rounded-full border-none font-bold px-3">Tabel / Pernyataan</Tag>
+                {currentData.title && (
+                  <Tag color="cyan" className="rounded-full border-none font-bold px-3">{currentData.title}</Tag>
+                )}
+              </div>
+              
+              <Title level={4} className="!font-manrope !font-black !text-xl mt-0 mb-4">Pertanyaan</Title>
+              
+              <div
+                className="prose prose-p:text-on-surface/90 prose-p:leading-loose text-on-surface font-normal font-sans"
+                style={{ fontSize: `${textSize}px` }}
+                dangerouslySetInnerHTML={{ __html: renderLatex(currentData.question) }}
+              />
+            </div>
+
+            {/* Right: Interactive Table (60% width) */}
+            <div className="lg:w-[60%] p-6 lg:p-10 bg-white overflow-y-auto flex flex-col">
+              <div className="flex items-center justify-between mb-6">
+                <Text className="text-xs font-black uppercase tracking-wider text-on-surface/50">
+                  Pilih salah satu jawaban untuk tiap baris pernyataan:
+                </Text>
+                <Button type="text" className="text-on-surface/40 hover:text-primary font-bold text-xs uppercase" icon={<WarningOutlined />}>Lapor Soal</Button>
+              </div>
+
+              {/* Interactive Table */}
+              <div className="bg-white rounded-3xl shadow-sm border border-surface-container overflow-hidden mb-6">
+                <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="sticky top-0 z-10 bg-surface-low/95 backdrop-blur-sm shadow-sm border-b border-surface-container">
+                      <tr>
+                        <th className="p-4 sm:p-5 font-black text-sm sm:text-base text-on-surface">
+                          {currentData.title || 'Pernyataan'}
+                        </th>
+                        {(currentData.options && currentData.options.length > 0 ? currentData.options : ['Benar', 'Salah']).map((col, cIdx) => (
+                          <th key={cIdx} className="p-4 sm:p-5 font-black text-sm sm:text-base text-center text-on-surface w-28 sm:w-36 border-l border-surface-container/60">
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-surface-container/60">
+                      {currentData.sub_questions?.map((sub, sIdx) => {
+                        const currentAnsArr = answers[sub.id] || [];
+                        const colList = currentData.options && currentData.options.length > 0 ? currentData.options : ['Benar', 'Salah'];
+                        return (
+                          <tr key={sub.id || sIdx} className="hover:bg-surface-low/20 transition-colors">
+                            {/* Statement Cell */}
+                            <td className="p-4 sm:p-5 align-middle">
+                              <div
+                                className="font-normal text-on-surface/90 leading-relaxed font-sans"
+                                style={{ fontSize: `${textSize}px` }}
+                                dangerouslySetInnerHTML={{ __html: renderLatex(sub.question) }}
+                              />
+                            </td>
+
+                            {/* Radio Options Cells */}
+                            {colList.map((colName, cIdx) => {
+                              const isSelected = currentAnsArr.includes(cIdx);
+                              return (
+                                <td
+                                  key={cIdx}
+                                  onClick={() => handleSelectOption(sub.id, 'single', cIdx)}
+                                  className={`p-4 sm:p-5 text-center align-middle cursor-pointer transition-all border-l border-surface-container/60 ${
+                                    isSelected ? 'bg-primary/5' : 'hover:bg-surface-low/40'
+                                  }`}
+                                >
+                                  <div className="flex flex-col items-center justify-center gap-1">
+                                    <div
+                                      className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all border-2 ${
+                                        isSelected
+                                          ? 'border-primary bg-primary text-white shadow-md shadow-primary/20 scale-105'
+                                          : 'border-on-surface/20 bg-surface-lowest text-on-surface/40 hover:border-primary/50'
+                                      }`}
+                                    >
+                                      {isSelected ? (
+                                        <div className="w-2.5 h-2.5 rounded-full bg-white" />
+                                      ) : (
+                                        <span className="text-[10px] font-bold sm:hidden">{String.fromCharCode(65 + cIdx)}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Ragu-ragu Checkbox */}
+              <div className="bg-surface-low/30 border border-surface-container rounded-2xl p-4 mt-auto">
+                <Checkbox
+                  checked={doubtfulQuestions[currentData.id] || false}
+                  onChange={(e) => handleToggleDoubtful(currentData.id, e)}
+                  className="font-bold text-on-surface/60 hover:text-on-surface"
+                >
+                  Ragu-ragu (Tandai untuk diperiksa kembali)
+                </Checkbox>
+              </div>
+            </div>
+          </div>
+
+        ) : currentData.type === 'nested' ? (
           /* ── SCENARIO / NESTED ── split layout */
           <div className="max-w-7xl mx-auto h-full flex flex-col lg:flex-row">
 
@@ -271,7 +386,7 @@ const ExamSimulation: React.FC = () => {
               <Tag color="blue" className="mb-4 rounded-full border-none font-bold px-3">{currentData.title || 'Skenario'}</Tag>
               <Title level={4} className="!font-manrope !font-black !text-xl mt-0">Skenario Kasus</Title>
               <div
-                className="prose prose-p:text-on-surface/80 prose-p:leading-loose"
+                className="prose prose-p:text-on-surface/80 prose-p:leading-loose font-normal font-sans"
                 style={{ fontSize: `${textSize}px` }}
                 dangerouslySetInnerHTML={{ __html: renderLatex(currentData.question) }}
               />
@@ -291,10 +406,10 @@ const ExamSimulation: React.FC = () => {
                   const currentAnsArr = answers[sub.id] || [];
                   return (
                     <div key={sub.id} className="border-b border-surface-container pb-8 last:border-0">
-                      <Paragraph className="leading-relaxed text-on-surface font-medium mb-6" style={{ fontSize: `${textSize}px` }}>
+                      <div className="leading-relaxed text-on-surface font-normal mb-6 font-sans" style={{ fontSize: `${textSize}px` }}>
                         <span className="font-black mr-2">{sIndex + 1}.</span>
                         <span dangerouslySetInnerHTML={{ __html: renderLatex(sub.question) }} />
-                      </Paragraph>
+                      </div>
                       <div className="space-y-3 mb-4">
                         {sub.options.map((opt, idx) => ({ opt, idx })).filter(({ opt }) => opt && opt.trim() !== '').map(({ opt, idx }) => {
                           const isSelected = currentAnsArr.includes(idx);
@@ -309,7 +424,7 @@ const ExamSimulation: React.FC = () => {
                                 {label}
                               </div>
                               <span
-                                className={`font-medium ${isSelected ? 'text-primary' : 'text-on-surface/80'}`}
+                                className={`font-normal font-sans ${isSelected ? 'text-primary font-medium' : 'text-on-surface/80'}`}
                                 style={{ fontSize: `${textSize}px` }}
                                 dangerouslySetInnerHTML={{ __html: renderLatex(opt) }}
                               />
@@ -357,7 +472,7 @@ const ExamSimulation: React.FC = () => {
                 <Tag color="blue" className="mb-4 rounded-full border-none font-bold px-3">{currentData.title}</Tag>
               )}
               <div
-                className="prose prose-p:text-on-surface/90 prose-p:leading-loose max-w-none text-on-surface font-medium"
+                className="prose prose-p:text-on-surface/90 prose-p:leading-loose max-w-none text-on-surface font-normal font-sans"
                 style={{ fontSize: `${textSize}px` }}
                 dangerouslySetInnerHTML={{ __html: renderLatex(currentData.question) }}
               />
@@ -389,7 +504,7 @@ const ExamSimulation: React.FC = () => {
                       {isSelected && currentData.type === 'multiple' ? '✓' : label}
                     </div>
                     <span
-                      className={`font-medium leading-relaxed ${isSelected ? 'text-primary' : 'text-on-surface/80'}`}
+                      className={`font-normal font-sans leading-relaxed ${isSelected ? 'text-primary font-medium' : 'text-on-surface/80'}`}
                       style={{ fontSize: `${textSize}px` }}
                       dangerouslySetInnerHTML={{ __html: renderLatex(opt) }}
                     />
@@ -470,9 +585,9 @@ const ExamSimulation: React.FC = () => {
           {questions.map((q, i) => {
             const num = i + 1;
 
-            // Check if answered. For nested, must have at least one subquestion answered.
+            // Check if answered. For nested or table, must have at least one subquestion answered.
             let isAnswered = false;
-            if (q.type === 'nested' && q.sub_questions) {
+            if ((q.type === 'nested' || q.type === 'table') && q.sub_questions) {
               isAnswered = q.sub_questions.some(sq => (answers[sq.id] || []).length > 0);
             } else {
               isAnswered = (answers[q.id] || []).length > 0;
