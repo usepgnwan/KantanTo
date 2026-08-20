@@ -33,6 +33,8 @@ interface AnswerDetail {
   discussion: string;
   parent_question?: string;
   parent_title?: string;
+  parent_type?: string;
+  parent_options?: string[];
 }
 
 interface GroupedQuestion {
@@ -40,6 +42,7 @@ interface GroupedQuestion {
   type: string;
   title: string;
   question_text: string;
+  options?: string[];
   answers: AnswerDetail[];
 }
 
@@ -73,18 +76,21 @@ const Review: React.FC = () => {
         }));
         setAnswers(raw);
 
-        // Group by question_id so nested questions appear on the same page
+        // Group by question_id so nested or table questions appear on the same page
         const groups: GroupedQuestion[] = [];
         const map = new Map<number, GroupedQuestion>();
 
         raw.forEach(a => {
-          if (a.parent_question) { // It's a sub-question (nested)
+          const isSub = a.sub_question_id !== null && a.sub_question_id !== undefined;
+          if (isSub) { // It's a sub-question (nested or table)
+            const parentType = a.parent_type || (a.question_type === 'table' ? 'table' : 'nested');
             if (!map.has(a.question_id)) {
               const g: GroupedQuestion = {
                 question_id: a.question_id,
-                type: 'nested',
-                title: a.parent_title || 'Skenario',
-                question_text: a.parent_question,
+                type: parentType,
+                title: a.parent_title || (parentType === 'table' ? 'Pernyataan' : 'Skenario'),
+                question_text: a.parent_question || '',
+                options: a.parent_options && a.parent_options.length > 0 ? a.parent_options : a.options || ['Benar', 'Salah'],
                 answers: []
               };
               map.set(a.question_id, g);
@@ -97,6 +103,7 @@ const Review: React.FC = () => {
               type: a.question_type || 'single',
               title: a.question_title || '',
               question_text: a.question_text,
+              options: a.options,
               answers: [a]
             });
           }
@@ -273,26 +280,170 @@ const Review: React.FC = () => {
                       {currentGroup.type === 'nested' && (
                         <Tag color="blue" className="rounded-full border-none font-bold px-3">Skenario</Tag>
                       )}
+                      {currentGroup.type === 'table' && (
+                        <Tag color="blue" className="rounded-full border-none font-bold px-3">Tabel / Pernyataan</Tag>
+                      )}
                       {currentGroup.type === 'multiple' && (
                         <Tag color="blue" className="rounded-full border-none font-bold px-3">Pilih lebih dari satu</Tag>
                       )}
                     </Space>
                   </div>
 
-                  {/* Scenario Text (if nested) */}
-                  {currentGroup.type === 'nested' && (
-                      <div className="bg-surface-lowest rounded-[2rem] p-6 lg:p-8 shadow-sm border border-surface-container mb-8">
-                        {currentGroup.title && (
-                          <Tag color="blue" className="mb-4 rounded-full border-none font-bold px-3">{currentGroup.title}</Tag>
-                        )}
+                  {/* Scenario or Table Header Narrative */}
+                  {(currentGroup.type === 'nested' || currentGroup.type === 'table') && (
+                    <div className="bg-surface-lowest rounded-[2rem] p-6 lg:p-8 shadow-sm border border-surface-container mb-8">
+                      {currentGroup.title && (
+                        <Tag color="blue" className="mb-4 rounded-full border-none font-bold px-3">{currentGroup.title}</Tag>
+                      )}
+                      {currentGroup.type === 'nested' && (
                         <Title level={4} className="!font-manrope !font-black !text-xl mt-0">Skenario Kasus</Title>
+                      )}
+                      {currentGroup.question_text && (
                         <div
-                          className="prose prose-lg prose-p:text-on-surface/90 prose-p:leading-loose max-w-none text-on-surface font-medium"
+                          className="prose prose-lg prose-p:text-on-surface/90 prose-p:leading-loose max-w-none text-on-surface font-normal font-sans"
                           dangerouslySetInnerHTML={{ __html: renderLatex(currentGroup.question_text) }}
                         />
-                      </div>
+                      )}
+                    </div>
                   )}
 
+                  {currentGroup.type === 'table' ? (
+                    /* ── TABLE QUESTION REVIEW ── */
+                    <div className="space-y-8">
+
+                      {/* Table: pernyataan + jawaban siswa + kunci */}
+                      <div className="bg-white rounded-3xl shadow-sm border border-surface-container overflow-hidden">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse">
+                            <thead>
+                              <tr className="bg-surface-low/80 border-b border-surface-container">
+                                <th className="p-4 sm:p-5 font-black text-sm text-on-surface">
+                                  {currentGroup.title || 'Pernyataan'}
+                                </th>
+                                {(currentGroup.options && currentGroup.options.length > 0 ? currentGroup.options : ['Benar', 'Salah']).map((col, cIdx) => (
+                                  <th key={cIdx} className="p-4 sm:p-5 font-black text-sm text-center text-on-surface w-24 sm:w-28 border-l border-surface-container/60">
+                                    {col}
+                                  </th>
+                                ))}
+                                <th className="p-4 sm:p-5 font-black text-sm text-center text-on-surface w-32 border-l border-surface-container/60">
+                                  Jawaban Kamu
+                                </th>
+                                <th className="p-4 sm:p-5 font-black text-sm text-center text-on-surface w-32 border-l border-surface-container/60">
+                                  Kunci Jawaban
+                                </th>
+                                <th className="p-4 sm:p-5 font-black text-sm text-center text-on-surface w-24 border-l border-surface-container/60">
+                                  Poin
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-surface-container/60">
+                              {currentGroup.answers.map((ans, aIdx) => {
+                                const userPick = ans.selected_options.length > 0 ? ans.selected_options[0] : null;
+                                const correctKey = ans.correct_answers.length > 0 ? ans.correct_answers[0] : 0;
+                                const colList = currentGroup.options && currentGroup.options.length > 0 ? currentGroup.options : ['Benar', 'Salah'];
+                                const rowBg = userPick === null ? '' : ans.is_correct ? 'bg-green-50/30' : 'bg-red-50/30';
+                                return (
+                                  <tr key={`${ans.id}-${aIdx}`} className={`transition-colors ${rowBg}`}>
+                                    {/* Statement text */}
+                                    <td className="p-4 sm:p-5 align-middle">
+                                      <div className="flex items-start gap-2">
+                                        <span className="font-black text-on-surface/30 text-xs mt-1 shrink-0">{aIdx + 1}.</span>
+                                        <div
+                                          className="font-normal font-sans text-on-surface text-sm leading-relaxed"
+                                          dangerouslySetInnerHTML={{ __html: renderLatex(ans.question_text) }}
+                                        />
+                                      </div>
+                                    </td>
+
+                                    {/* Option columns – radio indicators */}
+                                    {colList.map((colName, cIdx) => {
+                                      const isUserChoice = userPick === cIdx;
+                                      const isCorrectKey = correctKey === cIdx;
+                                      return (
+                                        <td key={cIdx} className="p-4 text-center align-middle border-l border-surface-container/60">
+                                          <div className="flex justify-center items-center">
+                                            {isUserChoice && isCorrectKey ? (
+                                              <div className="w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center text-sm font-black shadow" title="Benar">✓</div>
+                                            ) : isUserChoice && !isCorrectKey ? (
+                                              <div className="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center text-sm font-black shadow" title="Salah">✗</div>
+                                            ) : isCorrectKey ? (
+                                              <div className="w-8 h-8 rounded-full border-2 border-green-500 bg-green-50 text-green-700 flex items-center justify-center text-[9px] font-black leading-tight" title="Kunci">KEY</div>
+                                            ) : (
+                                              <div className="w-3 h-3 rounded-full border border-on-surface/15 bg-surface-low/50" />
+                                            )}
+                                          </div>
+                                        </td>
+                                      );
+                                    })}
+
+                                    {/* Jawaban Siswa */}
+                                    <td className="p-4 text-center align-middle border-l border-surface-container/60">
+                                      {userPick === null ? (
+                                        <Tag className="rounded-full border-none px-2.5 font-bold text-xs text-gray-400 bg-gray-100 m-0">Kosong</Tag>
+                                      ) : ans.is_correct ? (
+                                        <Tag color="success" className="rounded-full border-none font-bold text-xs px-2.5 m-0">
+                                          ✓ {colList[userPick] ?? String.fromCharCode(65 + userPick)}
+                                        </Tag>
+                                      ) : (
+                                        <Tag color="error" className="rounded-full border-none font-bold text-xs px-2.5 m-0">
+                                          ✗ {colList[userPick] ?? String.fromCharCode(65 + userPick)}
+                                        </Tag>
+                                      )}
+                                    </td>
+
+                                    {/* Kunci Jawaban */}
+                                    <td className="p-4 text-center align-middle border-l border-surface-container/60">
+                                      <Tag className="rounded-full font-bold text-xs px-2.5 bg-green-50 text-green-700 border border-green-300 m-0">
+                                        {colList[correctKey] ?? String.fromCharCode(65 + correctKey)}
+                                      </Tag>
+                                    </td>
+
+                                    {/* Poin */}
+                                    <td className="p-4 text-center align-middle border-l border-surface-container/60">
+                                      <span className={`text-xs font-black block ${ans.points_earned > 0 ? 'text-green-600' : userPick === null ? 'text-gray-400' : 'text-red-500'}`}>
+                                        {ans.points_earned} / {ans.max_points}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Pembahasan – satu per baris */}
+                      {currentGroup.answers.some(a => a.discussion && a.discussion.trim() !== '') && (
+                        <div className="bg-blue-50/50 border border-blue-100 rounded-3xl p-6 lg:p-8 space-y-5">
+                          <div className="flex gap-3 items-center mb-2">
+                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-500 text-lg shrink-0">
+                              <BulbOutlined />
+                            </div>
+                            <Title level={5} className="!m-0 !font-manrope !font-black !text-blue-900">Pembahasan</Title>
+                          </div>
+                          {currentGroup.answers.map((ans, aIdx) => {
+                            if (!ans.discussion || ans.discussion.trim() === '') return null;
+                            return (
+                              <div key={`disc-${aIdx}`} className="border-t border-blue-100 pt-4 first:border-0 first:pt-0">
+                                <div className="flex items-start gap-3">
+                                  <Tag className="rounded-lg bg-blue-500 text-white border-none font-bold text-xs shrink-0 mt-0.5">
+                                    Baris {aIdx + 1}
+                                  </Tag>
+                                  <div className="flex-1 space-y-1">
+                                    <div className="text-xs font-bold text-blue-900/50 leading-snug" dangerouslySetInnerHTML={{ __html: renderLatex(ans.question_text) }} />
+                                    <div
+                                      className="text-sm text-blue-950/90 font-normal font-sans leading-relaxed"
+                                      dangerouslySetInnerHTML={{ __html: renderLatex(ans.discussion) }}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
                   <div className="space-y-12">
                     {/* Render each sub-question (or the single question) */}
                     {currentGroup.answers.map((current, ansIdx) => (
@@ -447,6 +598,7 @@ const Review: React.FC = () => {
                       </div>
                     ))}
                   </div>
+                  )}
 
                   <Divider className="border-on-surface/10 mt-10 mb-8" />
 

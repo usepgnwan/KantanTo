@@ -3,7 +3,7 @@ import { Form, Input, Button, Checkbox, Divider, Typography, message, notificati
 import { MailOutlined, LockOutlined, GoogleOutlined, AppleOutlined, DownloadOutlined } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../layouts/AuthLayout';
-import authVisual from '../assets/login.png';
+import loginAnimation from '../assets/login.json';
 import PageLoader from '../components/atoms/PageLoader';
 import { loginUser } from '../services/userService';
 import { useAuth } from '../context/AuthContext';
@@ -119,7 +119,7 @@ const LoginPage: React.FC = () => {
     <AuthLayout
       title="Selamat Datang Kembali"
       subtitle="Masuk untuk mengakses materi belajar dan riwayat tryout Anda."
-      image={authVisual}
+      animationData={loginAnimation}
       quote={{
         text: "Buat akun untuk mulai menggunakan tryout",
         author: "Rifaya Education",

@@ -19,6 +19,7 @@
     "echarts-for-react": "^3.0.6",
     "jwt-decode": "^4.0.0",
     "katex": "^0.17.0",
+    "lottie-web": "^5.13.0",
     "postcss": "^8.4.35",
     "quill": "^2.0.3",
     "quill-table-better": "^1.2.3",

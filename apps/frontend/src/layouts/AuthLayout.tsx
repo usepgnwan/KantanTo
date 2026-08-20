@@ -2,6 +2,7 @@ import React from 'react';
 import { Typography, Row, Col } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { Link } from 'react-router-dom';
+import LottiePlayer from '../components/atoms/LottiePlayer';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -9,14 +10,15 @@ interface AuthLayoutProps {
   children: React.ReactNode;
   title: string;
   subtitle: string;
-  image: string;
+  image?: string;
+  animationData?: any;
   quote?: {
     text: string;
     author: string;
   };
 }
 
-const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title, subtitle, image, quote }) => {
+const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title, subtitle, image, animationData, quote }) => {
   return (
     <div className="min-h-screen bg-white flex flex-col font-manrope">
       {/* Minimalist Navigation */}
@@ -45,14 +47,21 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, title, subtitle, imag
         <Col xs={0} lg={12} className="relative bg-surface-low overflow-hidden mt-[81px]">
           <div className="absolute inset-0 bg-secondary/5 opacity-50"></div>
           <div className="absolute inset-0 flex flex-col items-center justify-center p-20 z-10">
-            <div className="relative w-full max-w-sm aspect-square mb-12">
-               <img 
-                 src={image} 
-                 alt="Auth Visual" 
-                 className="w-full h-full object-contain animate-in fade-in zoom-in duration-1000 drop-shadow-2xl"
-               />
-               <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-primary/10 rounded-full blur-3xl animate-pulse" />
-               <div className="absolute -top-10 -left-10 w-40 h-40 bg-secondary/10 rounded-full blur-3xl animate-pulse delay-700" />
+            <div className="relative w-full max-w-sm aspect-square mb-12 flex items-center justify-center">
+              {animationData ? (
+                <LottiePlayer
+                  animationData={animationData}
+                  className="w-full h-full object-contain animate-in fade-in zoom-in duration-1000 drop-shadow-2xl flex items-center justify-center"
+                />
+              ) : image ? (
+                <img 
+                  src={image} 
+                  alt="Auth Visual" 
+                  className="w-full h-full object-contain animate-in fade-in zoom-in duration-1000 drop-shadow-2xl"
+                />
+              ) : null}
+              <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-primary/10 rounded-full blur-3xl animate-pulse" />
+              <div className="absolute -top-10 -left-10 w-40 h-40 bg-secondary/10 rounded-full blur-3xl animate-pulse delay-700" />
             </div>
 
             {quote && (

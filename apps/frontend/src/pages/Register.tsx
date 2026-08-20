@@ -3,7 +3,7 @@ import { Form, Input, Button, Divider, Typography, Checkbox, message } from 'ant
 import { MailOutlined, LockOutlined, UserOutlined, WhatsAppOutlined, GoogleOutlined, AppleOutlined } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../layouts/AuthLayout';
-import authVisual from '../assets/login.png';
+import loginAnimation from '../assets/login.json';
 import PageLoader from '../components/atoms/PageLoader';
 import { registerUser } from '../services/userService';
 
@@ -47,7 +47,7 @@ const RegisterPage: React.FC = () => {
     <AuthLayout
       title="Buat Akun Anda"
       subtitle="Bergabunglah dengan ribuan siswa lainnya dan mulai raih impian masuk PTN idaman."
-      image={authVisual}
+      animationData={loginAnimation}
       quote={{
         text: "Buat akun untuk mulai menggunakan tryout",
         author: "Rifaya Education",
