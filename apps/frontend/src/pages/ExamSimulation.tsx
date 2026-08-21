@@ -27,20 +27,42 @@ const ExamSimulation: React.FC = () => {
   const [questions, setQuestions] = useState<PackageQuestionPayload[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(15 * 60); // Default 15 minutes, will be overridden by package duration
   const [isMapVisible, setIsMapVisible] = useState(false);
   const [isExitModalVisible, setIsExitModalVisible] = useState(false);
   const [textSize, setTextSize] = useState<number>(16);
 
+  // localStorage keys scoped per exam slug
+  const lsKey = (suffix: string) => `exam_${slug}_${suffix}`;
+
+  // Restore state from localStorage (if a previous session exists for this slug)
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(() => {
+    try { return Number(localStorage.getItem(`exam_${slug}_index`) ?? 0); } catch { return 0; }
+  });
+  const [timeRemaining, setTimeRemaining] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(`exam_${slug}_time`);
+      return saved !== null ? Number(saved) : 15 * 60;
+    } catch { return 15 * 60; }
+  });
+
   // Map of questionId -> array of selected option indexes
-  // For nested questions, we'll store sub_question ID -> array of selected option indexes
-  const [answers, setAnswers] = useState<Record<string, number[]>>({});
+  // For table questions, key is namespaced as "parentId_subId"
+  const [answers, setAnswers] = useState<Record<string, number[]>>(() => {
+    try {
+      const saved = localStorage.getItem(`exam_${slug}_answers`);
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
   const answersRef = React.useRef(answers);
   useEffect(() => {
     answersRef.current = answers;
   }, [answers]);
-  const [doubtfulQuestions, setDoubtfulQuestions] = useState<Record<string, boolean>>({});
+  const [doubtfulQuestions, setDoubtfulQuestions] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem(`exam_${slug}_doubtful`);
+      return saved ? JSON.parse(saved) : {};
+    } catch { return {}; }
+  });
 
   const getSizeClasses = (size: number) => {
     switch (size) {
@@ -82,13 +104,35 @@ const ExamSimulation: React.FC = () => {
     ])
       .then(([questionsData, packageData]) => {
         setQuestions(questionsData);
-        if (packageData && packageData.duration > 0) {
+        // Only set duration from backend if there's no saved timer in localStorage
+        const savedTime = localStorage.getItem(lsKey('time'));
+        if (!savedTime && packageData && packageData.duration > 0) {
           setTimeRemaining(packageData.duration * 60);
         }
       })
       .catch(() => message.error('Gagal memuat soal ujian'))
       .finally(() => setLoading(false));
   }, [slug]);
+
+  // Persist answers to localStorage whenever they change
+  useEffect(() => {
+    try { localStorage.setItem(lsKey('answers'), JSON.stringify(answers)); } catch {}
+  }, [answers]);
+
+  // Persist doubtful marks
+  useEffect(() => {
+    try { localStorage.setItem(lsKey('doubtful'), JSON.stringify(doubtfulQuestions)); } catch {}
+  }, [doubtfulQuestions]);
+
+  // Persist current question index
+  useEffect(() => {
+    try { localStorage.setItem(lsKey('index'), String(currentQuestionIndex)); } catch {}
+  }, [currentQuestionIndex]);
+
+  // Persist time remaining (updated every second)
+  useEffect(() => {
+    try { localStorage.setItem(lsKey('time'), String(timeRemaining)); } catch {}
+  }, [timeRemaining]);
 
   // Countdown Timer Effect
   useEffect(() => {
@@ -132,14 +176,32 @@ const ExamSimulation: React.FC = () => {
     setDoubtfulQuestions(prev => ({ ...prev, [qId]: e.target.checked }));
   };
 
+  const toggleDoubtful = (qId: string) => {
+    setDoubtfulQuestions(prev => ({ ...prev, [qId]: !prev[qId] }));
+  };
+
+  // Clear all persisted exam state from localStorage
+  const clearPersistedState = () => {
+    try {
+      ['answers', 'doubtful', 'index', 'time'].forEach(suffix =>
+        localStorage.removeItem(lsKey(suffix))
+      );
+    } catch {}
+  };
+
   const submitToBackend = async () => {
     if (!slug || !payload) return;
     setSubmitting(true);
 
     // Format answers from string map to number map for backend
+    // Keys may be namespaced as "parentId_subId" for table questions — extract the actual numeric sub-question ID.
     const formattedAnswers: Record<number, number[]> = {};
     Object.keys(answersRef.current).forEach(k => {
-      formattedAnswers[Number(k)] = answersRef.current[k];
+      const parts = k.split('_');
+      const numKey = Number(parts[parts.length - 1]);
+      if (!isNaN(numKey)) {
+        formattedAnswers[numKey] = answersRef.current[k];
+      }
     });
 
     try {
@@ -149,6 +211,7 @@ const ExamSimulation: React.FC = () => {
         is_testing: isAdmin(),
         answers: formattedAnswers
       });
+      clearPersistedState(); // clear saved state after successful submit
       message.success('Ujian berhasil dikumpulkan');
       navigate(`/riwayat/${res.session_id}/review`);
     } catch (err) {
@@ -199,7 +262,7 @@ const ExamSimulation: React.FC = () => {
   const totalQuestionsCount = questions.length;
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col font-sans transition-colors duration-500">
+    <div className="h-[100dvh] bg-surface flex flex-col font-sans transition-colors duration-500">
 
       {/* EXAM HEADER */}
       <header className="bg-white border-b border-surface-container h-16 flex items-center justify-between px-4 sm:px-8 shrink-0 relative z-30">
@@ -247,11 +310,11 @@ const ExamSimulation: React.FC = () => {
           </div>
           <Button
             type="text"
-            className="hidden sm:flex font-bold text-on-surface/60 items-center"
+            className="flex font-bold text-on-surface/60 items-center px-2 sm:px-4"
             onClick={() => setIsMapVisible(true)}
             icon={<AppstoreOutlined />}
           >
-            Peta Soal
+            <span className="hidden sm:inline">Peta Soal</span>
           </Button>
           <Button type="primary" onClick={() => finishExam(false)} loading={submitting} className="font-bold shadow-md shadow-primary/20 rounded-lg">
             Selesai
@@ -260,11 +323,11 @@ const ExamSimulation: React.FC = () => {
       </header>
 
       {/* EXAM BODY */}
-      <main className="flex-grow overflow-auto">
+      <main className="flex-grow overflow-hidden flex flex-col">
 
         {currentData.type === 'table' ? (
           /* ── TABLE / MATRIX ── split 40/60 layout */
-          <div className="max-w-7xl mx-auto h-full flex flex-col lg:flex-row">
+          <div key={currentData.id} className="flex-grow flex flex-col lg:flex-row overflow-hidden">
 
             {/* Left: Question text / prompt (40% width, sticky/independent scroll) */}
             <div className="lg:w-[40%] p-6 lg:p-10 border-b lg:border-b-0 lg:border-r border-surface-container overflow-y-auto bg-white/50 flex flex-col">
@@ -297,7 +360,7 @@ const ExamSimulation: React.FC = () => {
               </div>
 
               {/* Interactive Table */}
-              <div className="bg-white rounded-3xl shadow-sm border border-surface-container overflow-hidden mb-6">
+              <div key={currentData.id} className="bg-white rounded-3xl shadow-sm border border-surface-container overflow-hidden mb-6">
                 <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
                   <table className="w-full text-left border-collapse">
                     <thead className="sticky top-0 z-10 bg-surface-low/95 backdrop-blur-sm shadow-sm border-b border-surface-container">
@@ -314,10 +377,12 @@ const ExamSimulation: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-surface-container/60">
                       {currentData.sub_questions?.map((sub, sIdx) => {
-                        const currentAnsArr = answers[sub.id] || [];
+                        // Namespace key: "parentId_subId" to avoid collision when different table questions share sub IDs
+                        const answerKey = `${currentData.id}_${sub.id || sIdx}`;
+                        const currentAnsArr = answers[answerKey] || [];
                         const colList = currentData.options && currentData.options.length > 0 ? currentData.options : ['Benar', 'Salah'];
                         return (
-                          <tr key={sub.id || sIdx} className="hover:bg-surface-low/20 transition-colors">
+                          <tr key={answerKey} className="hover:bg-surface-low/20 transition-colors">
                             {/* Statement Cell */}
                             <td className="p-4 sm:p-5 align-middle">
                               <div
@@ -333,7 +398,7 @@ const ExamSimulation: React.FC = () => {
                               return (
                                 <td
                                   key={cIdx}
-                                  onClick={() => handleSelectOption(sub.id, 'single', cIdx)}
+                                  onClick={() => handleSelectOption(answerKey, 'single', cIdx)}
                                   className={`p-4 sm:p-5 text-center align-middle cursor-pointer transition-all border-l border-surface-container/60 ${
                                     isSelected ? 'bg-primary/5' : 'hover:bg-surface-low/40'
                                   }`}
@@ -364,25 +429,16 @@ const ExamSimulation: React.FC = () => {
                 </div>
               </div>
 
-              {/* Ragu-ragu Checkbox */}
-              <div className="bg-surface-low/30 border border-surface-container rounded-2xl p-4 mt-auto">
-                <Checkbox
-                  checked={doubtfulQuestions[currentData.id] || false}
-                  onChange={(e) => handleToggleDoubtful(currentData.id, e)}
-                  className="font-bold text-on-surface/60 hover:text-on-surface"
-                >
-                  Ragu-ragu (Tandai untuk diperiksa kembali)
-                </Checkbox>
-              </div>
+
             </div>
           </div>
 
         ) : currentData.type === 'nested' ? (
-          /* ── SCENARIO / NESTED ── split layout */
-          <div className="max-w-7xl mx-auto h-full flex flex-col lg:flex-row">
+          /* ── SCENARIO / NESTED ── split layout with sticky left panel */
+          <div className="flex-grow flex flex-col lg:flex-row overflow-hidden">
 
-            {/* Left: Scenario passage */}
-            <div className="lg:w-1/2 p-6 lg:p-10 border-b lg:border-b-0 lg:border-r border-surface-container overflow-y-auto bg-white/50">
+            {/* Left: Scenario passage — sticky, independent scroll */}
+            <div className="lg:w-1/2 p-6 lg:p-10 border-b lg:border-b-0 lg:border-r border-surface-container overflow-y-auto bg-white/50 shrink-0 lg:shrink">
               <Tag color="blue" className="mb-4 rounded-full border-none font-bold px-3">{currentData.title || 'Skenario'}</Tag>
               <Title level={4} className="!font-manrope !font-black !text-xl mt-0">Skenario Kasus</Title>
               <div
@@ -392,7 +448,7 @@ const ExamSimulation: React.FC = () => {
               />
             </div>
 
-            {/* Right: Sub-questions */}
+            {/* Right: Sub-questions — independent scroll */}
             <div className="lg:w-1/2 p-6 lg:p-10 bg-white overflow-y-auto flex flex-col">
               <div className="flex items-center justify-between mb-6">
                 <Tag className="rounded-full px-4 py-1 text-sm font-black border-none bg-surface-low text-on-surface">
@@ -437,22 +493,14 @@ const ExamSimulation: React.FC = () => {
                 })}
               </div>
 
-              <div className="bg-surface-low/30 border border-surface-container rounded-xl p-4 mt-auto">
-                <Checkbox
-                  checked={doubtfulQuestions[currentData.id] || false}
-                  onChange={(e) => handleToggleDoubtful(currentData.id, e)}
-                  className="font-bold text-on-surface/60 hover:text-on-surface"
-                >
-                  Ragu-ragu (Tandai untuk diperiksa kembali)
-                </Checkbox>
-              </div>
+
             </div>
           </div>
 
         ) : (
-          /* ── SINGLE / MULTIPLE ── full-width single column */
-          <div className="max-w-4xl mx-auto w-full px-4 sm:px-8 py-8 lg:py-12 flex flex-col gap-8">
-
+          /* ── SINGLE / MULTIPLE ── full-width single column, scrollable */
+          <div className="overflow-y-auto flex-grow">
+            <div className="max-w-4xl mx-auto w-full px-4 sm:px-8 py-8 lg:py-12 flex flex-col gap-8">
             {/* Question header */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -513,15 +561,7 @@ const ExamSimulation: React.FC = () => {
               })}
             </div>
 
-            {/* Ragu-ragu */}
-            <div className="bg-surface-low/30 border border-surface-container rounded-xl p-4">
-              <Checkbox
-                checked={doubtfulQuestions[currentData.id] || false}
-                onChange={(e) => handleToggleDoubtful(currentData.id, e)}
-                className="font-bold text-on-surface/60 hover:text-on-surface"
-              >
-                Ragu-ragu (Tandai untuk diperiksa kembali)
-              </Checkbox>
+
             </div>
 
           </div>
@@ -530,9 +570,9 @@ const ExamSimulation: React.FC = () => {
       </main>
 
 
-      {/* EXAM FOOTER */}
+      {/* EXAM FOOTER — fixed bottom bar */}
       <footer className="bg-white border-t border-surface-container p-4 shrink-0 relative z-30">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           <Button
             size="large"
             type="text"
@@ -544,15 +584,25 @@ const ExamSimulation: React.FC = () => {
             Kembali
           </Button>
 
-          {/* Mobile Peta Soal Trigger */}
-          <Button
-            type="dashed"
-            className="sm:hidden font-bold"
-            onClick={() => setIsMapVisible(true)}
-            icon={<AppstoreOutlined />}
-          >
-            Peta Soal
-          </Button>
+          {/* Center: Ragu-ragu + mobile Peta Soal */}
+          <div className="flex items-center gap-3">
+            <div
+              onClick={() => toggleDoubtful(currentData.id)}
+              className={`flex items-center gap-2.5 cursor-pointer rounded-xl border-2 px-4 py-2 transition-all select-none ${
+                doubtfulQuestions[currentData.id]
+                  ? 'border-yellow-400 bg-yellow-50 text-yellow-700'
+                  : 'border-surface-container bg-surface-low/40 text-on-surface/60 hover:border-yellow-300 hover:bg-yellow-50/50'
+              }`}
+            >
+              <span className={`text-lg transition-transform ${
+                doubtfulQuestions[currentData.id] ? 'scale-110' : ''
+              }`}>🚩</span>
+              <span className="font-bold text-sm hidden sm:inline">
+                {doubtfulQuestions[currentData.id] ? 'Ditandai Ragu-ragu' : 'Tandai Ragu-ragu'}
+              </span>
+            </div>
+
+          </div>
 
           <Button
             size="large"
@@ -588,7 +638,7 @@ const ExamSimulation: React.FC = () => {
             // Check if answered. For nested or table, must have at least one subquestion answered.
             let isAnswered = false;
             if ((q.type === 'nested' || q.type === 'table') && q.sub_questions) {
-              isAnswered = q.sub_questions.some(sq => (answers[sq.id] || []).length > 0);
+              isAnswered = q.sub_questions.some((sq, sqIdx) => (answers[`${q.id}_${sq.id || sqIdx}`] || []).length > 0);
             } else {
               isAnswered = (answers[q.id] || []).length > 0;
             }
