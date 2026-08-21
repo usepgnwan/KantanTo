@@ -160,7 +160,7 @@ const Review: React.FC = () => {
 
   return (
     <AppLayout>
-      <div className="bg-surface-low/30 min-h-screen py-8 lg:py-12 transition-colors duration-500">
+      <div className="bg-surface-low/30 min-h-screen pt-24 pb-8 lg:pt-32 lg:pb-12 transition-colors duration-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
           {/* Header */}
