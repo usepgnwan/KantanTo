@@ -2,7 +2,8 @@ import React from 'react';
 import { Button, Typography, Space } from 'antd';
 import { PlayCircleOutlined, UserOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import jumbotronImg from '../../assets/jumbotron.png';
+import LottiePlayer from '../atoms/LottiePlayer';
+import welcomeAnimation from '../../assets/Welcome.json';
 
 const { Title, Paragraph } = Typography;
 
@@ -17,7 +18,7 @@ const HeroSection: React.FC = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 w-full">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          
+
           {/* Left Column */}
           <div className="space-y-8 animate-in fade-in slide-in-from-left-8 duration-1000">
             <div>
@@ -61,16 +62,16 @@ const HeroSection: React.FC = () => {
 
           {/* Right Column - Illustration */}
           <div className="relative animate-in fade-in slide-in-from-right-8 duration-1000 delay-200 w-full flex justify-center lg:justify-end items-center">
-             <div className="relative w-full max-w-lg">
-                {/* Decorative blob behind image */}
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-primary/10 rounded-full blur-3xl z-0"></div>
-                
-                <img 
-                  src={jumbotronImg} 
-                  alt="Ilustrasi Siswa Rifaya Tryout" 
-                  className="relative z-10 w-full h-auto object-contain drop-shadow-2xl hover:scale-105 transition-transform duration-500" 
-                />
-             </div>
+            <div className="relative w-full max-w-lg">
+              {/* Decorative blob behind image */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-primary/10 rounded-full blur-3xl z-0"></div>
+
+              <LottiePlayer
+                animationData={welcomeAnimation}
+                loop={true}
+                className="relative z-10 w-full h-auto drop-shadow-2xl hover:scale-105 transition-transform duration-500"
+              />
+            </div>
           </div>
         </div>
       </div>

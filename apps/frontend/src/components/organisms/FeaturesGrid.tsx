@@ -40,8 +40,8 @@ const FeaturesGrid: React.FC = () => {
     {
       icon: <TrophyFilled className="text-2xl text-white" />,
       iconBg: "bg-pink-400",
-      title: "Ranking Nasional",
-      description: "Lihat peringkatmu di tingkat nasional."
+      title: "Lihat progress latihan",
+      description: "Lihat progress latihanmu dari waktu ke waktu."
     },
     {
       icon: <MobileFilled className="text-2xl text-white" />,
