@@ -101,7 +101,7 @@ func GoogleCallback(c echo.Context) error {
 		user = model.User{
 			Name:       userInfo.Name,
 			Email:      userInfo.Email,
-			Nohp:       "",
+			Nohp:       "OAUTH-" + fmt.Sprintf("%d", time.Now().UnixNano()),
 			Password:   string(hashedPassword),
 			Status:     "aktif",
 			FotoProfil: userInfo.Picture,
