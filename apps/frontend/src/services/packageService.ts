@@ -19,6 +19,8 @@ export interface PackageListItem {
   title: string;
   description: string;
   price: number;
+  discount_type?: 'percent' | 'harga' | '';
+  discount_value?: number;
   category: string;
   classes: string[];
   subjects: string[];
@@ -35,6 +37,8 @@ export interface PackagePayload {
   title: string;
   description: string;
   price: number;
+  discount_type?: 'percent' | 'harga' | '';
+  discount_value?: number;
   category: string;
   classes: string[];
   subjects: string[];
@@ -78,6 +82,8 @@ const normalizePackage = (pkg: any): PackageListItem => ({
   title: String(pkg?.title || ''),
   description: String(pkg?.description || ''),
   price: Number(pkg?.price) || 0,
+  discount_type: (pkg?.discount_type as 'percent' | 'harga' | '') || '',
+  discount_value: Number(pkg?.discount_value) || 0,
   category: String(pkg?.category || ''),
   classes: asStringArray(pkg?.classes ?? pkg?.Classes),
   subjects: asStringArray(pkg?.subjects ?? pkg?.Subjects),
@@ -301,5 +307,20 @@ export const getAdminExamSessions = async (isTesting: boolean, page: number = 1,
   }
 
   const { data } = await api.get(`/admin/exam-sessions?${params.toString()}`);
+  return data.data;
+};
+
+export const getProgressAnalysis = async (userId: number) => {
+  const { data } = await api.get(`/progress/analysis?user_id=${userId}`);
+  return data.data;
+};
+
+export const generateProgressAnalysis = async (userId: number, sessionIds: number[]) => {
+  const { data } = await api.post('/progress/analysis', { user_id: userId, session_ids: sessionIds });
+  return data.data;
+};
+
+export const deleteProgressAnalysis = async (id: number, userId: number) => {
+  const { data } = await api.delete(`/progress/analysis/${id}?user_id=${userId}`);
   return data.data;
 };

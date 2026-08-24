@@ -1,10 +1,10 @@
 import React from 'react';
 import { Typography, Space, Tag, Breadcrumb, Row, Col } from 'antd';
-import { 
-  UserOutlined, 
-  ClockCircleOutlined, 
-  TeamOutlined, 
-  SafetyCertificateFilled 
+import {
+  UserOutlined,
+  ClockCircleOutlined,
+  TeamOutlined,
+  SafetyCertificateFilled
 } from '@ant-design/icons';
 
 const { Title, Paragraph, Text } = Typography;
@@ -43,7 +43,7 @@ const PackageDetailHeader: React.FC<PackageDetailHeaderProps> = ({
         </Breadcrumb>
 
         <Row gutter={[48, 48]} align="middle">
-          <Col xs={24} lg={16}>
+          <Col span={24}>
             <Space direction="vertical" size="large" className="w-full">
               <Space size="middle">
                 <Tag color="blue" className="rounded-full px-4 border-none font-bold bg-primary text-white">
@@ -59,7 +59,7 @@ const PackageDetailHeader: React.FC<PackageDetailHeaderProps> = ({
                 <Title level={1} className="!text-4xl md:!text-6xl !font-manrope !m-0 !leading-[1.1]">
                   {title}
                 </Title>
-                <Paragraph className="text-xl text-surface-on/60 mt-6 max-w-2xl leading-relaxed">
+                <Paragraph className="text-md text-justify  text-surface-on/60 mt-6 leading-relaxed">
                   {description}
                 </Paragraph>
               </div>

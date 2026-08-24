@@ -119,12 +119,21 @@ const IndexPage: React.FC = () => {
                         </div>
 
                         <div className="py-4">
-                          <Text className="text-xs text-surface-on/40 line-through">
-                            Rp {Number(pkg.price * 2).toLocaleString('id-ID')}
-                          </Text>
+                          {pkg.discount_type && (
+                            <Text className="text-xs text-surface-on/40 line-through">
+                              Rp {Number(pkg.price).toLocaleString('id-ID')}
+                            </Text>
+                          )}
                           <div className="flex items-end space-x-1">
                             <Text className="text-xl font-bold text-primary">
-                              {pkg.price === 0 ? 'Gratis' : `Rp ${Number(pkg.price).toLocaleString('id-ID')}`}
+                              {(() => {
+                                const finalPrice = pkg.discount_type === 'percent'
+                                  ? pkg.price - (pkg.price * (pkg.discount_value || 0)) / 100
+                                  : pkg.discount_type === 'harga'
+                                  ? pkg.price - (pkg.discount_value || 0)
+                                  : pkg.price;
+                                return finalPrice === 0 ? 'Gratis' : `Rp ${Number(finalPrice).toLocaleString('id-ID')}`;
+                              })()}
                             </Text>
                             <Text className="text-xs text-surface-on/60 mb-1">/Paket</Text>
                           </div>

@@ -9,6 +9,7 @@ import {
   WarningOutlined,
   RightOutlined,
   LeftOutlined,
+  LogoutOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getExamSession } from '../services/packageService';
@@ -116,7 +117,7 @@ const Review: React.FC = () => {
 
   if (loading) {
     return (
-      <AppLayout>
+      <AppLayout hideBottomNav={true}>
         <div className="min-h-screen flex items-center justify-center bg-surface">
           <Spin size="large" tip="Memuat riwayat ujian..." />
         </div>
@@ -126,7 +127,7 @@ const Review: React.FC = () => {
 
   if (!session || answers.length === 0 || groupedQuestions.length === 0) {
     return (
-      <AppLayout>
+      <AppLayout hideBottomNav={true}>
         <div className="min-h-screen flex items-center justify-center bg-surface">
           <Card className="text-center rounded-2xl border-none">
             <WarningOutlined className="text-4xl text-red-500 mb-4" />
@@ -159,7 +160,7 @@ const Review: React.FC = () => {
   };
 
   return (
-    <AppLayout>
+    <AppLayout hideBottomNav={true}>
       <div className="bg-surface-low/30 min-h-screen pt-24 pb-8 lg:pt-32 lg:pb-12 transition-colors duration-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
@@ -603,26 +604,59 @@ const Review: React.FC = () => {
                   <Divider className="border-on-surface/10 mt-10 mb-8" />
 
                   {/* Navigation Footer */}
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-auto">
-                    <Button
-                      size="large"
-                      type="text"
-                      icon={<LeftOutlined />}
-                      disabled={selectedIndex === 0}
-                      onClick={() => setSelectedIndex(prev => Math.max(0, prev - 1))}
-                      className="w-full sm:w-auto h-12 rounded-xl font-bold bg-surface-low hover:bg-surface-low/80 text-on-surface/80"
-                    >
-                      Bagian Sebelumnya
-                    </Button>
-                    <Button
-                      size="large"
-                      type="primary"
-                      className="w-full sm:w-auto h-12 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
-                      disabled={selectedIndex === groupedQuestions.length - 1}
-                      onClick={() => setSelectedIndex(prev => Math.min(groupedQuestions.length - 1, prev + 1))}
-                    >
-                      Bagian Selanjutnya <RightOutlined />
-                    </Button>
+                  <div className="mt-auto">
+                    {/* Desktop View */}
+                    <div className="hidden sm:flex items-center justify-between gap-4">
+                      <Button
+                        size="large"
+                        type="text"
+                        icon={<LeftOutlined />}
+                        disabled={selectedIndex === 0}
+                        onClick={() => setSelectedIndex(prev => Math.max(0, prev - 1))}
+                        className="w-auto h-12 rounded-xl font-bold bg-surface-low hover:bg-surface-low/80 text-on-surface/80"
+                      >
+                        Bagian Sebelumnya
+                      </Button>
+                      <Button
+                        size="large"
+                        type="primary"
+                        className="w-auto h-12 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+                        disabled={selectedIndex === groupedQuestions.length - 1}
+                        onClick={() => setSelectedIndex(prev => Math.min(groupedQuestions.length - 1, prev + 1))}
+                      >
+                        Bagian Selanjutnya <RightOutlined />
+                      </Button>
+                    </div>
+                    {/* Mobile View - Fixed Bottom Nav */}
+                    <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-zinc-900 border-t border-surface-container px-4 py-3 pb-safe sm:hidden flex items-center justify-between gap-2 z-50">
+                      <Button
+                        size="large"
+                        icon={<LeftOutlined />}
+                        disabled={selectedIndex === 0}
+                        onClick={() => setSelectedIndex(prev => Math.max(0, prev - 1))}
+                        className="flex-1 h-12 rounded-xl font-bold bg-surface-low hover:bg-surface-low/80 text-on-surface/80 border-none text-[11px]"
+                      >
+                        Sebelumnya
+                      </Button>
+                      <Button
+                        size="large"
+                        danger
+                        icon={<LogoutOutlined />}
+                        onClick={() => navigate('/riwayat')}
+                        className="flex-1 h-12 rounded-xl font-bold text-[11px]"
+                      >
+                        Exit
+                      </Button>
+                      <Button
+                        size="large"
+                        type="primary"
+                        className="flex-1 h-12 rounded-xl font-bold flex items-center justify-center shadow-lg shadow-primary/20 text-[11px]"
+                        disabled={selectedIndex === groupedQuestions.length - 1}
+                        onClick={() => setSelectedIndex(prev => Math.min(groupedQuestions.length - 1, prev + 1))}
+                      >
+                        Selanjutnya <RightOutlined />
+                      </Button>
+                    </div>
                   </div>
 
                 </div>

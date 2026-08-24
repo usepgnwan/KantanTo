@@ -8,13 +8,19 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   FileTextOutlined,
-  TrophyOutlined
+  TrophyOutlined,
+  DeleteOutlined,
+  RobotOutlined,
+  WarningOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import PageLoader from '../components/atoms/PageLoader';
 import Paragraph from 'antd/es/typography/Paragraph';
 import { useAuth } from '../context/AuthContext';
-import { getAdminExamSessions } from '../services/packageService';
+import { getAdminExamSessions, getProgressAnalysis, generateProgressAnalysis, deleteProgressAnalysis } from '../services/packageService';
+import { Modal, Drawer, Checkbox, Spin } from 'antd';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const { Title, Text } = Typography;
 
@@ -23,6 +29,14 @@ const HistoryPage: React.FC = () => {
   const { payload } = useAuth();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any[]>([]);
+
+  // Progress Analysis states
+  const [analysisData, setAnalysisData] = useState<any>(null);
+  const [isAnalysisDrawerVisible, setIsAnalysisDrawerVisible] = useState(false);
+  const [isSelectModalVisible, setIsSelectModalVisible] = useState(false);
+  const [selectedSessionIds, setSelectedSessionIds] = useState<number[]>([]);
+  const [generatingAnalysis, setGeneratingAnalysis] = useState(false);
+  const [deletingAnalysis, setDeletingAnalysis] = useState(false);
 
   useEffect(() => {
     if (!payload?.user_id) return;
@@ -33,7 +47,65 @@ const HistoryPage: React.FC = () => {
       })
       .catch(() => message.error('Gagal memuat riwayat ujian'))
       .finally(() => setLoading(false));
+
+    // Fetch existing analysis
+    getProgressAnalysis(payload.user_id).then((res) => {
+      if (res) {
+        setAnalysisData(res);
+      }
+    }).catch(() => {});
   }, [payload?.user_id]);
+
+  const handleAnalisisClick = () => {
+    if (analysisData) {
+      setIsAnalysisDrawerVisible(true);
+    } else {
+      setIsSelectModalVisible(true);
+    }
+  };
+
+  const handleGenerateAnalysis = async () => {
+    if (selectedSessionIds.length === 0 || selectedSessionIds.length > 2) {
+      message.error("Pilih 1 atau maksimal 2 riwayat tryout.");
+      return;
+    }
+    setGeneratingAnalysis(true);
+    try {
+      const result = await generateProgressAnalysis(payload!.user_id, selectedSessionIds);
+      setAnalysisData(result);
+      message.success("Analisis berhasil dibuat!");
+      setIsSelectModalVisible(false);
+      setIsAnalysisDrawerVisible(true);
+    } catch (error: any) {
+      message.error(error?.response?.data?.message || "Gagal membuat analisis.");
+    } finally {
+      setGeneratingAnalysis(false);
+    }
+  };
+
+  const handleDeleteAnalysis = async () => {
+    if (!analysisData) return;
+    Modal.confirm({
+      title: 'Hapus Analisis?',
+      content: 'Apakah Anda yakin ingin menghapus analisis ini? Anda bisa membuat yang baru setelahnya.',
+      okText: 'Hapus',
+      okType: 'danger',
+      cancelText: 'Batal',
+      onOk: async () => {
+        setDeletingAnalysis(true);
+        try {
+          await deleteProgressAnalysis(analysisData.id, payload!.user_id);
+          message.success("Analisis berhasil dihapus.");
+          setAnalysisData(null);
+          setIsAnalysisDrawerVisible(false);
+        } catch (error: any) {
+          message.error(error?.response?.data?.message || "Gagal menghapus analisis.");
+        } finally {
+          setDeletingAnalysis(false);
+        }
+      }
+    });
+  };
 
   const columns = [
     {
@@ -116,6 +188,7 @@ const HistoryPage: React.FC = () => {
               icon={<BarChartOutlined />}
               size="large"
               className="rounded-2xl h-14 px-8 font-bold shadow-lg shadow-primary/20"
+              onClick={handleAnalisisClick}
             >
               Analisis Progress
             </Button>
@@ -128,6 +201,7 @@ const HistoryPage: React.FC = () => {
                   columns={columns}
                   dataSource={data}
                   pagination={{ pageSize: 5 }}
+                  scroll={{ x: 'max-content' }}
                   className="weightless-table"
                 />
               </Card>
@@ -180,6 +254,109 @@ const HistoryPage: React.FC = () => {
               </div>
             </Col>
           </Row>
+
+          {/* Modal Select Sessions */}
+          <Modal
+            title="Pilih Riwayat Tryout"
+            open={isSelectModalVisible}
+            onCancel={() => setIsSelectModalVisible(false)}
+            footer={null}
+            centered
+          >
+            <div className="space-y-4 my-6">
+              <Paragraph className="text-on-surface/60">
+                Pilih 1 atau maksimal 2 riwayat tryout terakhir yang ingin Anda analisis kesalahannya menggunakan AI.
+              </Paragraph>
+              {data.length === 0 ? (
+                <div className="text-center text-on-surface/40 p-4">Belum ada riwayat tryout.</div>
+              ) : (
+                <div className="max-h-60 overflow-y-auto space-y-2">
+                  {data.map((session: any) => (
+                    <div key={session.id} className="flex items-center gap-3 p-3 border border-surface-on/10 rounded-xl hover:bg-surface-low transition-colors">
+                      <Checkbox 
+                        checked={selectedSessionIds.includes(session.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            if (selectedSessionIds.length >= 2) {
+                              message.warning('Maksimal 2 riwayat yang dapat dipilih.');
+                              return;
+                            }
+                            setSelectedSessionIds([...selectedSessionIds, session.id]);
+                          } else {
+                            setSelectedSessionIds(selectedSessionIds.filter(id => id !== session.id));
+                          }
+                        }}
+                      />
+                      <div>
+                        <div className="font-bold">{session.package?.title || 'Unknown'}</div>
+                        <div className="text-xs text-on-surface/60">Skor: {session.score} • {new Date(session.created_at).toLocaleDateString('id-ID')}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <Button 
+                type="primary" 
+                block 
+                size="large" 
+                className="mt-4 rounded-xl font-bold"
+                onClick={handleGenerateAnalysis}
+                disabled={selectedSessionIds.length === 0 || generatingAnalysis}
+              >
+                {generatingAnalysis ? <Spin className="mr-2" /> : <RobotOutlined />}
+                {generatingAnalysis ? 'AI sedang menganalisis...' : 'Mulai Analisis AI'}
+              </Button>
+            </div>
+          </Modal>
+
+          {/* Drawer Analysis */}
+          <Drawer
+            title={
+              <div className="flex items-center gap-2">
+                <RobotOutlined className="text-primary" />
+                <span className="font-bold">Saran & Analisis AI</span>
+              </div>
+            }
+            placement="right"
+            width={600}
+            onClose={() => setIsAnalysisDrawerVisible(false)}
+            open={isAnalysisDrawerVisible}
+            footer={
+              <div className="flex justify-between items-center p-2">
+                <Text className="text-xs text-on-surface/40">
+                  {!analysisData?.can_delete && <><WarningOutlined /> Analisis baru dapat dihapus 1 minggu setelah pembuatan.</>}
+                </Text>
+                <Button 
+                  danger 
+                  type="text" 
+                  icon={<DeleteOutlined />} 
+                  onClick={handleDeleteAnalysis}
+                  disabled={!analysisData?.can_delete}
+                  loading={deletingAnalysis}
+                >
+                  Hapus Analisis
+                </Button>
+              </div>
+            }
+          >
+            {analysisData && (
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 mb-6">
+                  <Text className="text-primary font-bold text-xs uppercase tracking-widest block mb-2">Insight Guru AI</Text>
+                  <Paragraph className="m-0 text-sm opacity-80">
+                    Berikut adalah analisis pola kesalahan dari ujian yang telah kamu pilih. Jadikan acuan untuk memperdalam materi belajar!
+                  </Paragraph>
+                </div>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {analysisData.analysis_text}
+                </ReactMarkdown>
+                <div className="text-xs text-on-surface/40 mt-10 text-center">
+                  Dibuat pada: {new Date(analysisData.created_at).toLocaleString('id-ID')}
+                </div>
+              </div>
+            )}
+          </Drawer>
+
         </div>
       </div>
     </AppLayout>

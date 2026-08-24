@@ -8,12 +8,14 @@ type Package struct {
 	Title        string    `json:"title"`
 	Description  string    `json:"description"`
 	Price        float64   `gorm:"default:0" json:"price"`
+	DiscountType string    `gorm:"default:''" json:"discount_type"`
+	DiscountValue float64  `gorm:"default:0" json:"discount_value"`
 	Category     string    `gorm:"default:''" json:"category"`
 	ClassesJSON  string    `gorm:"type:text;default:'[]'" json:"-"`
 	SubjectsJSON string    `gorm:"type:text;default:'[]'" json:"-"`
 	Duration     int       `gorm:"default:0" json:"duration"`
 	Status       string    `gorm:"default:'draft'" json:"status"`
-	Thumbnail    string            `gorm:"default:''" json:"thumbnail"`
+	Thumbnail    string    `gorm:"default:''" json:"thumbnail"`
 	Materials    []PackageMaterial `gorm:"foreignKey:PackageID;constraint:OnDelete:CASCADE" json:"materials"`
 	CreatedAt    time.Time         `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`

@@ -21,6 +21,8 @@ type packageListResponse struct {
 	Title          string   `json:"title"`
 	Description    string   `json:"description"`
 	Price          float64  `json:"price"`
+	DiscountType   string   `json:"discount_type"`
+	DiscountValue  float64  `json:"discount_value"`
 	Category       string   `json:"category"`
 	Classes        []string `json:"classes"`
 	Subjects       []string `json:"subjects"`
@@ -36,9 +38,11 @@ type packageCreatePayload struct {
 	Slug        string   `json:"slug"`
 	Title       string   `json:"title"`
 	Description string   `json:"description"`
-	Price       float64  `json:"price"`
-	Category    string   `json:"category"`
-	Classes     []string `json:"classes"`
+	Price         float64  `json:"price"`
+	DiscountType  string   `json:"discount_type"`
+	DiscountValue float64  `json:"discount_value"`
+	Category      string   `json:"category"`
+	Classes       []string `json:"classes"`
 	Subjects    []string `json:"subjects"`
 	Duration    int      `json:"duration"`
 	Status      string   `json:"status"`
@@ -60,6 +64,8 @@ func mapPackageResponse(pkg model.Package, qCount, mCount, vCount int64) package
 		Title:          pkg.Title,
 		Description:    pkg.Description,
 		Price:          pkg.Price,
+		DiscountType:   pkg.DiscountType,
+		DiscountValue:  pkg.DiscountValue,
 		Category:       pkg.Category,
 		Classes:        classes,
 		Subjects:       subjects,
@@ -108,10 +114,12 @@ func CreatePackage(c echo.Context) error {
 	pkg := model.Package{
 		Slug:         payload.Slug,
 		Title:        payload.Title,
-		Description:  payload.Description,
-		Price:        payload.Price,
-		Category:     payload.Category,
-		ClassesJSON:  classesJSON,
+		Description:    payload.Description,
+		Price:          payload.Price,
+		DiscountType:   payload.DiscountType,
+		DiscountValue:  payload.DiscountValue,
+		Category:       payload.Category,
+		ClassesJSON:    classesJSON,
 		SubjectsJSON: subjectsJSON,
 		Duration:     payload.Duration,
 		Status:       payload.Status,
@@ -139,6 +147,8 @@ func UpdatePackage(c echo.Context) error {
 	pkg.Title = payload.Title
 	pkg.Description = payload.Description
 	pkg.Price = payload.Price
+	pkg.DiscountType = payload.DiscountType
+	pkg.DiscountValue = payload.DiscountValue
 	pkg.Category = payload.Category
 	pkg.ClassesJSON = toJSON(payload.Classes)
 	pkg.SubjectsJSON = toJSON(payload.Subjects)

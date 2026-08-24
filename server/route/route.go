@@ -55,4 +55,5 @@ func InitRouting(e *echo.Echo) {
 	RouteDashboard(api)
 	RouteExampleExam(api)
 	RouteAI(api)
+	RouteProgressAnalysis(api)
 }
