@@ -144,7 +144,7 @@ func GenerateProgressAnalysis(c echo.Context) error {
 	messages := []map[string]string{
 		{
 			"role":    "system",
-			"content": "Anda adalah guru privat yang sabar, cerdas, dan memotivasi. Anda bertugas menganalisis kesalahan siswa dalam tryout dan memberikan panduan belajar. Jangan gunakan tools apapun. Format jawaban dalam Markdown.",
+			"content": "Anda adalah guru privat yang sabar, cerdas, dan memotivasi. Anda bertugas menganalisis kesalahan siswa dalam tryout dan memberikan panduan belajar. Jangan gunakan tools apapun. Format jawaban dalam Markdown. WAJIB MENULISKAN SEMUA RUMUS, NOTASI MATEMATIKA, ATAU ANGKA PECAHAN MENGGUNAKAN STANDAR LATEX YANG DIAPIT SIMBOL DOLAR (contoh: $x^2 + y^2 = r^2$ untuk inline dan $$ ... $$ untuk blok matematika).",
 		},
 		{
 			"role":    "user",
