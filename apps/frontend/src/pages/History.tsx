@@ -19,7 +19,11 @@ import Paragraph from 'antd/es/typography/Paragraph';
 import { useAuth } from '../context/AuthContext';
 import { getAdminExamSessions, getProgressAnalysis, generateProgressAnalysis, deleteProgressAnalysis } from '../services/packageService';
 import { Modal, Drawer, Checkbox, Spin } from 'antd';
-import { renderContent } from '../utils/renderContent';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 
 const { Title, Text } = Typography;
 
@@ -346,10 +350,14 @@ const HistoryPage: React.FC = () => {
                     Berikut adalah analisis pola kesalahan dari ujian yang telah kamu pilih. Jadikan acuan untuk memperdalam materi belajar!
                   </Paragraph>
                 </div>
-                <div 
-                  className="prose prose-sm md:prose-base dark:prose-invert max-w-none prose-p:leading-relaxed prose-headings:font-manrope prose-headings:font-bold prose-a:text-primary"
-                  dangerouslySetInnerHTML={{ __html: renderContent(analysisData.analysis_text) }}
-                />
+                <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none prose-p:leading-relaxed prose-headings:font-manrope prose-headings:font-bold prose-a:text-primary">
+                  <ReactMarkdown 
+                    remarkPlugins={[remarkGfm, remarkMath]}
+                    rehypePlugins={[rehypeKatex]}
+                  >
+                    {analysisData.analysis_text}
+                  </ReactMarkdown>
+                </div>
                 <div className="text-xs text-on-surface/40 mt-10 text-center">
                   Dibuat pada: {new Date(analysisData.created_at).toLocaleString('id-ID')}
                 </div>
