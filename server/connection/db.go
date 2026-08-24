@@ -57,6 +57,7 @@ func ConnectDB() {
 		&model.VoucherUsage{},
 		&model.Transaction{},
 		&model.UserMaterialProgress{},
+		&model.ProgressAnalysis{},
 		&model.MenuLog{},
 		&model.ExampleExam{},
 		&model.ContactMessage{},

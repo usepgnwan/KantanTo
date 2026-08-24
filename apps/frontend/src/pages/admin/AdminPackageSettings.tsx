@@ -79,7 +79,12 @@ interface VideoMaterial {
 const stripHtml = (value: string): string =>
   value.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
 
-const hasPreviewContent = (value?: string): boolean => Boolean(value && stripHtml(value).length > 0);
+const hasPreviewContent = (value?: string): boolean => {
+  if (!value) return false;
+  if (value.includes('ql-formula') || value.includes('<img')) return true;
+  if (value.includes('$$')) return true;
+  return stripHtml(value).length > 0;
+};
 
 const getCorrectIndexes = (correct: number | number[] | undefined): number[] => {
   if (Array.isArray(correct)) return correct.map(Number).filter(Number.isFinite);

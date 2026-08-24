@@ -31,8 +31,12 @@ const toPackageCard = (pkg: PackageListItem): PackageProps => ({
   slug: pkg.slug,
   title: pkg.title,
   image: pkg.thumbnail || fallbackImage,
-  price: pkg.price,
-  originalPrice: pkg.price > 0 ? pkg.price * 2 : 0,
+  price: pkg.discount_type === 'percent' 
+    ? pkg.price - (pkg.price * (pkg.discount_value || 0)) / 100 
+    : pkg.discount_type === 'harga'
+    ? pkg.price - (pkg.discount_value || 0)
+    : pkg.price,
+  originalPrice: pkg.discount_type ? pkg.price : 0,
   rating: 5,
   studentCount: 0,
   duration: pkg.duration > 0 ? `${pkg.duration} Menit` : 'Tryout',

@@ -144,7 +144,11 @@ const PackageCard: React.FC<PackageProps> = ({
           ) : (
             <>
               <div className="mb-4">
-                <Text className="text-xs text-surface-on/40 line-through">Rp {originalPrice.toLocaleString('id-ID')}</Text>
+                {originalPrice > price && (
+                  <div className="flex items-center gap-2">
+                    <Text className="text-xs text-surface-on/40 line-through">Rp {originalPrice.toLocaleString('id-ID')}</Text>
+                  </div>
+                )}
                 <div className="flex items-baseline gap-1">
                   <Text className="text-2xl font-bold text-primary">Rp {price.toLocaleString('id-ID')}</Text>
                   <Text className="text-xs text-surface-on/60">/paket</Text>

@@ -91,6 +91,8 @@ const AdminPackageForm: React.FC = () => {
       subjects: pkg.subjects,
       duration: pkg.duration,
       price: pkg.price,
+      discount_type: pkg.discount_type || '',
+      discount_value: pkg.discount_value || 0,
     });
     setModalOpen(true);
   };
@@ -113,6 +115,8 @@ const AdminPackageForm: React.FC = () => {
           duration: vals.duration ?? 0,
           status: vals.status ?? 'draft',
           thumbnail: editTarget.thumbnail,
+          discount_type: vals.discount_type ?? '',
+          discount_value: vals.discount_value ?? 0,
         });
         setPackages(prev =>
           prev.map(p => p.slug === editTarget.slug ? toRow(updated) : p)
@@ -142,6 +146,8 @@ const AdminPackageForm: React.FC = () => {
           duration: vals.duration ?? 0,
           status: vals.status ?? 'draft',
           thumbnail: '',
+          discount_type: vals.discount_type ?? '',
+          discount_value: vals.discount_value ?? 0,
         });
         setPackages(prev => [...prev, toRow(created)]);
         message.success('Paket baru berhasil dibuat');
@@ -168,6 +174,8 @@ const AdminPackageForm: React.FC = () => {
         duration: pkg.duration,
         status: newStatus,
         thumbnail: pkg.thumbnail,
+        discount_type: pkg.discount_type,
+        discount_value: pkg.discount_value,
       });
       setPackages(prev => prev.map(p => p.slug === pkg.slug ? toRow(updated) : p));
     } catch {
@@ -289,10 +297,30 @@ const AdminPackageForm: React.FC = () => {
       dataIndex: 'price',
       key: 'price',
       align: 'right',
-      render: (price) => (
-        <span className="font-black text-primary">
-          {price === 0 ? 'Gratis' : `Rp ${Number(price).toLocaleString('id-ID')}`}
-        </span>
+      render: (price, record) => (
+        <div className="flex flex-col items-end gap-1">
+          {record.discount_type ? (
+            <>
+              <span className="text-xs text-on-surface/40 line-through">
+                Rp {Number(price).toLocaleString('id-ID')}
+              </span>
+              <span className="font-black text-primary">
+                Rp {Number(
+                  record.discount_type === 'percent'
+                    ? price - (price * (record.discount_value || 0)) / 100
+                    : price - (record.discount_value || 0)
+                ).toLocaleString('id-ID')}
+              </span>
+              <Tag color="red" className="m-0 mt-1 border-none font-bold text-[9px] px-1.5 py-0.5 rounded-md">
+                {record.discount_type === 'percent' ? `${record.discount_value}% OFF` : `Hemat Rp ${Number(record.discount_value).toLocaleString('id-ID')}`}
+              </Tag>
+            </>
+          ) : (
+            <span className="font-black text-primary">
+              {price === 0 ? 'Gratis' : `Rp ${Number(price).toLocaleString('id-ID')}`}
+            </span>
+          )}
+        </div>
       ),
       sorter: (a, b) => a.price - b.price,
     },
@@ -526,6 +554,44 @@ const AdminPackageForm: React.FC = () => {
                   formatter={(v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.')}
                   parser={(v) => Number(v?.replace(/\./g, '') ?? 0) as any}
                 />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="discount_type" label={<span className="font-bold text-sm">Tipe Diskon</span>} initialValue="">
+                <Select
+                  className="rounded-xl w-full"
+                  style={{ height: 48 }}
+                  options={[
+                    { value: '', label: 'Tidak Ada Diskon' },
+                    { value: 'percent', label: 'Persen (%)' },
+                    { value: 'harga', label: 'Nominal (Rp)' },
+                  ]}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item noStyle shouldUpdate={(prev, curr) => prev.discount_type !== curr.discount_type}>
+                {({ getFieldValue }) => {
+                  const type = getFieldValue('discount_type');
+                  if (!type) return null;
+                  return (
+                    <Form.Item
+                      name="discount_value"
+                      label={<span className="font-bold text-sm">Nilai Diskon</span>}
+                      rules={[{ required: true, message: 'Wajib diisi' }]}
+                    >
+                      <InputNumber
+                        min={0}
+                        max={type === 'percent' ? 100 : undefined}
+                        placeholder={type === 'percent' ? "10" : "15000"}
+                        className="w-full rounded-xl"
+                        style={{ height: 48, display: 'flex', alignItems: 'center' }}
+                        formatter={type === 'harga' ? (v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : undefined}
+                        parser={type === 'harga' ? (v) => Number(v?.replace(/\./g, '') ?? 0) as any : undefined}
+                      />
+                    </Form.Item>
+                  );
+                }}
               </Form.Item>
             </Col>
           </Row>

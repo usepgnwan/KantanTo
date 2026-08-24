@@ -126,12 +126,18 @@ const PackageDetailPage: React.FC = () => {
     if (!packageData) return;
     
     if (!isInCart(packageData.slug)) {
+      const finalPrice = packageData.discount_type === 'percent'
+        ? packageData.price - (packageData.price * (packageData.discount_value || 0)) / 100
+        : packageData.discount_type === 'harga'
+        ? packageData.price - (packageData.discount_value || 0)
+        : packageData.price;
+
       addToCart({
         id: packageData.slug,
         slug: packageData.slug,
         title: packageData.title,
         variant: `${packageData.category} • ${packageData.duration} Menit`,
-        price: packageData.price,
+        price: finalPrice,
         image: packageData.thumbnail || fallbackVideoThumbnail,
         quantity: 1,
       });
@@ -161,7 +167,7 @@ const PackageDetailPage: React.FC = () => {
         )
       ),
     },
-    {
+    materials.length > 0 ? {
       key: 'pembahasan',
       label: (
         <span className="flex items-center gap-2 px-2">
@@ -196,8 +202,8 @@ const PackageDetailPage: React.FC = () => {
           )}
         </div>
       ),
-    },
-    {
+    } : null,
+    videos.length > 0 ? {
       key: 'video',
       label: (
         <span className="flex items-center gap-2 px-2">
@@ -226,8 +232,8 @@ const PackageDetailPage: React.FC = () => {
           )}
         </div>
       ),
-    },
-  ];
+    } : null,
+  ].filter(Boolean) as any[];
 
   return (
     <AppLayout>
@@ -316,14 +322,22 @@ const PackageDetailPage: React.FC = () => {
                         ) : (
                           <>
                             <div className="bg-surface-low p-6 rounded-2xl border border-surface-container">
-                              {packageData && packageData.price > 0 && (
+                              {packageData && packageData.discount_type && (
                                 <Text className="text-xs text-surface-on/40 line-through">
-                                  Rp {Number(packageData.price * 2).toLocaleString('id-ID')}
+                                  Rp {Number(packageData.price).toLocaleString('id-ID')}
                                 </Text>
                               )}
                               <div className="flex items-baseline gap-2">
                                 <Title level={2} className="!m-0 !text-primary">
-                                  {packageData?.price === 0 ? 'Gratis' : `Rp ${Number(packageData?.price || 0).toLocaleString('id-ID')}`}
+                                  {(() => {
+                                    if (!packageData) return 'Gratis';
+                                    const finalPrice = packageData.discount_type === 'percent'
+                                      ? packageData.price - (packageData.price * (packageData.discount_value || 0)) / 100
+                                      : packageData.discount_type === 'harga'
+                                      ? packageData.price - (packageData.discount_value || 0)
+                                      : packageData.price;
+                                    return finalPrice === 0 ? 'Gratis' : `Rp ${Number(finalPrice).toLocaleString('id-ID')}`;
+                                  })()}
                                 </Title>
                                 <Text className="text-xs text-surface-on/40">/ Lifetime</Text>
                               </div>
