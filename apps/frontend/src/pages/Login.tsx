@@ -100,9 +100,8 @@ const LoginPage: React.FC = () => {
   };
 
   const handleGoogleLogin = () => {
-    // Note: User mentioned OAUTH_REDIRECT for frontend, using that and standard REACT_APP prefix just in case
-    const clientId = process.env.REACT_APP_OAUTH_CLIENT_ID || process.env.OAUTH_CLIEN_ID;
-    const redirectUri = process.env.REACT_APP_OAUTH_REDIRECT || process.env.OAUTH_REDIRECT || 'http://localhost:3000/oauth/callback';
+    const clientId = (process.env.REACT_APP_OAUTH_CLIENT_ID || process.env.OAUTH_CLIEN_ID || '').replace(/['"]/g, '');
+    const redirectUri = (process.env.REACT_APP_OAUTH_REDIRECT || process.env.OAUTH_REDIRECT || 'http://localhost:3000/oauth/callback').replace(/['"]/g, '');
 
     if (!clientId) {
       message.error('Client ID Google tidak ditemukan di konfigurasi frontend (.env)');
