@@ -12,7 +12,10 @@ import (
 
 func InitRouting(e *echo.Echo) {
 	e.Static("/uploads", "uploads")
-	e.GET("/sitemap.xml", controller.GenerateSitemap)
+	e.GET("/sitemap.xml", controller.GenerateSitemapIndex)
+	e.GET("/page-sitemap.xml", controller.GeneratePageSitemap)
+	e.GET("/package-sitemap.xml", controller.GeneratePackageSitemap)
+	e.GET("/blog-sitemap.xml", controller.GenerateBlogSitemap)
 
 	// Swagger Endpoint with Basic Auth
 	swaggerGroup := e.Group("/swagger")
