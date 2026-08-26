@@ -42,6 +42,7 @@ const AdminSubjects = React.lazy(() => import('../pages/admin/AdminSubjects'));
 const AdminRoles = React.lazy(() => import('../pages/admin/AdminRoles'));
 const AdminExamHistory = React.lazy(() => import('../pages/admin/AdminExamHistory'));
 const AdminExampleExams = React.lazy(() => import('../pages/admin/AdminExampleExams'));
+const AdminChangePassword = React.lazy(() => import('../pages/admin/AdminChangePassword'));
 const NotFound = React.lazy(() => import('../pages/NotFound'));
 
 export interface MenuItem {
@@ -370,6 +371,13 @@ export const menuConfig: MenuItem[] = [
     path: '/admin/subjects',
     name: 'Mata Pelajaran',
     component: AdminSubjects,
+    hidden: true,
+  },
+  {
+    id: 'admin-change-password',
+    path: '/admin/change-password',
+    name: 'Ubah Password',
+    component: AdminChangePassword,
     hidden: true,
   },
   {

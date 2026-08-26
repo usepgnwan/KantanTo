@@ -96,30 +96,34 @@
   .ql-align-center {
     text-align: center !important;
   }
+
   .ql-align-right {
     text-align: right !important;
   }
+
   .ql-align-justify {
     text-align: justify !important;
   }
 
   /* ── KaTeX Math Display Fixes & Blog Styles ────────── */
   .katex-display {
-    margin: 1.25rem 0 !important;
+    margin: 0.85rem 0 !important;
     overflow-x: auto !important;
     overflow-y: hidden !important;
     padding: 0.25rem 0 !important;
   }
+
   .katex-formula-wrapper {
     display: inline-block;
     vertical-align: middle;
     padding: 0 2px;
   }
+
   .katex-block-wrapper,
   .katex-display-wrapper {
     display: flex;
     justify-content: center;
-    margin: 1.25rem 0;
+    margin: 0.8rem 0;
     overflow-x: auto;
   }
 
@@ -129,9 +133,15 @@
     word-break: break-word;
   }
 
+  .blog-content p,
+  .kantan-quill-preview p {
+    margin-top: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+  }
+
   .blog-content ul,
   .kantan-quill-preview ul {
-    list-style-type: disc !important;
+    list-style-type: disc;
     padding-left: 2.5rem !important;
     margin-top: 0.5rem !important;
     margin-bottom: 0.5rem !important;
@@ -139,7 +149,7 @@
 
   .blog-content ol,
   .kantan-quill-preview ol {
-    list-style-type: decimal !important;
+    list-style-type: decimal;
     padding-left: 2.5rem !important;
     margin-top: 0.5rem !important;
     margin-bottom: 0.5rem !important;
@@ -149,6 +159,21 @@
   .kantan-quill-preview li {
     margin-bottom: 0.25rem !important;
     display: list-item !important;
+  }
+
+  /* Override based on Quill data-list attributes in case Quill uses <ol> for everything */
+  .blog-content li[data-list="bullet"],
+  .kantan-quill-preview li[data-list="bullet"],
+  .blog-content ul li,
+  .kantan-quill-preview ul li {
+    list-style-type: disc !important;
+  }
+
+  .blog-content li[data-list="ordered"],
+  .kantan-quill-preview li[data-list="ordered"],
+  .blog-content ol li,
+  .kantan-quill-preview ol li {
+    list-style-type: decimal !important;
   }
 
 
@@ -165,8 +190,19 @@
     margin: 0 !important;
     display: inline-block;
   }
-  
+
   .kantan-option-math .katex-display-wrapper {
-    margin: 0.5rem 0 !important;
+    margin: 0.25rem 0 !important;
+  }
+
+  .blog-content .katex-display,
+  .kantan-quill-preview .katex-display {
+    margin: 0.25rem 0 !important;
+  }
+
+  .blog-content p:has(.katex-display),
+  .kantan-quill-preview p:has(.katex-display) {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
   }
 }

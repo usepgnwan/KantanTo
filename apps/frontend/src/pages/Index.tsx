@@ -198,7 +198,7 @@ const IndexPage: React.FC = () => {
                     onClick={() => navigate(`/blog/${blogs[0].slug}`)}
                   >
                     <div className="aspect-video sm:aspect-[16/10] overflow-hidden relative shrink-0">
-                      <img src={blogs[0].thumbnail ? `${backendUrl}${blogs[0].thumbnail}` : 'https://images.unsplash.com/photo-1434031211128-095490e7e7e9?auto=format&fit=crop&q=80&w=800'} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" alt={blogs[0].judul} />
+                      <img src={blogs[0].thumbnail ? `${backendUrl}${blogs[0].thumbnail}` : '/logo-rifaya.png'} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" alt={blogs[0].judul} />
                       <div className="absolute top-4 left-4 bg-yellow-400 text-yellow-900 text-[9px] font-black uppercase px-3 py-1 rounded-full flex items-center gap-1 shadow-md">
                         <StarFilled className="text-[8px]" /> Terbaru
                       </div>
@@ -223,7 +223,7 @@ const IndexPage: React.FC = () => {
                     {blogs.slice(1, 5).map(post => (
                       <div key={post.id} className="flex gap-3 sm:gap-5 group cursor-pointer bg-white dark:bg-zinc-800/50 p-2 sm:p-3 rounded-2xl sm:rounded-[20px] hover:shadow-lg transition-all" onClick={() => navigate(`/blog/${post.slug}`)}>
                         <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-xl sm:rounded-2xl overflow-hidden shrink-0">
-                          <img src={post.thumbnail ? `${backendUrl}${post.thumbnail}` : 'https://images.unsplash.com/photo-1434031211128-095490e7e7e9?auto=format&fit=crop&q=80&w=800'} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={post.judul} />
+                          <img src={post.thumbnail ? `${backendUrl}${post.thumbnail}` : '/logo-rifaya.png'} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={post.judul} />
                         </div>
                         <div className="flex flex-col justify-center flex-1 py-1 sm:py-2 pr-2">
                           <Space className="mb-1 sm:mb-2 flex-wrap gap-y-1">
