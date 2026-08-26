@@ -100,6 +100,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       icon: <UserOutlined />,
     },
     {
+      key: 'change-password',
+      label: 'Ubah Password',
+      icon: <SettingOutlined />,
+      onClick: () => navigate('/admin/change-password'),
+    },
+    {
       key: 'settings',
       label: 'Pengaturan',
       icon: <SettingOutlined />,

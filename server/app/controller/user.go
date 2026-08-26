@@ -194,3 +194,53 @@ func UpdateProfile(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, Response{Status: true, Message: "Profile berhasil diperbarui", Data: user})
 }
+
+type UpdatePasswordRequest struct {
+	OldPassword string `json:"old_password" validate:"required"`
+	NewPassword string `json:"new_password" validate:"required,min=6"`
+}
+
+// UpdatePassword godoc
+// @Summary      Update User Password
+// @Description  Update a user's password.
+// @Tags         User
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id path int true "User ID"
+// @Param        request body controller.UpdatePasswordRequest true "Update Password Data"
+// @Param secret-to-apps header string true "API secret key" default(Z9ToSwagger1413999)
+// @Success      200  {object}  Response
+// @Failure      400  {object}  Response
+// @Failure      404  {object}  Response
+// @Router       /api/user/password/{id} [put]
+func UpdatePassword(c echo.Context) error {
+	id := c.Param("id")
+	var user model.User
+	if err := connection.DB.First(&user, id).Error; err != nil {
+		return c.JSON(http.StatusNotFound, Response{Status: false, Message: "User tidak ditemukan"})
+	}
+
+	var req UpdatePasswordRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Format request tidak valid"})
+	}
+
+	// Compare old password
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.OldPassword)); err != nil {
+		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Password lama salah"})
+	}
+
+	// Hash new password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, Response{Status: false, Message: "Gagal memproses password baru"})
+	}
+
+	// Update password
+	if err := connection.DB.Model(&user).Update("password", string(hashedPassword)).Error; err != nil {
+		return c.JSON(http.StatusInternalServerError, Response{Status: false, Message: "Gagal menyimpan password baru"})
+	}
+
+	return c.JSON(http.StatusOK, Response{Status: true, Message: "Password berhasil diperbarui"})
+}

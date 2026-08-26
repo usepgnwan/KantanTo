@@ -38,7 +38,7 @@ const BlogDetail: React.FC = () => {
       } catch { return dateStr; }
    };
 
-   const thumbnailUrl = (path: string) => path ? `${backendUrl}${path}` : 'https://images.unsplash.com/photo-1434031211128-095490e7e7e9?auto=format&fit=crop&q=80&w=1200';
+   const thumbnailUrl = (path: string) => path ? `${backendUrl}${path}` : '/logo-rifaya.png';
 
    return (
       <AppLayout>

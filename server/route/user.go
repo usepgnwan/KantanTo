@@ -13,4 +13,5 @@ func RouteUser(api *echo.Group) {
 	user.POST("/register", controller.RegisterUser)
 	user.GET("/profile/:id", controller.GetProfile)
 	user.PUT("/profile/:id", controller.UpdateProfile)
+	user.PUT("/password/:id", controller.UpdatePassword)
 }

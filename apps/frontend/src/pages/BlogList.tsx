@@ -42,7 +42,7 @@ const BlogPage: React.FC = () => {
     } catch { return dateStr; }
   };
 
-  const thumbnailUrl = (path: string) => path ? `${backendUrl}${path}` : 'https://images.unsplash.com/photo-1434031211128-095490e7e7e9?auto=format&fit=crop&q=80&w=800';
+  const thumbnailUrl = (path: string) => path ? `${backendUrl}${path}` : '/logo-rifaya.png';
 
   // Non-headline posts (exclude headline from list on first page to avoid duplicate)
   const otherPosts = (currentPage === 1 && headline)

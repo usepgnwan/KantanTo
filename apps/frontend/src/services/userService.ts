@@ -100,6 +100,11 @@ export const updateProfileAPI = async (id: number, payload: UpdateProfilePayload
   return response.data.data;
 };
 
+export const changePasswordAPI = async (id: number, payload: any): Promise<{ message: string }> => {
+  const response = await api.put(`/user/password/${id}`, payload);
+  return response.data;
+};
+
 export const forgotPassword = async (email: string): Promise<{ message: string }> => {
   const response = await api.post('/auth/forgot-password', { email });
   return response.data;
