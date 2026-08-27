@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import dayjs from 'dayjs';
 import AppLayout from '../layouts/AppLayout';
 import PackageCard, { PackageProps } from '../components/molecules/PackageCard';
 import PackageFilters from '../components/organisms/PackageFilters';
@@ -44,6 +45,12 @@ const toPackageCard = (pkg: PackageListItem): PackageProps => ({
   classes: pkg.classes,
   subjects: pkg.subjects,
   isPopular: pkg.questions_count > 0,
+  is_lifetime: pkg.is_lifetime,
+  validity_days: pkg.validity_days,
+  max_exam_attempts: pkg.max_exam_attempts,
+  questions_count: pkg.questions_count,
+  materials_count: pkg.materials_count,
+  videos_count: pkg.videos_count,
 });
 
 const PackagesPage: React.FC = () => {
@@ -62,6 +69,15 @@ const PackagesPage: React.FC = () => {
         .then((myTransactions) => {
           const slugs = new Set(
             (myTransactions || [])
+              .filter((tx) => {
+                if (!tx.is_lifetime && tx.active_until && dayjs(tx.active_until).isBefore(dayjs())) {
+                  return false;
+                }
+                if (tx.max_exam_attempts > 0 && tx.used_exam_attempts >= tx.max_exam_attempts) {
+                  return false;
+                }
+                return true;
+              })
               .map((tx) => tx.package?.slug)
               .filter(Boolean) as string[]
           );

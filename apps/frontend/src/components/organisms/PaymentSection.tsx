@@ -1,5 +1,5 @@
 import React from 'react';
-import { Typography, Card, Button, Badge, Space } from 'antd';
+import { Typography, Card, Button, Badge, Space, Image } from 'antd';
 import {
   CopyOutlined,
   WhatsAppOutlined,
@@ -91,11 +91,13 @@ Mohon bantuan untuk konfirmasi & aktivasi transaksi ini. Terima kasih!`;
             <div className="flex items-center justify-center gap-2 mb-4 text-primary font-bold text-sm">
               <QrcodeOutlined className="text-xl" /> Scan QRIS Pembayaran
             </div>
-            <div className="bg-white rounded-2xl p-4 mb-4 border border-surface-container shadow-inner">
-              <img
+            <div className="bg-white rounded-2xl p-4 mb-4 border border-surface-container shadow-inner flex justify-center">
+              <Image
                 src={qrisPlaceholder}
                 alt="QRIS Payment"
-                className="w-full aspect-square object-contain mx-auto max-w-[240px]"
+                className="w-full aspect-square object-contain"
+                style={{ maxWidth: '240px' }}
+                preview={{ mask: <div className="text-white text-sm"><InfoCircleOutlined /> Klik untuk Zoom</div> }}
               />
             </div>
             <Text className="text-xs font-bold uppercase tracking-wider text-on-surface/60 block mb-1">

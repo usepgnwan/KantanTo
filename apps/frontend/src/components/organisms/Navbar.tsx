@@ -11,7 +11,8 @@ import {
   HistoryOutlined,
   ShoppingOutlined,
   ThunderboltOutlined,
-  BookOutlined
+  BookOutlined,
+  CalendarOutlined
 } from '@ant-design/icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -64,6 +65,11 @@ const Navbar: React.FC = () => {
       key: 'latihan',
       label: <Link to="/latihan">Belajar</Link>,
       icon: <BookOutlined />,
+    },
+    {
+      key: 'jadwal',
+      label: <Link to="/jadwal">Jadwal Belajar</Link>,
+      icon: <CalendarOutlined />,
     },
     {
       key: 'profile',
@@ -165,7 +171,10 @@ const Navbar: React.FC = () => {
             {isLoggedIn ? (
               <Dropdown menu={{ 
                 items: userMenuItems,
-                onClick: (info) => logMenuClick(info.key, `UserMenu: ${info.key}`)
+                onClick: (info) => {
+                  logMenuClick(info.key, `UserMenu: ${info.key}`);
+                  if (info.key === 'logout') handleLogout();
+                }
               }} placement="bottomRight" arrow={{ pointAtCenter: true }} trigger={['click']}>
                 <div className="flex items-center gap-3 cursor-pointer group">
                   <Avatar
@@ -251,6 +260,7 @@ const Navbar: React.FC = () => {
                 onClick={(info) => {
                   logMenuClick(info.key, `UserMenu: ${info.key}`);
                   setMobileVisible(false);
+                  if (info.key === 'logout') handleLogout();
                 }}
                 className="border-none weightless-menu font-bold"
               />

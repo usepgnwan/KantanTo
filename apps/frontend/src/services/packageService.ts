@@ -27,6 +27,9 @@ export interface PackageListItem {
   duration: number;
   status: 'published' | 'draft' | 'deleted';
   thumbnail: string;
+  is_lifetime: boolean;
+  validity_days: number;
+  max_exam_attempts: number;
   questions_count: number;
   materials_count: number;
   videos_count: number;
@@ -45,6 +48,9 @@ export interface PackagePayload {
   duration: number;
   status: string;
   thumbnail?: string;
+  is_lifetime: boolean;
+  validity_days: number;
+  max_exam_attempts: number;
 }
 
 const asStringArray = (value: unknown): string[] => {
@@ -90,6 +96,9 @@ const normalizePackage = (pkg: any): PackageListItem => ({
   duration: Number(pkg?.duration) || 0,
   status: normalizeStatus(pkg?.status),
   thumbnail: String(pkg?.thumbnail || ''),
+  is_lifetime: Boolean(pkg?.is_lifetime ?? true),
+  validity_days: Number(pkg?.validity_days) || 0,
+  max_exam_attempts: Number(pkg?.max_exam_attempts) || 0,
   questions_count: Number(pkg?.questions_count) || 0,
   materials_count: Number(pkg?.materials_count) || 0,
   videos_count: Number(pkg?.videos_count) || 0,

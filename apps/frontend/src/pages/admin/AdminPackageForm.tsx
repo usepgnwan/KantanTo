@@ -76,7 +76,7 @@ const AdminPackageForm: React.FC = () => {
   const openCreate = () => {
     setEditTarget(null);
     form.resetFields();
-    form.setFieldsValue({ status: 'draft', classes: [], subjects: [], duration: 120, price: 0 });
+    form.setFieldsValue({ status: 'draft', classes: [], subjects: [], duration: 120, price: 0, is_lifetime: true, validity_days: 30, max_exam_attempts: 0 });
     setModalOpen(true);
   };
 
@@ -93,6 +93,9 @@ const AdminPackageForm: React.FC = () => {
       price: pkg.price,
       discount_type: pkg.discount_type || '',
       discount_value: pkg.discount_value || 0,
+      is_lifetime: pkg.is_lifetime,
+      validity_days: pkg.validity_days || 30,
+      max_exam_attempts: pkg.max_exam_attempts || 0,
     });
     setModalOpen(true);
   };
@@ -117,6 +120,9 @@ const AdminPackageForm: React.FC = () => {
           thumbnail: editTarget.thumbnail,
           discount_type: vals.discount_type ?? '',
           discount_value: vals.discount_value ?? 0,
+          is_lifetime: vals.is_lifetime ?? true,
+          validity_days: vals.validity_days ?? 0,
+          max_exam_attempts: vals.max_exam_attempts ?? 0,
         });
         setPackages(prev =>
           prev.map(p => p.slug === editTarget.slug ? toRow(updated) : p)
@@ -148,6 +154,9 @@ const AdminPackageForm: React.FC = () => {
           thumbnail: '',
           discount_type: vals.discount_type ?? '',
           discount_value: vals.discount_value ?? 0,
+          is_lifetime: vals.is_lifetime ?? true,
+          validity_days: vals.validity_days ?? 0,
+          max_exam_attempts: vals.max_exam_attempts ?? 0,
         });
         setPackages(prev => [...prev, toRow(created)]);
         message.success('Paket baru berhasil dibuat');
@@ -338,6 +347,24 @@ const AdminPackageForm: React.FC = () => {
           <Tag className="rounded-full bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400 border-none font-bold text-[10px] px-2">
             {r.videos_count} video
           </Tag>
+        </Space>
+      ),
+    },
+    {
+      title: 'Akses & Limit',
+      key: 'access_limit',
+      render: (_, r) => (
+        <Space direction="vertical" size={2}>
+          {r.is_lifetime ? (
+            <Tag color="green" className="m-0 rounded-lg border-none font-bold text-[9px] px-2">Lifetime</Tag>
+          ) : (
+            <Tag color="blue" className="m-0 rounded-lg border-none font-bold text-[9px] px-2">{r.validity_days} Hari</Tag>
+          )}
+          {r.max_exam_attempts === 0 ? (
+            <Tag color="orange" className="m-0 rounded-lg border-none font-bold text-[9px] px-2">Ujian Unlimited</Tag>
+          ) : (
+            <Tag color="magenta" className="m-0 rounded-lg border-none font-bold text-[9px] px-2">Max {r.max_exam_attempts}x Ujian</Tag>
+          )}
         </Space>
       ),
     },
@@ -540,8 +567,38 @@ const AdminPackageForm: React.FC = () => {
               </Form.Item>
             </Col>
             <Col xs={24} sm={12}>
-              <Form.Item name="duration" label={<span className="font-bold text-sm">Durasi (Menit)</span>} rules={[{ required: true, message: 'Durasi wajib diisi' }]}>
+              <Form.Item name="duration" label={<span className="font-bold text-sm">Durasi Ujian (Menit)</span>} rules={[{ required: true, message: 'Durasi wajib diisi' }]}>
                 <InputNumber min={1} placeholder="120" className="w-full rounded-xl" style={{ height: 44, display: 'flex', alignItems: 'center' }} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="is_lifetime" label={<span className="font-bold text-sm">Masa Aktif Paket</span>} initialValue={true}>
+                <Select
+                  className="rounded-xl w-full"
+                  style={{ height: 44 }}
+                  options={[
+                    { value: true, label: 'Lifetime (Selamanya)' },
+                    { value: false, label: 'Terbatas (Hari)' },
+                  ]}
+                />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item noStyle shouldUpdate={(prev, curr) => prev.is_lifetime !== curr.is_lifetime}>
+                {({ getFieldValue }) => {
+                  const isLifetime = getFieldValue('is_lifetime');
+                  if (isLifetime) return null;
+                  return (
+                    <Form.Item name="validity_days" label={<span className="font-bold text-sm">Jumlah Hari Aktif</span>} rules={[{ required: true, message: 'Wajib diisi' }]}>
+                      <InputNumber min={1} placeholder="30" className="w-full rounded-xl" style={{ height: 44, display: 'flex', alignItems: 'center' }} />
+                    </Form.Item>
+                  );
+                }}
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12}>
+              <Form.Item name="max_exam_attempts" label={<span className="font-bold text-sm">Limit Kesempatan Ujian</span>} initialValue={0} tooltip="Isi 0 untuk unlimited">
+                <InputNumber min={0} placeholder="0 (Unlimited)" className="w-full rounded-xl" style={{ height: 44, display: 'flex', alignItems: 'center' }} />
               </Form.Item>
             </Col>
             <Col span={24}>

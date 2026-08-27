@@ -18,6 +18,7 @@ const Profile = React.lazy(() => import('../pages/Profile'));
 const Purchases = React.lazy(() => import('../pages/Purchases'));
 const Dashboard = React.lazy(() => import('../pages/Dashboard'));
 const Practice = React.lazy(() => import('../pages/Practice'));
+const Schedule = React.lazy(() => import('../pages/Schedule'));
 const Review = React.lazy(() => import('../pages/Review'));
 const MaterialDetail = React.lazy(() => import('../pages/MaterialDetail'));
 const VideoPlayer = React.lazy(() => import('../pages/VideoPlayer'));
@@ -194,6 +195,13 @@ export const menuConfig: MenuItem[] = [
     path: '/latihan',
     name: 'Latihan Soal',
     component: Practice,
+    hidden: true,
+  },
+  {
+    id: 'jadwal',
+    path: '/jadwal',
+    name: 'Jadwal Belajar',
+    component: Schedule,
     hidden: true,
   },
   {

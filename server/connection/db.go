@@ -62,6 +62,7 @@ func ConnectDB() {
 		&model.ExampleExam{},
 		&model.ContactMessage{},
 		&model.PasswordResetToken{},
+		&model.StudySchedule{},
 	)
 	if err != nil {
 		log.Fatal("Failed to migrate database:", err)

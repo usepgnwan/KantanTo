@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"server/app/model"
 	"server/connection"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"gorm.io/gorm"
@@ -49,6 +50,25 @@ func SubmitExam(c echo.Context) error {
 			"status":  false,
 			"message": "Package not found",
 		})
+	}
+
+	// 1.5 Validate Access (Lifetime/Expiration & Exam Limits)
+	if !req.IsTesting {
+		var validTransaction model.Transaction
+		err := connection.DB.Where("user_id = ? AND package_id = ? AND status = 'active' AND (is_lifetime = ? OR active_until > ?) AND (max_exam_attempts = 0 OR used_exam_attempts < max_exam_attempts)", 
+			req.UserID, pkg.ID, true, time.Now()).
+			Order("created_at asc").
+			First(&validTransaction).Error
+
+		if err != nil {
+			return c.JSON(http.StatusForbidden, map[string]interface{}{
+				"status":  false,
+				"message": "Masa aktif paket sudah habis atau limit ujian telah tercapai. Silakan beli ulang paket ini.",
+			})
+		}
+
+		// Increment limit usage
+		connection.DB.Model(&validTransaction).UpdateColumn("used_exam_attempts", gorm.Expr("used_exam_attempts + ?", 1))
 	}
 
 	// 2. Fetch all questions for this package

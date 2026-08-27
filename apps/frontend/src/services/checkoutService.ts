@@ -28,6 +28,9 @@ export interface TransactionResponse {
   payment_method: string;
   status: string;
   active_until: string | null;
+  is_lifetime: boolean;
+  max_exam_attempts: number;
+  used_exam_attempts: number;
   created_at?: string;
 }
 

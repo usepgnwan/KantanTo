@@ -29,6 +29,9 @@ type packageListResponse struct {
 	Duration       int      `json:"duration"`
 	Status         string   `json:"status"`
 	Thumbnail      string   `json:"thumbnail"`
+	IsLifetime     bool     `json:"is_lifetime"`
+	ValidityDays   int      `json:"validity_days"`
+	MaxExamAttempts int     `json:"max_exam_attempts"`
 	QuestionsCount int64    `json:"questions_count"`
 	MaterialsCount int64    `json:"materials_count"`
 	VideosCount    int64    `json:"videos_count"`
@@ -47,6 +50,9 @@ type packageCreatePayload struct {
 	Duration    int      `json:"duration"`
 	Status      string   `json:"status"`
 	Thumbnail   string   `json:"thumbnail"`
+	IsLifetime  bool     `json:"is_lifetime"`
+	ValidityDays int     `json:"validity_days"`
+	MaxExamAttempts int  `json:"max_exam_attempts"`
 }
 
 func mapPackageResponse(pkg model.Package, qCount, mCount, vCount int64) packageListResponse {
@@ -72,6 +78,9 @@ func mapPackageResponse(pkg model.Package, qCount, mCount, vCount int64) package
 		Duration:       pkg.Duration,
 		Status:         pkg.Status,
 		Thumbnail:      pkg.Thumbnail,
+		IsLifetime:     pkg.IsLifetime,
+		ValidityDays:   pkg.ValidityDays,
+		MaxExamAttempts: pkg.MaxExamAttempts,
 		QuestionsCount: qCount,
 		MaterialsCount: mCount,
 		VideosCount:    vCount,
@@ -124,6 +133,9 @@ func CreatePackage(c echo.Context) error {
 		Duration:     payload.Duration,
 		Status:       payload.Status,
 		Thumbnail:    payload.Thumbnail,
+		IsLifetime:   payload.IsLifetime,
+		ValidityDays: payload.ValidityDays,
+		MaxExamAttempts: payload.MaxExamAttempts,
 	}
 	if err := connection.DB.Create(&pkg).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, helpers.Response{Status: false, Message: "Gagal membuat paket: " + err.Error()})
@@ -144,6 +156,8 @@ func UpdatePackage(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, helpers.Response{Status: false, Message: "Paket tidak ditemukan"})
 	}
 
+	wasLifetime := pkg.IsLifetime
+
 	pkg.Title = payload.Title
 	pkg.Description = payload.Description
 	pkg.Price = payload.Price
@@ -155,9 +169,19 @@ func UpdatePackage(c echo.Context) error {
 	pkg.Duration = payload.Duration
 	pkg.Status = payload.Status
 	pkg.Thumbnail = payload.Thumbnail
+	pkg.IsLifetime = payload.IsLifetime
+	pkg.ValidityDays = payload.ValidityDays
+	pkg.MaxExamAttempts = payload.MaxExamAttempts
 
 	if err := connection.DB.Save(&pkg).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, helpers.Response{Status: false, Message: "Gagal memperbarui paket"})
+	}
+
+	// Update existing active transactions to lifetime if package changes from limited to lifetime
+	if !wasLifetime && pkg.IsLifetime {
+		connection.DB.Model(&model.Transaction{}).
+			Where("package_id = ? AND status = ?", pkg.ID, "active").
+			Updates(map[string]interface{}{"is_lifetime": true, "active_until": nil})
 	}
 
 	var qCount, mCount, vCount int64

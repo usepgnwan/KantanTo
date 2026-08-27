@@ -1,5 +1,6 @@
 import React from 'react';
 import AppLayout from '../layouts/AppLayout';
+import UpcomingSchedules from '../components/organisms/UpcomingSchedules';
 import { Row, Col, Card, Typography, Avatar, Space, Progress, Tag, Button, Alert } from 'antd';
 import {
   HistoryOutlined,
@@ -305,7 +306,7 @@ const Dashboard: React.FC = () => {
                 </Card>
 
                 {/* Study Time Chart Moved Here for Better Layout */}
-                <Card className="weightless-card border-none p-2 flex-grow">
+                {/* <Card className="weightless-card border-none p-2">
                   <div className="flex items-center justify-between mb-8">
                     <div>
                       <Title level={4} className="!m-0 !font-black !font-manrope">Study Time</Title>
@@ -332,7 +333,11 @@ const Dashboard: React.FC = () => {
                       </div>
                     ))}
                   </div>
-                </Card>
+                </Card> */}
+
+                <div className="flex-grow min-h-[300px]">
+                  <UpcomingSchedules />
+                </div>
               </div>
             </Col>
           </Row>

@@ -57,12 +57,17 @@ func UpdateTransactionStatus(c echo.Context) error {
 
 	transaction.Status = req.Status
 	if req.Status == "active" {
-		durationDays := 30
-		if transaction.Package.Duration > 0 {
-			durationDays = transaction.Package.Duration
+		if transaction.IsLifetime {
+			transaction.ActiveUntil = nil
+		} else {
+			// Jika paket terbatas waktu, set ActiveUntil
+			durationDays := 30 // Default fallback
+			if transaction.Package.ValidityDays > 0 {
+				durationDays = transaction.Package.ValidityDays
+			}
+			t := time.Now().AddDate(0, 0, durationDays)
+			transaction.ActiveUntil = &t
 		}
-		t := time.Now().AddDate(0, 0, durationDays)
-		transaction.ActiveUntil = &t
 	} else if req.Status == "pending payment" {
 		transaction.ActiveUntil = nil
 	}
