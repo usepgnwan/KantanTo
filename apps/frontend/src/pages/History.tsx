@@ -17,7 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import PageLoader from '../components/atoms/PageLoader';
 import Paragraph from 'antd/es/typography/Paragraph';
 import { useAuth } from '../context/AuthContext';
-import { getAdminExamSessions, getProgressAnalysis, generateProgressAnalysis, deleteProgressAnalysis } from '../services/packageService';
+import { getAdminExamSessions, getProgressAnalysis, generateProgressAnalysis, deleteProgressAnalysis, getPackages } from '../services/packageService';
 import { Modal, Drawer, Checkbox, Spin } from 'antd';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -40,6 +40,8 @@ const HistoryPage: React.FC = () => {
   const [selectedSessionIds, setSelectedSessionIds] = useState<number[]>([]);
   const [generatingAnalysis, setGeneratingAnalysis] = useState(false);
   const [deletingAnalysis, setDeletingAnalysis] = useState(false);
+  
+  const [pendingExams, setPendingExams] = useState<any[]>([]);
 
   useEffect(() => {
     if (!payload?.user_id) return;
@@ -57,6 +59,40 @@ const HistoryPage: React.FC = () => {
         setAnalysisData(res);
       }
     }).catch(() => {});
+
+    // Fetch pending exams from localStorage
+    const loadPendingExams = async () => {
+      try {
+        const allPackages = await getPackages();
+        const pending: any[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('exam_') && key.endsWith('_time')) {
+            const slug = key.replace('exam_', '').replace('_time', '');
+            const timeStr = localStorage.getItem(key);
+            if (timeStr && parseInt(timeStr, 10) > 0) {
+              const pkg = allPackages.find(p => p.slug === slug);
+              if (pkg) {
+                // Also get saved answers count for info
+                let answeredCount = 0;
+                try {
+                  const ansStr = localStorage.getItem(`exam_${slug}_answers`);
+                  if (ansStr) {
+                    const ansObj = JSON.parse(ansStr);
+                    answeredCount = Object.keys(ansObj).filter(k => ansObj[k].length > 0).length;
+                  }
+                } catch (e) {}
+                pending.push({ ...pkg, time_remaining: parseInt(timeStr, 10), answered_count: answeredCount });
+              }
+            }
+          }
+        }
+        setPendingExams(pending);
+      } catch (err) {
+        console.error('Failed to load pending exams', err);
+      }
+    };
+    loadPendingExams();
   }, [payload?.user_id]);
 
   const handleAnalisisClick = () => {
@@ -200,6 +236,75 @@ const HistoryPage: React.FC = () => {
           <Row gutter={[32, 32]}>
             <Col xs={24} lg={18}>
               <Card className="border-none bg-white rounded-[40px] shadow-2xl shadow-primary/5 p-4 md:p-8 animate-in fade-in slide-in-from-left-4 duration-700 delay-100">
+                {pendingExams.length > 0 ? (
+                  <div className="mb-8">
+                    <Title level={4} className="!font-manrope mb-4 flex items-center gap-2">
+                      <ClockCircleOutlined className="text-yellow-500" />
+                      Ujian Berjalan (Pending)
+                    </Title>
+                    <Table
+                      columns={[
+                        {
+                          title: 'Tryout',
+                          dataIndex: 'title',
+                          key: 'title',
+                          render: (title: string, pkg: any) => (
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 bg-yellow-500/10 rounded-xl flex items-center justify-center">
+                                <ClockCircleOutlined className="text-yellow-500" />
+                              </div>
+                              <div>
+                                <div className="font-bold text-on-surface">{title || 'Unknown'}</div>
+                                <div className="text-[10px] text-on-surface/40 uppercase tracking-widest font-heavy">{pkg?.category || 'Umum'}</div>
+                              </div>
+                            </div>
+                          ),
+                        },
+                        {
+                          title: 'Sisa Waktu',
+                          key: 'time_remaining',
+                          render: (pkg: any) => (
+                            <Text className="font-medium text-on-surface/60">
+                              {Math.floor(pkg.time_remaining / 60)} menit {pkg.time_remaining % 60} detik
+                            </Text>
+                          )
+                        },
+                        {
+                          title: 'Progress',
+                          key: 'answered_count',
+                          render: (pkg: any) => (
+                            <Text className="font-bold text-primary">
+                              {pkg.answered_count} / {pkg.questions_count} terjawab
+                            </Text>
+                          )
+                        },
+                        {
+                          title: 'Aksi',
+                          key: 'action',
+                          render: (record: any) => (
+                            <Button
+                              type="primary"
+                              onClick={() => navigate(`/exam/${record.slug}`)}
+                              className="rounded-xl font-bold"
+                            >
+                              Lanjutkan
+                            </Button>
+                          ),
+                        },
+                      ]}
+                      dataSource={pendingExams}
+                      pagination={false}
+                      scroll={{ x: 'max-content' }}
+                      className="weightless-table mb-8"
+                    />
+                    <div className="h-px bg-surface-container my-8" />
+                    <Title level={4} className="!font-manrope mb-4 flex items-center gap-2">
+                      <CheckCircleOutlined className="text-green-500" />
+                      Riwayat Ujian Selesai
+                    </Title>
+                  </div>
+                ) : null}
+
                 <Table
                   columns={columns}
                   dataSource={data}
@@ -244,7 +349,7 @@ const HistoryPage: React.FC = () => {
                         <ClockCircleOutlined className="text-yellow-500" />
                         <Text className="font-bold">Berjalan</Text>
                       </Space>
-                      <Text className="font-black">0</Text>
+                      <Text className="font-black">{pendingExams.length}</Text>
                     </div>
                     <div className="h-px bg-on-surface/5" />
                     <div className="pt-2">

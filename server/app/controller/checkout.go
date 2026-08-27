@@ -52,10 +52,12 @@ func Checkout(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, Response{Status: false, Message: "Paket tidak ditemukan"})
 	}
 
-	// Check if user already has an active transaction for this package
+	// Check if user already has an active and valid transaction for this package
 	var existingCount int64
 	connection.DB.Model(&model.Transaction{}).
 		Where("user_id = ? AND package_id = ? AND status = ?", req.UserID, pkg.ID, "active").
+		Where("(is_lifetime = ? OR active_until > ?)", true, time.Now()).
+		Where("(max_exam_attempts = 0 OR used_exam_attempts < max_exam_attempts)").
 		Count(&existingCount)
 
 	if existingCount > 0 {
@@ -118,8 +120,14 @@ func Checkout(c echo.Context) error {
 	
 	var activeUntil *time.Time
 	if status == "active" {
-		t := time.Now().Add(time.Duration(pkg.Duration) * 24 * time.Hour)
-		activeUntil = &t
+		if !pkg.IsLifetime {
+			durationDays := 30
+			if pkg.ValidityDays > 0 {
+				durationDays = pkg.ValidityDays
+			}
+			t := time.Now().AddDate(0, 0, durationDays)
+			activeUntil = &t
+		}
 	}
 
 	var vId *uint
@@ -136,6 +144,8 @@ func Checkout(c echo.Context) error {
 		Amount:        finalAmount,
 		PaymentMethod: "qris",
 		Status:        status,
+		IsLifetime:    pkg.IsLifetime,
+		MaxExamAttempts: pkg.MaxExamAttempts,
 		ActiveUntil:   activeUntil,
 	}
 

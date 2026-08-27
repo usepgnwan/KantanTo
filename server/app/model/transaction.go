@@ -15,6 +15,9 @@ type Transaction struct {
 	Amount        float64   `gorm:"not null" json:"amount"`
 	PaymentMethod string    `gorm:"default:'qris'" json:"payment_method"`
 	Status        string    `gorm:"default:'pending payment'" json:"status"` // pending payment, active, inactive, expired
+	IsLifetime    bool      `gorm:"default:true" json:"is_lifetime"`
+	MaxExamAttempts int     `gorm:"default:0" json:"max_exam_attempts"`
+	UsedExamAttempts int    `gorm:"default:0" json:"used_exam_attempts"`
 	ActiveUntil   *time.Time `json:"active_until"`
 	Progress      float64    `gorm:"-" json:"progress"` // Calculated field, not in DB
 	CreatedAt     time.Time  `json:"created_at"`

@@ -14,6 +14,9 @@ import {
 } from '@ant-design/icons';
 import { useAuth } from '../context/AuthContext';
 import { getMyPackagesAPI, getUserMapelsAPI, MyTransaction } from '../services/myPackageService';
+import type { PackageListItem } from '../services/packageService';
+import dayjs from 'dayjs';
+import UpcomingSchedules from '../components/organisms/UpcomingSchedules';
 import { Mapel } from '../services/mapelService';
 
 const { Title, Text, Paragraph } = Typography;
@@ -94,6 +97,69 @@ const Practice: React.FC = () => {
     return list;
   }, [myTransactions]);
 
+  const groupedTransactions = React.useMemo(() => {
+    const map = new Map<number, MyTransaction>();
+    
+    myTransactions.forEach(tx => {
+      if (!tx.package) return;
+      const pkgId = tx.package.id;
+      
+      if (!map.has(pkgId)) {
+        map.set(pkgId, JSON.parse(JSON.stringify(tx)));
+      } else {
+        const existing = map.get(pkgId)!;
+        
+        // Combine limits
+        if (existing.max_exam_attempts === 0 || tx.max_exam_attempts === 0) {
+          existing.max_exam_attempts = 0; // unlimited
+        } else {
+          existing.max_exam_attempts += tx.max_exam_attempts;
+        }
+        
+        existing.used_exam_attempts = (existing.used_exam_attempts || 0) + (tx.used_exam_attempts || 0);
+        
+        // Override is_lifetime with package truth, as old transactions might have wrong default true in DB
+        tx.is_lifetime = tx.package.is_lifetime;
+        existing.is_lifetime = existing.package.is_lifetime;
+
+        // Combine expiry (active_until)
+        if (tx.is_lifetime || existing.is_lifetime) {
+          existing.is_lifetime = true;
+          existing.active_until = ''; // unlimited
+        } else {
+          let existingActiveUntil = existing.active_until ? new Date(existing.active_until) : null;
+          if (!existingActiveUntil && existing.package.validity_days > 0 && existing.created_at) {
+              const createdAt = new Date(existing.created_at);
+              existingActiveUntil = new Date(createdAt.getTime() + existing.package.validity_days * 24 * 60 * 60 * 1000);
+          }
+          
+          let txActiveUntil = tx.active_until ? new Date(tx.active_until) : null;
+          if (!txActiveUntil && tx.package.validity_days > 0 && tx.created_at) {
+              const createdAt = new Date(tx.created_at);
+              txActiveUntil = new Date(createdAt.getTime() + tx.package.validity_days * 24 * 60 * 60 * 1000);
+          }
+          
+          if (txActiveUntil && existingActiveUntil) {
+             if (txActiveUntil > existingActiveUntil) {
+                 existing.active_until = txActiveUntil.toISOString();
+                 existing.created_at = tx.created_at; // keep created_at in sync
+             }
+          } else if (txActiveUntil) {
+             existing.active_until = txActiveUntil.toISOString();
+             existing.created_at = tx.created_at;
+          }
+        }
+        
+        // Progress: take max
+        if ((tx.progress || 0) > (existing.progress || 0)) {
+          existing.progress = tx.progress;
+        }
+      }
+    });
+    
+    return Array.from(map.values());
+  }, [myTransactions]);
+
   return (
     <AppLayout>
       <div className="bg-surface-low/30 min-h-screen py-12 transition-colors duration-500">
@@ -150,7 +216,7 @@ const Practice: React.FC = () => {
                 </div>
                 {loading ? (
                   <div className="text-center py-10"><Text className="text-on-surface/40">Memuat paket...</Text></div>
-                ) : myTransactions.length === 0 ? (
+                ) : groupedTransactions.length === 0 ? (
                   <Card className="weightless-card border-none p-10 text-center">
                     <Title level={4} className="!m-0 !font-black text-on-surface/40">
                       {searchTerm || selectedMapelId !== 'all' ? 'Paket Tidak Ditemukan' : 'Belum Ada Paket'}
@@ -168,11 +234,28 @@ const Practice: React.FC = () => {
                   </Card>
                 ) : (
                   <Row gutter={[24, 24]}>
-                    {myTransactions.map((tx) => {
+                    {groupedTransactions.map((tx) => {
                       const pkg = tx.package;
                       if (!pkg) return null;
                       const progress = calculateProgress(tx);
                       const isExpanded = expandedPackage === pkg.id;
+                      
+                      const isLifetime = tx.is_lifetime;
+                      const maxAttempts = tx.max_exam_attempts || 0;
+                      const usedAttempts = tx.used_exam_attempts || 0;
+                      
+                      let activeUntilDate: Date | null = null;
+                      if (!isLifetime) {
+                        if (tx.active_until) {
+                          activeUntilDate = new Date(tx.active_until);
+                        } else if (pkg.validity_days > 0 && tx.created_at) {
+                          const createdAt = new Date(tx.created_at);
+                          activeUntilDate = new Date(createdAt.getTime() + pkg.validity_days * 24 * 60 * 60 * 1000);
+                        }
+                      }
+                      
+                      const isExpired = !isLifetime && activeUntilDate && activeUntilDate < new Date();
+                      const isAttemptsExhausted = maxAttempts > 0 && usedAttempts >= maxAttempts;
                       
                       return (
                         <Col xs={24} md={12} key={tx.id}>
@@ -189,11 +272,25 @@ const Practice: React.FC = () => {
                             }
                           >
                             <div className="p-6">
-                              <Title level={4} className="!m-0 !font-black !font-manrope !text-lg mb-4">{pkg.title}</Title>
+                              <Title level={4} className="!m-0 !font-black !font-manrope !text-lg mb-2">{pkg.title}</Title>
+                              
+                              <div className="flex flex-wrap gap-2 mb-4">
+                                {isLifetime ? (
+                                  <Tag color="purple" className="border-none font-bold uppercase text-[10px] m-0">Akses Selamanya (Lifetime)</Tag>
+                                ) : (
+                                  <Tag color={isExpired ? 'red' : 'blue'} className="border-none font-bold uppercase text-[10px] m-0">
+                                    Aktif S/D: {activeUntilDate ? activeUntilDate.toLocaleDateString('id-ID') : '-'}
+                                  </Tag>
+                                )}
+                                <Tag color={maxAttempts === 0 ? 'cyan' : (isAttemptsExhausted ? 'red' : 'orange')} className="border-none font-bold uppercase text-[10px] m-0">
+                                  {maxAttempts === 0 ? 'Bebas Ujian Berkali-kali' : `Terpakai: ${usedAttempts} | Sisa Ujian: ${Math.max(0, maxAttempts - usedAttempts)} / ${maxAttempts}`}
+                                </Tag>
+                              </div>
+
                               <div className="space-y-4">
                                 <div>
                                   <div className="flex justify-between mb-2">
-                                    <Text className="text-xs text-on-surface/40">Progres Belajar (Simulasi)</Text>
+                                    <Text className="text-xs text-on-surface/40">Progres Belajar (Materi)</Text>
                                     <Text className="text-xs font-bold text-primary">{progress}%</Text>
                                   </div>
                                   <Progress 
@@ -204,17 +301,19 @@ const Practice: React.FC = () => {
                                     strokeWidth={6}
                                   />
                                 </div>
-                                <div className="flex items-center justify-between pt-2">
-                                  <Space size="large" className="text-xs text-on-surface/60">
-                                    <span className="flex items-center gap-1.5"><FileTextOutlined /> {(pkg.materials && pkg.materials.length) || 0} Materi</span>
-                                  </Space>
-                                  <Button 
-                                    type="default" 
-                                    shape="circle" 
-                                    icon={isExpanded ? <DownOutlined /> : <RightOutlined />} 
-                                    onClick={() => toggleExpand(pkg.id)}
-                                  />
-                                </div>
+                                {pkg.materials && pkg.materials.length > 0 && (
+                                  <div className="flex items-center justify-between pt-2">
+                                    <Space size="large" className="text-xs text-on-surface/60">
+                                      <span className="flex items-center gap-1.5"><FileTextOutlined /> {pkg.materials.length} Materi</span>
+                                    </Space>
+                                    <Button 
+                                      type="default" 
+                                      shape="circle" 
+                                      icon={isExpanded ? <DownOutlined /> : <RightOutlined />} 
+                                      onClick={() => toggleExpand(pkg.id)}
+                                    />
+                                  </div>
+                                )}
                               </div>
 
                               {/* Materials Dropdown */}
@@ -246,8 +345,18 @@ const Practice: React.FC = () => {
                               )}
                                   <div className="mt-6 pt-6 border-t border-surface-low">
                                     <Space className="w-full" direction="vertical" size="middle">
-                                      <Button type="primary" block className="rounded-xl font-bold h-11 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-shadow" onClick={() => navigate(`/paket/${pkg.slug}/materi/${pkg.materials?.[0]?.client_id || 'm1'}`)}>Buka Modul Belajar</Button>
-                                      <Button block className="rounded-xl font-bold h-11 border-primary text-primary hover:bg-primary/5 transition-colors" onClick={() => navigate(`/exam/${pkg.slug}`)}>Mulai Simulasi Ujian</Button>
+                                      {pkg.materials && pkg.materials.length > 0 && (
+                                        <Button type="primary" block className="rounded-xl font-bold h-11 shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-shadow" onClick={() => navigate(`/paket/${pkg.slug}/materi/${pkg.materials[0].client_id}`)}>Buka Modul Belajar</Button>
+                                      )}
+                                      <Button 
+                                        block 
+                                        type={pkg.materials && pkg.materials.length > 0 ? "default" : "primary"}
+                                        className={`rounded-xl font-bold h-11 transition-colors ${pkg.materials && pkg.materials.length > 0 ? 'border-primary text-primary hover:bg-primary/5' : 'shadow-lg shadow-primary/20 hover:shadow-primary/40'}`} 
+                                        disabled={isExpired || isAttemptsExhausted}
+                                        onClick={() => navigate(`/exam/${pkg.slug}`)}
+                                      >
+                                        Mulai Simulasi Ujian
+                                      </Button>
                                       <Button block type="text" className="rounded-xl font-bold h-11 text-on-surface/60 hover:text-primary transition-colors" onClick={() => navigate(`/paket/${pkg.slug}`)}>Lihat Detail Paket</Button>
                                     </Space>
                                   </div>
@@ -309,20 +418,8 @@ const Practice: React.FC = () => {
                   )}
                 </Card>
 
-                {/* Study Time Reminder or Ad */}
-                <Card className="bg-primary/5 border-primary/10 rounded-[2.5rem] p-8 text-center border overflow-hidden relative">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full -translate-x-[-20%] -translate-y-[20%]" />
-                  <div className="relative z-10">
-                    <ClockCircleOutlined className="text-5xl text-primary mb-6" />
-                    <Title level={4} className="!font-black !font-manrope mb-4">Konsistensi adalah Kunci</Title>
-                    <Paragraph className="text-sm text-on-surface/60 mb-8">
-                      Gunakan alarm belajar harian agar progresmu tetap terjaga dan target PTN impian tercapai!
-                    </Paragraph>
-                    <Button type="primary" block size="large" className="rounded-2xl h-14 font-bold shadow-xl shadow-primary/20">
-                      Atur Jadwal Belajar
-                    </Button>
-                  </div>
-                </Card>
+                {/* Upcoming Schedules */}
+                <UpcomingSchedules />
 
               </div>
             </Col>

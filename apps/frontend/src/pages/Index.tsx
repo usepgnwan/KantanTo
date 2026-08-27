@@ -141,12 +141,14 @@ const IndexPage: React.FC = () => {
 
                         <div className="space-y-2 mb-6">
                           {[
+                            pkg.is_lifetime ? 'Akses Selamanya (Lifetime)' : `Akses ${pkg.validity_days} Hari`,
+                            pkg.max_exam_attempts === 0 ? 'Bebas Ujian Berkali-kali' : `Maksimal ${pkg.max_exam_attempts}x Ujian`,
                             `${pkg.questions_count} Soal`,
-                            `${pkg.materials_count} Materi`,
-                            `${pkg.videos_count} Video Pembahasan`,
-                          ].map((feature) => (
-                            <div key={feature} className="flex items-center space-x-2">
-                              <CheckCircleFilled className="text-primary/40 text-xs" />
+                            pkg.materials_count > 0 ? `${pkg.materials_count} Materi Pembahasan` : 'Pembahasan dalam soal',
+                            pkg.videos_count > 0 ? `${pkg.videos_count} Video Pembahasan` : null,
+                          ].filter(Boolean).map((feature) => (
+                            <div key={feature as string} className="flex items-start space-x-2">
+                              <CheckCircleFilled className="text-primary/40 text-xs mt-0.5 shrink-0" />
                               <Text className="text-xs text-surface-on/70">{feature}</Text>
                             </div>
                           ))}

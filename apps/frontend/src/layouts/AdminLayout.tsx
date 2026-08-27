@@ -27,6 +27,7 @@ import {
   MailOutlined,
 } from '@ant-design/icons';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -92,6 +93,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { mode, toggleTheme } = useTheme();
+  const { logout } = useAuth();
 
   const userDropdownItems: MenuProps['items'] = [
     {
@@ -116,7 +118,10 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       label: 'Keluar',
       icon: <LogoutOutlined />,
       danger: true,
-      onClick: () => navigate('/login'),
+      onClick: () => {
+        logout();
+        navigate('/login');
+      },
     },
   ];
 

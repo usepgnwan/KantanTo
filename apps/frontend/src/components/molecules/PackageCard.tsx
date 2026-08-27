@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, Tag, Typography, Button, Space, Rate } from 'antd';
-import { UserOutlined, ClockCircleOutlined, ThunderboltOutlined } from '@ant-design/icons';
+import { UserOutlined, ClockCircleOutlined, ThunderboltOutlined, CheckCircleFilled } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
@@ -23,6 +23,12 @@ export interface PackageProps {
   subjects: string[];
   isPopular?: boolean;
   isOwned?: boolean;
+  is_lifetime?: boolean;
+  validity_days?: number;
+  max_exam_attempts?: number;
+  questions_count?: number;
+  materials_count?: number;
+  videos_count?: number;
 }
 
 const PackageCard: React.FC<PackageProps> = ({
@@ -39,7 +45,13 @@ const PackageCard: React.FC<PackageProps> = ({
   classes,
   subjects,
   isPopular,
-  isOwned
+  isOwned,
+  is_lifetime,
+  validity_days,
+  max_exam_attempts,
+  questions_count,
+  materials_count,
+  videos_count
 }) => {
   const navigate = useNavigate();
   const { addToCart, isInCart } = useCart();
@@ -121,10 +133,25 @@ const PackageCard: React.FC<PackageProps> = ({
             {classes?.map(c => <Tag key={c} className="m-0 rounded-md border-none bg-on-surface/5 text-on-surface/40 font-bold text-[9px] px-2">{c}</Tag>)}
             {subjects?.map(s => <Tag key={s} className="m-0 rounded-md border-none bg-blue-500/10 text-blue-500 font-bold text-[9px] px-2">{s}</Tag>)}
           </div>
-          <div className="flex flex-wrap gap-3 text-xs text-surface-on/60">
+          <div className="flex flex-wrap gap-3 text-xs text-surface-on/60 mb-4">
             <span className="flex items-center gap-1">
               <ClockCircleOutlined className="text-primary" /> {duration}
             </span>
+          </div>
+          
+          <div className="space-y-1.5 mt-2">
+            {[
+              is_lifetime ? 'Akses Selamanya (Lifetime)' : `Akses ${validity_days} Hari`,
+              max_exam_attempts === 0 ? 'Bebas Ujian Berkali-kali' : `Maksimal ${max_exam_attempts}x Ujian`,
+              `${questions_count || 0} Soal`,
+              (materials_count ?? 0) > 0 ? `${materials_count} Materi Pembahasan` : 'Pembahasan dalam soal',
+              (videos_count ?? 0) > 0 ? `${videos_count} Video Pembahasan` : null,
+            ].filter(Boolean).map((feature) => (
+              <div key={feature as string} className="flex items-start space-x-2">
+                <CheckCircleFilled className="text-primary/40 text-[10px] mt-0.5 shrink-0" />
+                <Text className="text-[11px] text-surface-on/70">{feature}</Text>
+              </div>
+            ))}
           </div>
         </div>
 

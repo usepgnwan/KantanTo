@@ -38,6 +38,9 @@ func InitRouting(e *echo.Echo) {
 	api.GET("/user/packages", controller.GetMyPackages)
 	api.GET("/user/mapels", controller.GetMyMapels)
 	api.POST("/user/progress", controller.MarkMaterialAsRead)
+	api.GET("/user/schedules", controller.GetSchedules)
+	api.POST("/user/schedules", controller.CreateSchedule)
+	api.DELETE("/user/schedules/:id", controller.DeleteSchedule)
 
 	// Call separate route logic
 	RouteMapel(api)

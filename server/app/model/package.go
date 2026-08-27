@@ -16,6 +16,9 @@ type Package struct {
 	Duration     int       `gorm:"default:0" json:"duration"`
 	Status       string    `gorm:"default:'draft'" json:"status"`
 	Thumbnail    string    `gorm:"default:''" json:"thumbnail"`
+	IsLifetime   bool      `gorm:"default:true" json:"is_lifetime"` // Default to true based on user request
+	ValidityDays int       `gorm:"default:0" json:"validity_days"` // Hari expired
+	MaxExamAttempts int    `gorm:"default:0" json:"max_exam_attempts"` // 0 = unlimited
 	Materials    []PackageMaterial `gorm:"foreignKey:PackageID;constraint:OnDelete:CASCADE" json:"materials"`
 	CreatedAt    time.Time         `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`

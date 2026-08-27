@@ -2,14 +2,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Tabs, Row, Col, Card, Button, Typography, Space, Empty, Spin, Tag } from 'antd';
 import {
-  ExperimentOutlined, 
-  FileSearchOutlined, 
+  ExperimentOutlined,
+  FileSearchOutlined,
   VideoCameraOutlined,
   ShoppingOutlined,
   PlayCircleOutlined,
   LockOutlined,
   EyeOutlined,
-  BookOutlined
+  BookOutlined,
+  WarningOutlined
 } from '@ant-design/icons';
 import AppLayout from '../layouts/AppLayout';
 import { useAuth } from '../context/AuthContext';
@@ -27,7 +28,8 @@ import {
   PackageQuestionPayload,
   PackageVideoPayload,
 } from '../services/packageService';
-import { getMyPackagesAPI } from '../services/myPackageService';
+import { getMyPackagesAPI, MyTransaction } from '../services/myPackageService';
+import dayjs from 'dayjs';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -46,8 +48,32 @@ const PackageDetailPage: React.FC = () => {
   const { addToCart, isInCart } = useCart();
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [ownsPackage, setOwnsPackage] = useState(false);
+  const [ownedTx, setOwnedTx] = useState<MyTransaction | null>(null);
 
-  const hasAccess = isPreviewMode || ownsPackage;
+  const { isExpired, isLimitReached, isPackageValid } = useMemo(() => {
+    let expired = false;
+    let limitReached = false;
+
+    if (ownedTx) {
+      if (!ownedTx.is_lifetime && ownedTx.active_until) {
+        if (dayjs(ownedTx.active_until).isBefore(dayjs())) {
+          expired = true;
+        }
+      }
+
+      if (ownedTx.max_exam_attempts > 0 && ownedTx.used_exam_attempts >= ownedTx.max_exam_attempts) {
+        limitReached = true;
+      }
+    }
+
+    return {
+      isExpired: expired,
+      isLimitReached: limitReached,
+      isPackageValid: ownsPackage && !expired && !limitReached
+    };
+  }, [ownedTx, ownsPackage]);
+
+  const hasAccess = isPreviewMode || isPackageValid;
   const headerData = useMemo(() => ({
     title: packageData?.title || 'Paket tidak ditemukan',
     description: packageData?.description || '',
@@ -110,10 +136,61 @@ const PackageDetailPage: React.FC = () => {
 
   useEffect(() => {
     if (!slug || !user?.id) return;
-    
+
     getMyPackagesAPI(user.id).then((myPackages) => {
-      const owned = myPackages.some(tx => tx.package?.slug === slug && tx.status === 'active');
-      setOwnsPackage(owned);
+      const activeTxs = myPackages.filter(tx => tx.package?.slug === slug && tx.status === 'active');
+      
+      if (activeTxs.length > 0) {
+        const combinedTx = JSON.parse(JSON.stringify(activeTxs[0]));
+        
+        for (let i = 1; i < activeTxs.length; i++) {
+          const tx = activeTxs[i];
+          
+          if (combinedTx.max_exam_attempts === 0 || tx.max_exam_attempts === 0) {
+            combinedTx.max_exam_attempts = 0;
+          } else {
+            combinedTx.max_exam_attempts += tx.max_exam_attempts;
+          }
+          
+          combinedTx.used_exam_attempts = (combinedTx.used_exam_attempts || 0) + (tx.used_exam_attempts || 0);
+          
+          if (tx.package?.is_lifetime || combinedTx.package?.is_lifetime) {
+            combinedTx.is_lifetime = true;
+            combinedTx.active_until = null;
+          } else {
+            let combinedUntil = combinedTx.active_until ? new Date(combinedTx.active_until) : null;
+            if (!combinedUntil && combinedTx.package?.validity_days > 0 && combinedTx.created_at) {
+               const createdAt = new Date(combinedTx.created_at);
+               combinedUntil = new Date(createdAt.getTime() + combinedTx.package.validity_days * 24 * 60 * 60 * 1000);
+            }
+            
+            let txUntil = tx.active_until ? new Date(tx.active_until) : null;
+            if (!txUntil && tx.package?.validity_days > 0 && tx.created_at) {
+               const createdAt = new Date(tx.created_at);
+               txUntil = new Date(createdAt.getTime() + tx.package.validity_days * 24 * 60 * 60 * 1000);
+            }
+            
+            if (txUntil && combinedUntil) {
+               if (txUntil > combinedUntil) {
+                   combinedTx.active_until = txUntil.toISOString();
+                   combinedTx.created_at = tx.created_at;
+               }
+            } else if (txUntil) {
+               combinedTx.active_until = txUntil.toISOString();
+               combinedTx.created_at = tx.created_at;
+            }
+          }
+        }
+        
+        // Final fallback override for old data
+        combinedTx.is_lifetime = combinedTx.package?.is_lifetime || false;
+        
+        setOwnsPackage(true);
+        setOwnedTx(combinedTx);
+      } else {
+        setOwnsPackage(false);
+        setOwnedTx(null);
+      }
     }).catch(console.error);
   }, [slug, user]);
 
@@ -122,15 +199,15 @@ const PackageDetailPage: React.FC = () => {
       navigate('/login');
       return;
     }
-    
+
     if (!packageData) return;
-    
+
     if (!isInCart(packageData.slug)) {
       const finalPrice = packageData.discount_type === 'percent'
         ? packageData.price - (packageData.price * (packageData.discount_value || 0)) / 100
         : packageData.discount_type === 'harga'
-        ? packageData.price - (packageData.discount_value || 0)
-        : packageData.price;
+          ? packageData.price - (packageData.discount_value || 0)
+          : packageData.price;
 
       addToCart({
         id: packageData.slug,
@@ -268,11 +345,27 @@ const PackageDetailPage: React.FC = () => {
                     {hasAccess ? (
                       <Space direction="vertical" size="large" className="w-full">
                         <div>
-                          <Text className="text-xs text-green-500 font-bold uppercase tracking-widest mb-2 block">Paket Aktif</Text>
+                          <div className="flex justify-between items-start mb-2">
+                            <Text className="text-xs text-green-500 font-bold uppercase tracking-widest block mt-1">Paket Aktif</Text>
+                            {ownedTx && (
+                              <Tag color={ownedTx.is_lifetime ? 'green' : 'blue'} className="m-0 rounded-full font-bold">
+                                {ownedTx.is_lifetime ? 'Selamanya (Lifetime)' : `Berlaku s/d ${new Date(ownedTx.active_until || '').toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`}
+                              </Tag>
+                            )}
+                          </div>
                           <Title level={3} className="!m-0">Siap Untuk Simulasi?</Title>
                           <Paragraph className="text-surface-on/60 mt-4">
                             Uji kemampuanmu sekarang dengan simulasi ujian sesuai standar CBT terbaru.
                           </Paragraph>
+
+                          {ownedTx && (
+                            <div className="bg-surface-low p-4 rounded-xl mt-4 border border-surface-container flex justify-between items-center">
+                              <Text className="font-bold text-sm text-on-surface/80">Sisa Kuota Ujian</Text>
+                              <Text className="font-black text-primary text-base">
+                                {ownedTx.max_exam_attempts === 0 ? 'Tak Terbatas' : `Terpakai: ${ownedTx.used_exam_attempts || 0} | Sisa: ${Math.max(0, ownedTx.max_exam_attempts - (ownedTx.used_exam_attempts || 0))} dari ${ownedTx.max_exam_attempts}`}
+                              </Text>
+                            </div>
+                          )}
                         </div>
 
                         <Button
@@ -315,12 +408,18 @@ const PackageDetailPage: React.FC = () => {
                           </Paragraph>
                         </div>
 
-                        {ownsPackage ? (
+                        {isPackageValid ? (
                           <div className="bg-green-50 text-green-600 p-4 rounded-xl border border-green-200 text-center font-bold">
-                            Anda sudah memiliki paket ini.
+                            Anda sudah memiliki akses aktif ke paket ini.
                           </div>
                         ) : (
                           <>
+                            {(isExpired || isLimitReached) && (
+                              <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-200 text-center text-sm font-bold animate-pulse">
+                                <WarningOutlined className="mr-2" />
+                                Paket anda saat ini sudah tidak aktif, segera aktivasi kembali.
+                              </div>
+                            )}
                             <div className="bg-surface-low p-6 rounded-2xl border border-surface-container">
                               {packageData && packageData.discount_type && (
                                 <Text className="text-xs text-surface-on/40 line-through">
@@ -334,12 +433,17 @@ const PackageDetailPage: React.FC = () => {
                                     const finalPrice = packageData.discount_type === 'percent'
                                       ? packageData.price - (packageData.price * (packageData.discount_value || 0)) / 100
                                       : packageData.discount_type === 'harga'
-                                      ? packageData.price - (packageData.discount_value || 0)
-                                      : packageData.price;
+                                        ? packageData.price - (packageData.discount_value || 0)
+                                        : packageData.price;
                                     return finalPrice === 0 ? 'Gratis' : `Rp ${Number(finalPrice).toLocaleString('id-ID')}`;
                                   })()}
                                 </Title>
-                                <Text className="text-xs text-surface-on/40">/ Lifetime</Text>
+                                <Text className="text-xs text-surface-on/40">
+                                  / {packageData?.is_lifetime ? 'Selamanya (Lifetime)' : `${packageData?.validity_days} Hari`}
+                                </Text>
+                              </div>
+                              <div className="mt-2 text-[10px] uppercase font-bold tracking-widest text-primary/60">
+                                {packageData?.max_exam_attempts === 0 ? 'Bebas Ujian Berkali-kali' : `Maksimal ${packageData?.max_exam_attempts}x Ujian`}
                               </div>
                             </div>
 
