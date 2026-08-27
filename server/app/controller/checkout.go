@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -88,13 +89,22 @@ func Checkout(c echo.Context) error {
 		}
 	}
 
+	// Get Setting for PPN
+	var setting model.Setting
+	connection.DB.First(&setting)
+	ppn := setting.Ppn
+
 	finalAmount := amount - discount
 	if finalAmount < 0 {
 		finalAmount = 0
 	}
 	
-	// Add tax 11%
-	finalAmount = finalAmount + (finalAmount * 0.11)
+	// Add PPN
+	var ppnAmount float64 = 0
+	if ppn > 0 {
+		ppnAmount = finalAmount * (ppn / 100.0)
+		finalAmount = finalAmount + ppnAmount
+	}
 
 	tx := connection.DB.Begin()
 
@@ -177,6 +187,48 @@ func Checkout(c echo.Context) error {
 	}
 
 	tx.Commit()
+
+	// Send email notification to Admin asynchronously
+	go func() {
+		receiver := os.Getenv("MAIL_RECEIVER")
+		if receiver != "" {
+			var user model.User
+			if err := connection.DB.Where("id = ?", req.UserID).First(&user).Error; err == nil {
+				subject := fmt.Sprintf("Pesanan Baru: %s", pkg.Title)
+				voucherText := "-"
+				if discount > 0 {
+					voucherText = fmt.Sprintf("Rp %.0f", discount)
+				}
+				
+				ppnText := ""
+				if ppnAmount > 0 {
+					ppnText = fmt.Sprintf("<li><b>PPN (%.0f%%):</b> Rp %.0f</li>", ppn, ppnAmount)
+				}
+
+				body := fmt.Sprintf(`
+					<html>
+					<body>
+						<h2>Halo Admin, ada pesanan baru masuk!</h2>
+						<p><b>Informasi Pesanan:</b></p>
+						<ul>
+							<li><b>Nama Pembeli:</b> %s</li>
+							<li><b>Email Pembeli:</b> %s</li>
+							<li><b>Paket Dibeli:</b> %s</li>
+							<li><b>Harga Paket:</b> Rp %.0f</li>
+							<li><b>Diskon Voucher:</b> %s</li>
+							%s
+							<li><b>Total Dibayar:</b> Rp %.0f</li>
+							<li><b>Tanggal Pembelian:</b> %s</li>
+						</ul>
+						<p>Silakan periksa dashboard untuk detail lebih lanjut.</p>
+					</body>
+					</html>
+				`, user.Name, user.Email, pkg.Title, amount, voucherText, ppnText, finalAmount, time.Now().Format("02 Jan 2006 15:04:05"))
+				
+				_ = SendEmail(receiver, subject, body)
+			}
+		}
+	}()
 
 	return c.JSON(http.StatusOK, Response{Status: true, Message: "Checkout berhasil diproses", Data: transaction})
 }

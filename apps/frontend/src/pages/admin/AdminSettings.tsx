@@ -41,6 +41,7 @@ const AdminSettings: React.FC = () => {
           address: config.alamat,
           email: config.email,
           whatsapp: config.no_wa,
+          ppn: config.ppn ?? 11,
         });
       } catch (error) {
         message.error('Gagal memuat konfigurasi sistem');
@@ -85,6 +86,7 @@ const AdminSettings: React.FC = () => {
         alamat: values.address,
         email: values.email,
         no_wa: values.whatsapp,
+        ppn: Number(values.ppn),
       };
 
       await updateSetting(payload);
@@ -176,6 +178,14 @@ const AdminSettings: React.FC = () => {
                     <Col xs={24} sm={12}>
                       <Form.Item name="whatsapp" label={<span className="font-bold text-sm">No. WhatsApp Bantuan</span>}>
                         <Input prefix={<WhatsAppOutlined className="text-on-surface/20" />} className="h-12 rounded-2xl" placeholder="Cth: 0812..." />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                  
+                  <Row gutter={16}>
+                    <Col xs={24} sm={12}>
+                      <Form.Item name="ppn" label={<span className="font-bold text-sm">Pajak PPN (%)</span>} tooltip="Isi 0 jika tidak ada pajak">
+                        <Input type="number" min={0} step={0.1} className="h-12 rounded-2xl" placeholder="Cth: 11" suffix="%" />
                       </Form.Item>
                     </Col>
                   </Row>

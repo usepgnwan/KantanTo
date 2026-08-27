@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import AppLayout from '../layouts/AppLayout';
 import { Typography, Row, Col, Avatar, Button, Card, Form, Input, Switch, Badge, Divider, Tag } from 'antd';
-import { 
-  UserOutlined, 
-  MailOutlined, 
-  WhatsAppOutlined, 
-  EditOutlined, 
-  SafetyCertificateOutlined, 
-  BellOutlined, 
-  TrophyOutlined, 
-  RocketOutlined, 
+import {
+  UserOutlined,
+  MailOutlined,
+  WhatsAppOutlined,
+  EditOutlined,
+  SafetyCertificateOutlined,
+  BellOutlined,
+  TrophyOutlined,
+  RocketOutlined,
   HistoryOutlined,
   SaveOutlined,
   StarOutlined,
@@ -63,7 +63,7 @@ const ProfilePage: React.FC = () => {
     if (user?.id) {
       getUserDashboardStatsAPI(user.id).then(setDashboardStats);
       fetchProfile(user.id);
-      getMyPackagesAPI(user.id, 'all').then(setPurchases).catch(() => {});
+      getMyPackagesAPI(user.id, 'all').then(setPurchases).catch(() => { });
     }
 
     return () => clearTimeout(timer);
@@ -78,7 +78,7 @@ const ProfilePage: React.FC = () => {
     try {
       const values = await form.validateFields();
       if (!user?.id) return;
-      
+
       const payload: UpdateProfilePayload = {
         name: values.name,
         email: values.email,
@@ -105,31 +105,31 @@ const ProfilePage: React.FC = () => {
     <AppLayout>
       <div className="bg-surface-low/30 pt-32 pb-24 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
+
           <Row gutter={[48, 48]}>
             {/* Left Column: Avatar & Quick Stats */}
             <Col xs={24} lg={8}>
               <div className="space-y-8 animate-in fade-in slide-in-from-left-4 duration-700">
                 <Card className="border-none glass rounded-[40px] overflow-hidden shadow-2xl shadow-primary/5 text-center p-8">
                   <div className="relative inline-block mb-6">
-                    <Avatar 
-                      size={160} 
-                      src={user?.avatar} 
-                      icon={<UserOutlined />} 
+                    <Avatar
+                      size={160}
+                      src={user?.avatar}
+                      icon={<UserOutlined />}
                       className="border-8 border-white shadow-xl ring-1 ring-on-surface/5"
                     />
                     <div className="absolute bottom-2 right-2">
-                       <Badge status="success" className="scale-150" />
+                      <Badge status="success" className="scale-150" />
                     </div>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Title level={2} className="!font-manrope !m-0 !font-black tracking-tight">{user?.name}</Title>
                     <Tag color="blue" className="rounded-full px-4 border-none font-bold uppercase tracking-widest text-[10px]">Premium Member</Tag>
                   </div>
 
                   <Divider className="my-8" />
-                  
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="text-center p-4 rounded-3xl bg-surface-low">
                       <Title level={4} className="!m-0 !font-black !text-primary">{dashboardStats?.total_exams || 0}</Title>
@@ -144,30 +144,30 @@ const ProfilePage: React.FC = () => {
 
                 {/* Achievements Card */}
                 <Card className="border-none glass rounded-[32px] p-6 shadow-xl shadow-primary/5">
-                    <div className="flex items-center justify-between mb-6">
-                        <Title level={5} className="!font-manrope !m-0">Pencapaian</Title>
-                        <TrophyOutlined className="text-xl text-yellow-500" />
+                  <div className="flex items-center justify-between mb-6">
+                    <Title level={5} className="!font-manrope !m-0">Pencapaian</Title>
+                    <TrophyOutlined className="text-xl text-yellow-500" />
+                  </div>
+                  <div className="space-y-4">
+                    <div className="flex gap-4 items-center">
+                      <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                        <RocketOutlined className="text-primary" />
+                      </div>
+                      <div>
+                        <Text className="block font-bold text-sm">Konsisten Belajar</Text>
+                        <Text className="text-xs text-on-surface/40">7 hari berturut-turut</Text>
+                      </div>
                     </div>
-                    <div className="space-y-4">
-                        <div className="flex gap-4 items-center">
-                            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                                <RocketOutlined className="text-primary" />
-                            </div>
-                            <div>
-                                <Text className="block font-bold text-sm">Konsisten Belajar</Text>
-                                <Text className="text-xs text-on-surface/40">7 hari berturut-turut</Text>
-                            </div>
-                        </div>
-                        <div className="flex gap-4 items-center">
-                            <div className="w-10 h-10 bg-secondary/10 rounded-xl flex items-center justify-center">
-                                <HistoryOutlined className="text-secondary" />
-                            </div>
-                            <div>
-                                <Text className="block font-bold text-sm">Penyelamat Skor</Text>
-                                <Text className="text-xs text-on-surface/40">Naik 100 poin dalam 1 bulan</Text>
-                            </div>
-                        </div>
+                    <div className="flex gap-4 items-center">
+                      <div className="w-10 h-10 bg-secondary/10 rounded-xl flex items-center justify-center">
+                        <HistoryOutlined className="text-secondary" />
+                      </div>
+                      <div>
+                        <Text className="block font-bold text-sm">Penyelamat Skor</Text>
+                        <Text className="text-xs text-on-surface/40">Naik 100 poin dalam 1 bulan</Text>
+                      </div>
                     </div>
+                  </div>
                 </Card>
               </div>
             </Col>
@@ -176,19 +176,19 @@ const ProfilePage: React.FC = () => {
             <Col xs={24} lg={16}>
               <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-700">
                 {/* Personal Information */}
-                <Card 
+                <Card
                   className="border-none bg-white rounded-[40px] p-8 md:p-12 shadow-2xl shadow-primary/5"
                   title={
                     <div className="flex justify-between items-center w-full">
-                        <Title level={3} className="!font-manrope !m-0 !font-black tracking-tight">Informasi Pribadi</Title>
-                        <Button 
-                          type={editing ? "primary" : "text"} 
-                          icon={editing ? <SaveOutlined /> : <EditOutlined />} 
-                          onClick={handleSave}
-                          className={editing ? "rounded-full px-6" : "text-primary font-bold"}
-                        >
-                            {editing ? "Simpan Perubahan" : "Edit Profil"}
-                        </Button>
+                      <Title level={3} className="!font-manrope !m-0 !font-black tracking-tight">Informasi Pribadi</Title>
+                      <Button
+                        type={editing ? "primary" : "text"}
+                        icon={editing ? <SaveOutlined /> : <EditOutlined />}
+                        onClick={handleSave}
+                        className={editing ? "rounded-full px-6" : "text-primary font-bold"}
+                      >
+                        {editing ? "Simpan Perubahan" : "Edit Profil"}
+                      </Button>
                     </div>
                   }
                 >
@@ -221,10 +221,10 @@ const ProfilePage: React.FC = () => {
                     </Row>
 
                     <Divider className="my-8" />
-                    
+
                     <div className="flex items-center gap-2 mb-6">
-                        <BulbOutlined className="text-secondary" />
-                        <Title level={4} className="!font-manrope !m-0 !font-black tracking-tight">Vision Board</Title>
+                      <BulbOutlined className="text-secondary" />
+                      <Title level={4} className="!font-manrope !m-0 !font-black tracking-tight">Vision Board</Title>
                     </div>
 
                     <Row gutter={24}>
@@ -254,99 +254,42 @@ const ProfilePage: React.FC = () => {
 
                 {/* Account Security & Notifications */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <Card className="border-none bg-white rounded-[32px] p-6 shadow-xl shadow-primary/5">
-                        <div className="flex items-center gap-4 mb-6">
-                            <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
-                                <SafetyCertificateOutlined className="text-blue-500" />
-                            </div>
-                            <Title level={5} className="!font-manrope !m-0">Keamanan</Title>
-                        </div>
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                                <Text className="text-sm font-medium">Verifikasi 2 Langkah</Text>
-                                <Switch size="small" defaultChecked />
-                            </div>
-                            <Button block type="dashed" className="rounded-xl font-bold">Ubah Kata Sandi</Button>
-                        </div>
-                    </Card>
-
-                    <Card className="border-none bg-white rounded-[32px] p-6 shadow-xl shadow-primary/5">
-                        <div className="flex items-center gap-4 mb-6">
-                            <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
-                                <BellOutlined className="text-purple-500" />
-                            </div>
-                            <Title level={5} className="!font-manrope !m-0">Notifikasi</Title>
-                        </div>
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                                <Text className="text-sm font-medium">Pengingat Tryout</Text>
-                                <Switch size="small" defaultChecked />
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <Text className="text-sm font-medium">Promo & Diskon</Text>
-                                <Switch size="small" />
-                            </div>
-                        </div>
-                    </Card>
-                </div>
-
-                {/* Purchase History */}
-                <Card
-                  className="border-none bg-white rounded-[40px] p-8 shadow-2xl shadow-primary/5"
-                  title={
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center">
-                        <ShoppingOutlined className="text-green-500" />
+                  <Card className="border-none bg-white rounded-[32px] p-6 shadow-xl shadow-primary/5">
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center">
+                        <SafetyCertificateOutlined className="text-blue-500" />
                       </div>
-                      <div>
-                        <Title level={4} className="!font-manrope !m-0 !font-black">History Pembelian</Title>
-                        <Text className="text-[10px] uppercase font-bold text-on-surface/40 tracking-widest">Riwayat transaksi Anda</Text>
+                      <Title level={5} className="!font-manrope !m-0">Keamanan</Title>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <Text className="text-sm font-medium">Verifikasi 2 Langkah</Text>
+                        <Switch size="small" defaultChecked />
+                      </div>
+                      <Button block type="dashed" className="rounded-xl font-bold">Ubah Kata Sandi</Button>
+                    </div>
+                  </Card>
+
+                  <Card className="border-none bg-white rounded-[32px] p-6 shadow-xl shadow-primary/5">
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-10 h-10 bg-purple-50 rounded-xl flex items-center justify-center">
+                        <BellOutlined className="text-purple-500" />
+                      </div>
+                      <Title level={5} className="!font-manrope !m-0">Notifikasi</Title>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <Text className="text-sm font-medium">Pengingat Tryout</Text>
+                        <Switch size="small" defaultChecked />
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <Text className="text-sm font-medium">Promo & Diskon</Text>
+                        <Switch size="small" />
                       </div>
                     </div>
-                  }
-                >
-                  {purchases.length === 0 ? (
-                    <Empty description="Belum ada riwayat pembelian" />
-                  ) : (
-                    <Timeline
-                      items={purchases.map(tx => {
-                        const date = new Date(tx.created_at || '');
-                        const isActive = tx.status === 'active';
-                        const isPending = tx.status === 'pending payment';
-                        return {
-                          color: isActive ? 'green' : isPending ? 'orange' : 'gray',
-                          children: (
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2">
-                              <div>
-                                <Text className="font-black block text-on-surface">{tx.package?.title || `Paket #${tx.package_id}`}</Text>
-                                <Text className="text-xs text-on-surface/40 block">
-                                  {tx.invoice_code} &bull; {date.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-                                </Text>
-                                {tx.active_until && (
-                                  <Text className="text-[10px] text-green-600 font-bold block">
-                                    Aktif s/d: {new Date(tx.active_until).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
-                                  </Text>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-3 shrink-0">
-                                <Text className="font-black text-primary">
-                                  {tx.amount === 0 ? 'Gratis' : `Rp ${Number(tx.amount).toLocaleString('id-ID')}`}
-                                </Text>
-                                <span className={`text-[10px] font-bold uppercase px-3 py-1 rounded-full ${
-                                  isActive ? 'bg-green-100 text-green-700' :
-                                  isPending ? 'bg-orange-100 text-orange-700' :
-                                  'bg-gray-100 text-gray-500'
-                                }`}>
-                                  {isActive ? 'Aktif' : isPending ? 'Pending' : tx.status}
-                                </span>
-                              </div>
-                            </div>
-                          ),
-                        };
-                      })}
-                    />
-                  )}
-                </Card>
+                  </Card>
+                </div>
+
               </div>
             </Col>
           </Row>

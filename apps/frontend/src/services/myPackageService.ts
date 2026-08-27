@@ -50,6 +50,31 @@ export const getMyPackagesAPI = async (
   return data as MyTransaction[];
 };
 
+export interface PaginatedResponse<T> {
+  total: number;
+  rows: T[];
+  currentPage: number;
+  perPage: number;
+  lastPage: number;
+}
+
+export const getMyPackagesPaginatedAPI = async (
+  userId: number,
+  page: number,
+  limit: number,
+  status?: string,
+  search?: string,
+  mapelId?: number | string
+): Promise<PaginatedResponse<MyTransaction>> => {
+  const params = new URLSearchParams({ user_id: String(userId), paginate: 'true', page: String(page), limit: String(limit) });
+  if (status) params.append('status', status);
+  if (search) params.append('search', search);
+  if (mapelId && mapelId !== 'all') params.append('mapel_id', String(mapelId));
+
+  const response = await api.get(`/user/packages?${params.toString()}`);
+  return response.data?.data;
+};
+
 export const getUserMapelsAPI = async (userId: number): Promise<Mapel[]> => {
   const response = await api.get(`/user/mapels?user_id=${userId}`);
   const data = response.data?.data ?? response.data;

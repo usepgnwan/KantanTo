@@ -10,6 +10,7 @@ type Setting struct {
 	NoWa         string    `json:"no_wa"`
 	Email        string    `json:"email"`
 	Alamat       string    `json:"alamat"`
+	Ppn          float64   `gorm:"default:11" json:"ppn"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
