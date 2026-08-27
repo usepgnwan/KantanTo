@@ -11,13 +11,14 @@ interface CartSummaryProps {
   subtotal: number;
   tax: number;
   total: number;
+  ppnRate: number;
   appliedVoucher: Voucher | null;
   onApplyVoucher: (voucher: Voucher) => void;
   onRemoveVoucher: () => void;
   onCheckout: () => void;
 }
 
-const CartSummary: React.FC<CartSummaryProps> = ({ subtotal, tax, total, appliedVoucher, onApplyVoucher, onRemoveVoucher, onCheckout }) => {
+const CartSummary: React.FC<CartSummaryProps> = ({ subtotal, tax, total, ppnRate, appliedVoucher, onApplyVoucher, onRemoveVoucher, onCheckout }) => {
   const [code, setCode] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const { user } = useAuth();
@@ -55,7 +56,7 @@ const CartSummary: React.FC<CartSummaryProps> = ({ subtotal, tax, total, applied
   
   // Recalculate tax and total with discount
   const newSubtotal = Math.max(0, subtotal - discount);
-  const newTax = Math.round(newSubtotal * 0.11);
+  const newTax = Math.round(newSubtotal * (ppnRate / 100));
   const newTotal = newSubtotal + newTax;
 
   const formatCurrency = (value: number) => 
@@ -75,10 +76,12 @@ const CartSummary: React.FC<CartSummaryProps> = ({ subtotal, tax, total, applied
           <Text className="font-semibold">{formatCurrency(subtotal)}</Text>
         </div>
         
-        <div className="flex justify-between items-center">
-          <Text className="text-on-surface/60">PPN (11%)</Text>
-          <Text className="font-semibold">{formatCurrency(tax)}</Text>
-        </div>
+        {ppnRate > 0 && (
+          <div className="flex justify-between items-center">
+            <Text className="text-on-surface/60">PPN ({ppnRate}%)</Text>
+            <Text className="font-semibold">{formatCurrency(newTax)}</Text>
+          </div>
+        )}
         
         <div className="pt-2">
           <Text className="text-xs text-on-surface/40 block mb-2 uppercase tracking-wider font-bold">Kupon / Promo</Text>
@@ -121,9 +124,9 @@ const CartSummary: React.FC<CartSummaryProps> = ({ subtotal, tax, total, applied
           </div>
         )}
         
-        <div className="flex justify-between items-center mb-6">
-          <Text className="text-lg font-bold">Total</Text>
-          <Text className="text-2xl font-bold text-primary">{formatCurrency(newTotal)}</Text>
+        <div className="flex justify-between items-center mt-2">
+          <Text className="font-bold text-lg">Total</Text>
+          <Text className="font-black text-xl text-primary">{formatCurrency(newTotal)}</Text>
         </div>
         
         <Button 

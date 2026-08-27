@@ -18,6 +18,7 @@ export interface Setting {
   no_wa: string;
   email: string;
   alamat: string;
+  ppn?: number;
   created_at?: string;
   updated_at?: string;
 }

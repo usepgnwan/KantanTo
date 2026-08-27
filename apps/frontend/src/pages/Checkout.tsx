@@ -10,6 +10,7 @@ import PageLoader from '../components/atoms/PageLoader';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { checkoutAPI } from '../services/checkoutService';
+import { getSetting } from '../services/settingService';
 import { message } from 'antd';
 
 const { Title, Text, Paragraph } = Typography;
@@ -28,6 +29,7 @@ const CheckoutPage: React.FC = () => {
   const [customerData, setCustomerData] = useState({ name: '', whatsapp: '', email: '' });
   const [purchasedItems, setPurchasedItems] = useState<any[]>([]);
   const [purchasedTotal, setPurchasedTotal] = useState<number>(0);
+  const [ppn, setPpn] = useState<number>(11);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -41,6 +43,13 @@ const CheckoutPage: React.FC = () => {
     const timer = setTimeout(() => {
       setLoading(false);
     }, 500);
+
+    getSetting().then(config => {
+      if (config.ppn !== undefined) {
+        setPpn(config.ppn);
+      }
+    }).catch(console.error);
+
     return () => clearTimeout(timer);
   }, [isLoggedIn, cartItems.length, step, navigate]);
 
@@ -56,7 +65,7 @@ const CheckoutPage: React.FC = () => {
   }
 
   const newSubtotal = Math.max(0, subtotal - discount);
-  const tax = Math.round(newSubtotal * 0.11);
+  const tax = Math.round(newSubtotal * (ppn / 100));
   const total = newSubtotal + tax;
 
   const handleFormComplete = async (values: any) => {

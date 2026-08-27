@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import AppLayout from '../layouts/AppLayout';
 import {
-  Typography, Card, Tag, Empty, Spin, Divider, Timeline, Button, Row, Col, Modal, message, Space,
+  Typography, Card, Tag, Empty, Spin, Divider, Timeline, Button, Row, Col, Modal, message, Space, Pagination,
 } from 'antd';
 import {
   ShoppingOutlined,
@@ -15,7 +15,7 @@ import {
   CloseOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../context/AuthContext';
-import { getMyPackagesAPI, MyTransaction } from '../services/myPackageService';
+import { getMyPackagesAPI, getMyPackagesPaginatedAPI, MyTransaction } from '../services/myPackageService';
 import { getSetting, Setting } from '../services/settingService';
 import { updateTransactionStatus } from '../services/transactionService';
 import { useNavigate } from 'react-router-dom';
@@ -62,18 +62,22 @@ const PurchasesPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [purchases, setPurchases] = useState<MyTransaction[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [setting, setSetting] = useState<Setting | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
-  const fetchPurchases = () => {
+  const fetchPurchases = (page: number = 1) => {
     if (user?.id) {
       setLoading(true);
       Promise.all([
-        getMyPackagesAPI(user.id, 'all'),
+        getMyPackagesPaginatedAPI(user.id, page, pageSize, 'all'),
         getSetting().catch(() => null)
       ])
-        .then(([purchasesData, settingData]) => {
-          setPurchases(purchasesData);
+        .then(([paginatedData, settingData]) => {
+          setPurchases(paginatedData.rows || []);
+          setTotal(paginatedData.total || 0);
           if (settingData) setSetting(settingData);
         })
         .finally(() => setLoading(false));
@@ -81,8 +85,8 @@ const PurchasesPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchPurchases();
-  }, [user]);
+    fetchPurchases(currentPage);
+  }, [user, currentPage]);
 
   const handleConfirmWhatsApp = (tx: MyTransaction) => {
     const waNumber = setting?.no_wa || '';
@@ -143,7 +147,7 @@ const PurchasesPage: React.FC = () => {
           {/* Stats Row */}
           <Row gutter={[16, 16]} className="mb-10">
             {[
-              { label: 'Total Transaksi', value: purchases.length, color: 'text-primary' },
+              { label: 'Total Transaksi', value: total, color: 'text-primary' },
               { label: 'Paket Aktif', value: activeCount, color: 'text-green-500' },
               { label: 'Pending', value: pendingCount, color: 'text-orange-500' },
               {
@@ -172,7 +176,7 @@ const PurchasesPage: React.FC = () => {
               <div>
                 <Title level={4} className="!font-manrope !m-0 !font-black">Riwayat Transaksi</Title>
                 <Text className="text-[10px] uppercase font-bold text-on-surface/40 tracking-widest">
-                  {purchases.length} transaksi ditemukan
+                  {total} transaksi ditemukan
                 </Text>
               </div>
             </div>
@@ -233,6 +237,30 @@ const PurchasesPage: React.FC = () => {
                                   Aktif s/d: {activeUntil.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
                                 </Text>
                               )}
+
+                              {/* Price Details */}
+                              <div className="mt-3 bg-surface-low/50 rounded-lg p-3 text-xs border border-on-surface/5">
+                                <div className="flex justify-between mb-1">
+                                  <Text className="text-on-surface/60">Harga Paket</Text>
+                                  <Text>Rp {Number(tx.package?.price || 0).toLocaleString('id-ID')}</Text>
+                                </div>
+                                {tx.voucher && (
+                                  <div className="flex justify-between mb-1 text-green-600">
+                                    <Text className="text-green-600">
+                                      Diskon ({tx.voucher.code} - {tx.voucher.discount_percentage}%)
+                                    </Text>
+                                    <Text>- Rp {Number((tx.package?.price || 0) * (tx.voucher.discount_percentage / 100)).toLocaleString('id-ID')}</Text>
+                                  </div>
+                                )}
+                                <div className="flex justify-between mb-1 border-b border-on-surface/10 pb-1">
+                                  <Text className="text-on-surface/60">PPN / Pajak</Text>
+                                  <Text>Rp {Number(tx.amount - Math.max(0, (tx.package?.price || 0) - ((tx.package?.price || 0) * ((tx.voucher?.discount_percentage || 0) / 100)))).toLocaleString('id-ID')}</Text>
+                                </div>
+                                <div className="flex justify-between mt-1 font-bold">
+                                  <Text>Total Dibayar</Text>
+                                  <Text className="text-primary">Rp {Number(tx.amount).toLocaleString('id-ID')}</Text>
+                                </div>
+                              </div>
                             </div>
 
                             <div className="flex items-center gap-3 shrink-0">
@@ -287,6 +315,18 @@ const PurchasesPage: React.FC = () => {
                     };
                   })}
                 />
+                
+                {total > pageSize && (
+                  <div className="flex justify-center mt-6">
+                    <Pagination
+                      current={currentPage}
+                      pageSize={pageSize}
+                      total={total}
+                      onChange={(page) => setCurrentPage(page)}
+                      showSizeChanger={false}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </Card>

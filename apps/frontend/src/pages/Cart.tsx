@@ -5,19 +5,29 @@ import CartItemList from '../components/organisms/CartItemList';
 import CartSummary from '../components/organisms/CartSummary';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { getSetting } from '../services/settingService';
 
 const { Title, Paragraph } = Typography;
 
 const CartPage: React.FC = () => {
   const navigate = useNavigate();
   const { items, removeFromCart, appliedVoucher, applyVoucher, removeVoucher } = useCart();
+  const [ppn, setPpn] = useState<number>(11);
+
+  React.useEffect(() => {
+    getSetting().then(config => {
+      if (config.ppn !== undefined) {
+        setPpn(config.ppn);
+      }
+    }).catch(console.error);
+  }, []);
 
   const handleRemove = (id: string) => {
     removeFromCart(id);
   };
 
   const subtotal = items.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  const tax = Math.round(subtotal * 0.11);
+  const tax = Math.round(subtotal * (ppn / 100));
   const total = subtotal + tax;
 
   return (
@@ -50,6 +60,7 @@ const CartPage: React.FC = () => {
                   subtotal={subtotal} 
                   tax={tax} 
                   total={total}
+                  ppnRate={ppn}
                   appliedVoucher={appliedVoucher}
                   onApplyVoucher={applyVoucher}
                   onRemoveVoucher={removeVoucher}

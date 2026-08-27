@@ -24,6 +24,7 @@ export interface TransactionResponse {
   user_id: number;
   package_id: number;
   voucher_id: number | null;
+  voucher?: { code: string; discount_percentage: number; title: string };
   amount: number;
   payment_method: string;
   status: string;
