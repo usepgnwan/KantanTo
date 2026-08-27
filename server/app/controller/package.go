@@ -397,6 +397,28 @@ func SavePackageQuestions(c echo.Context) error {
 
 	response := make([]questionResponse, 0, len(payload))
 	err = connection.DB.Transaction(func(tx *gorm.DB) error {
+		// Collect incoming client IDs
+		incomingIDs := make([]string, 0, len(payload))
+		for _, p := range payload {
+			if p.ID != "" {
+				incomingIDs = append(incomingIDs, p.ID)
+			}
+		}
+
+		// Delete questions whose client_id is NOT in the incoming payload
+		if len(incomingIDs) > 0 {
+			if err := tx.Where("package_id = ? AND client_id NOT IN ?", pkg.ID, incomingIDs).
+				Delete(&model.PackageQuestion{}).Error; err != nil {
+				return err
+			}
+		} else {
+			// If payload is empty, delete all questions for this package
+			if err := tx.Where("package_id = ?", pkg.ID).Delete(&model.PackageQuestion{}).Error; err != nil {
+				return err
+			}
+		}
+
+		// Upsert remaining questions
 		for i := range payload {
 			normalizeQuestionPayload(&payload[i])
 			question, err := persistQuestionWithDB(tx, pkg, payload[i])
@@ -413,6 +435,7 @@ func SavePackageQuestions(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, helpers.Response{Status: true, Message: "Daftar soal berhasil disimpan", Data: response})
 }
+
 
 func ScoreQuestion(c echo.Context) error {
 	payload := new(scoreRequest)
