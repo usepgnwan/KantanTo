@@ -48,7 +48,7 @@ const ContactPage: React.FC = () => {
     <AppLayout>
       <div className="bg-surface-low/30 pt-32 pb-24 min-h-screen">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          
+
           {/* Header Section */}
           <div className="text-center max-w-3xl mx-auto mb-16 animate-in fade-in slide-in-from-top-4 duration-700">
             <Text className="text-primary font-bold tracking-widest uppercase text-sm mb-4 block">
@@ -58,7 +58,7 @@ const ContactPage: React.FC = () => {
               Hubungi {setting?.nama_aplikasi || 'Tim Rifaya Tryout'}
             </Title>
             <Paragraph className="text-lg text-on-surface/60">
-              Ada pertanyaan terkait paket pembelajaran SNBT, kendala teknis, atau ingin tahu lebih lanjut bagaimana Rifaya Tryout membantu ribuan siswa lolos PTN impian? Kami siap membantu.
+              Ada pertanyaan terkait paket pembelajaran di Rifaya Tryout, kendala teknis, atau ingin tahu lebih lanjut bagaimana Rifaya Tryout membantu siswa agar konsisten dalam menentukan jadwal belajar? Kami siap membantu.
             </Paragraph>
           </div>
 
@@ -78,21 +78,21 @@ const ContactPage: React.FC = () => {
                   ) : (
                     <>
                       <p>
-                        <strong>Rifaya Tryout</strong> didirikan dengan satu misi sederhana: mendemokratisasi akses pendidikan berstandar tinggi untuk persiapan Seleksi Nasional Berdasarkan Tes (SNBT).
+                        <strong>Rifaya Tryout</strong> didirikan dengan satu misi sederhana: membantu Anda agar tetap konsisten dalam latihan dan terstruktur dalam belajar.
                       </p>
                       <p>
-                        Kami percaya bahwa kelulusan ke PTN impian bukanlah tentang seberapa keras Anda menghafal, melainkan seberapa cerdas Anda menggunakan <i>Cognitive Sanctuary</i>—sebuah ruang fokus yang dirancang khusus untuk meminimalkan beban mental dan memaksimalkan retensi materi.
+                        Kami percaya bahwa keberhasilan bukanlah tentang seberapa keras Anda menghafal, melainkan seberapa cerdas Anda menjaga fokus pada tujuan utama Anda. Dengan <i>Cognitive Sanctuary</i>—sebuah ruang fokus yang dirancang khusus untuk meminimalkan gangguan—kami siap mendampingi perjalanan Anda untuk mencapai target dengan maksimal.
                       </p>
                     </>
                   )}
                 </div>
 
                 <Divider className="border-on-surface/10" />
-                
+
                 <Title level={4} className="!font-manrope !font-black !mt-8 !mb-6">
                   Informasi Kontak
                 </Title>
-                
+
                 <div className="space-y-6">
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
@@ -103,7 +103,7 @@ const ContactPage: React.FC = () => {
                       {setting ? <Text className="text-on-surface/60">{setting.email}</Text> : <Skeleton.Input active size="small" />}
                     </div>
                   </div>
-                  
+
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-green-500/10 text-green-600 flex items-center justify-center shrink-0">
                       <PhoneOutlined className="text-xl" />
@@ -113,7 +113,7 @@ const ContactPage: React.FC = () => {
                       {setting ? <Text className="text-on-surface/60">{setting.no_wa}</Text> : <Skeleton.Input active size="small" />}
                     </div>
                   </div>
-                  
+
                   <div className="flex items-start gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-orange-500/10 text-orange-600 flex items-center justify-center shrink-0">
                       <EnvironmentOutlined className="text-xl" />
@@ -132,7 +132,7 @@ const ContactPage: React.FC = () => {
               <Card className="weightless-card border-none bg-white p-2 sm:p-8">
                 <Title level={3} className="!font-manrope !font-black !mb-2">Kirim Pesan Langsung</Title>
                 <Paragraph className="text-on-surface/60 mb-8">Isi formulir di bawah ini dan representatif kami akan membalas dalam waktu maksimal 1x24 jam.</Paragraph>
-                
+
                 <Form
                   form={form}
                   layout="vertical"
@@ -177,19 +177,19 @@ const ContactPage: React.FC = () => {
                     label={<span className="font-bold text-on-surface/80">Pesan Detail</span>}
                     rules={[{ required: true, message: 'Tuliskan pesan Anda' }]}
                   >
-                    <TextArea 
-                      rows={5} 
-                      className="rounded-xl border-surface-container hover:border-primary focus:border-primary bg-surface-lowest p-3" 
-                      placeholder="Jelaskan secara detail pertanyaan atau kendala yang Anda alami..." 
+                    <TextArea
+                      rows={5}
+                      className="rounded-xl border-surface-container hover:border-primary focus:border-primary bg-surface-lowest p-3"
+                      placeholder="Jelaskan secara detail pertanyaan atau kendala yang Anda alami..."
                     />
                   </Form.Item>
 
                   <Form.Item className="mt-8 mb-0">
-                    <Button 
-                      type="primary" 
-                      htmlType="submit" 
-                      size="large" 
-                      block 
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      size="large"
+                      block
                       loading={loading}
                       className="h-14 rounded-xl font-bold shadow-lg shadow-primary/20 text-lg flex items-center justify-center gap-2 transition-transform hover:scale-[1.02]"
                     >
