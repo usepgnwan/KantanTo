@@ -139,7 +139,7 @@ export const deletePackage = async (slug: string): Promise<void> => {
 };
 
 
-export type QuestionType = 'single' | 'multiple' | 'nested' | 'table';
+export type QuestionType = 'single' | 'multiple' | 'nested' | 'table' | 'linked';
 export type ScoringMethod = 'all_or_nothing' | 'partial';
 
 export interface PackageSubQuestionPayload {

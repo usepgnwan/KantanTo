@@ -247,6 +247,63 @@ const ExamSimulation: React.FC = () => {
     });
   };
 
+  // ── FLAT QUESTION LIST: expand 'linked' into individual numbered entries ──
+  type FlatQuestion = {
+    id: string;                  // sub-question id (for linked) or question id
+    type: string;
+    question: string;
+    options: string[];
+    title: string;
+    discussion: string;
+    sub_questions?: any[];
+    // for linked type:
+    isLinked: boolean;
+    linkedPassage?: string;
+    linkedPassageTitle?: string;
+    linkedParentId?: string;
+    linkedSubIndex?: number;
+    linkedGroupSize?: number;
+    linkedGroupStart?: number;  // flat index of the first question in this linked group
+  };
+
+  const flatQuestions: FlatQuestion[] = React.useMemo(() => {
+    const result: FlatQuestion[] = [];
+    for (const q of questions) {
+      if (q.type === 'linked' && q.sub_questions && q.sub_questions.length > 0) {
+        const groupStart = result.length;
+        q.sub_questions.forEach((sub: any, subIdx: number) => {
+          result.push({
+            id: String(sub.id),
+            type: sub.type || 'single',
+            question: sub.question || '',
+            options: (sub.options as string[]) || [],
+            title: (sub as any).title || '',
+            discussion: sub.discussion || '',
+            isLinked: true,
+            linkedPassage: q.question,
+            linkedPassageTitle: q.title,
+            linkedParentId: String(q.id),
+            linkedSubIndex: subIdx,
+            linkedGroupSize: q.sub_questions!.length,
+            linkedGroupStart: groupStart,
+          });
+        });
+      } else {
+        result.push({
+          id: String(q.id),
+          type: q.type,
+          question: q.question,
+          options: q.options,
+          title: q.title,
+          discussion: q.discussion,
+          sub_questions: q.sub_questions,
+          isLinked: false,
+        });
+      }
+    }
+    return result;
+  }, [questions]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface">
@@ -268,8 +325,10 @@ const ExamSimulation: React.FC = () => {
     );
   }
 
-  const currentData = questions[currentQuestionIndex];
-  const totalQuestionsCount = questions.length;
+  const currentData = flatQuestions[currentQuestionIndex] || flatQuestions[0];
+  // Also keep access to the original question for table/nested rendering (non-linked)
+  const currentOriginal = questions[currentQuestionIndex];
+  const totalQuestionsCount = flatQuestions.length;
 
   return (
     <div className="h-[100dvh] bg-surface flex flex-col font-sans transition-colors duration-500">
@@ -335,7 +394,74 @@ const ExamSimulation: React.FC = () => {
       {/* EXAM BODY */}
       <main className="flex-grow overflow-y-auto flex flex-col">
 
-        {currentData.type === 'table' ? (
+        {currentData.isLinked ? (
+          /* ── LINKED (PASSAGE) ── split layout: passage left, single sub-question right */
+          <div key={currentData.id + '_' + currentQuestionIndex} className="flex-grow flex flex-col lg:flex-row">
+
+            {/* Left: Passage — sticky, independent scroll */}
+            <div className="lg:w-1/2 p-6 lg:p-10 border-b lg:border-b-0 lg:border-r border-surface-container bg-white/50 shrink-0 lg:shrink lg:sticky lg:top-0 lg:self-start lg:max-h-[100%] lg:overflow-y-auto">
+              <div className="flex items-center gap-2 mb-4 flex-wrap">
+                <Tag color="green" className="rounded-full border-none font-bold px-3">📖 {currentData.linkedPassageTitle || 'Teks Bacaan'}</Tag>
+                {currentData.linkedGroupSize && currentData.linkedGroupSize > 1 && (
+                  <Tag className="rounded-full border-none font-bold px-3 bg-surface-low text-on-surface/60">
+                    Soal #{(currentData.linkedGroupStart ?? 0) + 1}–{(currentData.linkedGroupStart ?? 0) + currentData.linkedGroupSize}
+                  </Tag>
+                )}
+              </div>
+              <Title level={4} className="!font-manrope !font-black !text-xl mt-0">Teks Bacaan</Title>
+              <div
+                className="prose prose-p:text-on-surface/80 prose-p:leading-loose font-normal font-sans"
+                style={{ fontSize: `${textSize}px` }}
+                dangerouslySetInnerHTML={{ __html: renderLatex(currentData.linkedPassage || '') }}
+              />
+            </div>
+
+            {/* Right: Single sub-question — independent scroll */}
+            <div className="lg:w-1/2 p-6 lg:p-10 bg-white flex flex-col">
+              <div className="flex items-center justify-between mb-6">
+                <Tag className="rounded-full px-4 py-1 text-sm font-black border-none bg-surface-low text-on-surface">
+                  Soal #{currentQuestionIndex + 1} <span className="opacity-60">(Teks Berhubungan {(currentData.linkedSubIndex ?? 0) + 1}/{currentData.linkedGroupSize})</span>
+                </Tag>
+                <Button type="text" className="text-on-surface/40 hover:text-primary font-bold text-xs uppercase" icon={<WarningOutlined />}>Lapor Soal</Button>
+              </div>
+
+              {/* Sub-question text */}
+              <div className="bg-white rounded-[2rem] p-6 lg:p-8 shadow-sm border border-surface-container mb-6">
+                <div
+                  className="prose prose-p:text-on-surface/90 prose-p:leading-loose max-w-none text-on-surface font-normal font-sans"
+                  style={{ fontSize: `${textSize}px` }}
+                  dangerouslySetInnerHTML={{ __html: renderLatex(currentData.question) }}
+                />
+              </div>
+
+              {/* Options */}
+              <div className="space-y-4">
+                {(currentData.options || []).filter(opt => opt && opt.trim() !== '').map((opt, idx) => {
+                  const currentAnsArr = answers[currentData.id] || [];
+                  const isSelected = currentAnsArr.includes(idx);
+                  const label = String.fromCharCode(65 + idx);
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => handleSelectOption(currentData.id, currentData.type, idx)}
+                      className={`rounded-xl flex items-center cursor-pointer transition-all border ${sizeClasses.nestedPadding} ${isSelected ? 'border-primary bg-primary/5 shadow-[0_0_0_2px_rgba(0,83,221,0.2)]' : 'border-surface-container bg-surface-lowest hover:border-primary/50'}`}
+                    >
+                      <div className={`rounded-full flex items-center justify-center font-bold shrink-0 transition-colors ${sizeClasses.nestedCircleSize} ${isSelected ? 'bg-primary text-white' : 'bg-surface-low text-on-surface/60'}`}>
+                        {label}
+                      </div>
+                      <span
+                        className={`font-normal font-sans ml-3 ${isSelected ? 'text-primary font-medium' : 'text-on-surface/80'}`}
+                        style={{ fontSize: `${textSize}px` }}
+                        dangerouslySetInnerHTML={{ __html: renderLatex(opt) }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+        ) : currentData.type === 'table' ? (
           /* ── TABLE / MATRIX ── split 40/60 layout */
           <div key={currentData.id} className="flex-grow flex flex-col lg:flex-row">
 
@@ -475,7 +601,7 @@ const ExamSimulation: React.FC = () => {
                         <div className="flex-1 min-w-0 [&>p:first-child]:mt-0 [&>p:last-child]:mb-0" dangerouslySetInnerHTML={{ __html: renderLatex(sub.question) }} />
                       </div>
                       <div className="space-y-3 mb-4">
-                        {sub.options.map((opt, idx) => ({ opt, idx })).filter(({ opt }) => opt && opt.trim() !== '').map(({ opt, idx }) => {
+                        {sub.options.map((opt: string, idx: number) => ({ opt, idx })).filter(({ opt }: { opt: string }) => opt && opt.trim() !== '').map(({ opt, idx }: { opt: string; idx: number }) => {
                           const isSelected = currentAnsArr.includes(idx);
                           const label = String.fromCharCode(65 + idx);
                           return (
@@ -643,47 +769,58 @@ const ExamSimulation: React.FC = () => {
         open={isMapVisible}
         width={320}
       >
-        <div className="flex gap-4 items-center mb-6 text-xs text-on-surface/60">
+        <div className="flex gap-4 items-center mb-6 text-xs text-on-surface/60 flex-wrap">
           <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-primary rounded-full"></div> Selesai</span>
           <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-yellow-400 rounded-full"></div> Ragu-ragu</span>
           <span className="flex items-center gap-1.5"><div className="w-3 h-3 border border-surface-container rounded-full"></div> Kosong</span>
+          <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-green-400 rounded-full"></div> Teks Berhubungan</span>
         </div>
         <div className="grid grid-cols-5 gap-3">
-          {questions.map((q, i) => {
+          {flatQuestions.map((q, i) => {
             const num = i + 1;
 
-            // Check if answered. For nested or table, must have at least one subquestion answered.
+            // Check if answered
             let isAnswered = false;
-            if ((q.type === 'nested' || q.type === 'table') && q.sub_questions) {
-              isAnswered = q.sub_questions.some((sq, sqIdx) => (answers[`${q.id}_${sq.id || sqIdx}`] || []).length > 0);
+            if (!q.isLinked && (q.type === 'nested' || q.type === 'table') && q.sub_questions) {
+              isAnswered = q.sub_questions.some((sq: any, sqIdx: number) => (answers[`${q.id}_${sq.id || sqIdx}`] || []).length > 0);
             } else {
               isAnswered = (answers[q.id] || []).length > 0;
             }
 
             const isDoubtful = doubtfulQuestions[q.id];
             const isCurrent = currentQuestionIndex === i;
+            // Visual grouping: linked questions get a green outline
+            const isLinkedQ = q.isLinked;
+            const isFirstInGroup = isLinkedQ && q.linkedSubIndex === 0;
+            const isLastInGroup = isLinkedQ && q.linkedSubIndex === (q.linkedGroupSize! - 1);
 
             return (
               <button
-                key={q.id}
+                key={q.id + '_' + i}
                 onClick={() => {
                   setCurrentQuestionIndex(i);
                   setIsMapVisible(false);
                 }}
+                title={isLinkedQ ? `Teks Berhubungan — ${q.linkedPassageTitle || 'Passage'}` : undefined}
                 className={`
-                  aspect-square rounded-xl flex items-center justify-center font-bold text-sm transition-all
+                  aspect-square rounded-xl flex items-center justify-center font-bold text-sm transition-all relative
                   ${isCurrent ? 'ring-2 ring-primary scale-110 shadow-md' : ''}
                   ${isDoubtful ? 'bg-yellow-400 text-yellow-900 border-yellow-500'
-                    : isAnswered ? 'bg-primary text-white border-primary'
-                      : 'bg-white text-on-surface border border-surface-container hover:bg-surface-low'
+                    : isAnswered ? (isLinkedQ ? 'bg-green-500 text-white' : 'bg-primary text-white border-primary')
+                      : isLinkedQ ? 'bg-green-50 text-green-700 border border-green-300 hover:bg-green-100'
+                        : 'bg-white text-on-surface border border-surface-container hover:bg-surface-low'
                   }
                 `}
               >
                 {num}
+                {isLinkedQ && !isAnswered && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-400 rounded-full border border-white" />
+                )}
               </button>
             );
           })}
         </div>
+
       </Drawer>
 
       {/* MODAL: EXIT CONFIRMATION */}

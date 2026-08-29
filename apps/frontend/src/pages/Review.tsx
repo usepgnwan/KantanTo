@@ -40,9 +40,14 @@ interface AnswerDetail {
 
 interface GroupedQuestion {
   question_id: number;
+  sub_question_id?: number | null;
   type: string;
   title: string;
   question_text: string;
+  parent_question?: string;
+  parent_title?: string;
+  linkedSubIndex?: number;
+  linkedGroupSize?: number;
   options?: string[];
   answers: AnswerDetail[];
 }
@@ -77,15 +82,48 @@ const Review: React.FC = () => {
         }));
         setAnswers(raw);
 
-        // Group by question_id so nested or table questions appear on the same page
+        // Group questions: table/nested stay grouped together,
+        // while linked (passage) questions appear separated per question number
         const groups: GroupedQuestion[] = [];
-        const map = new Map<number, GroupedQuestion>();
+        const tableNestedMap = new Map<number, GroupedQuestion>();
+
+        // Count how many sub-questions each linked parent question has
+        const linkedCounts = new Map<number, number>();
+        raw.forEach(a => {
+          const parentType = a.parent_type || (a.question_type === 'table' ? 'table' : (a.question_type === 'linked' ? 'linked' : 'nested'));
+          if (parentType === 'linked') {
+            linkedCounts.set(a.question_id, (linkedCounts.get(a.question_id) || 0) + 1);
+          }
+        });
+
+        const linkedIndices = new Map<number, number>();
 
         raw.forEach(a => {
           const isSub = a.sub_question_id !== null && a.sub_question_id !== undefined;
-          if (isSub) { // It's a sub-question (nested or table)
-            const parentType = a.parent_type || (a.question_type === 'table' ? 'table' : 'nested');
-            if (!map.has(a.question_id)) {
+          const parentType = a.parent_type || (a.question_type === 'table' ? 'table' : (a.question_type === 'linked' ? 'linked' : 'nested'));
+
+          if (parentType === 'linked') {
+            // ── SOAL BERHUBUNGAN (PASSAGE): TERPISAH 1 PER 1 ──
+            const curSubIdx = linkedIndices.get(a.question_id) || 0;
+            linkedIndices.set(a.question_id, curSubIdx + 1);
+            const groupSize = linkedCounts.get(a.question_id) || 1;
+
+            groups.push({
+              question_id: a.question_id,
+              sub_question_id: a.sub_question_id,
+              type: 'linked',
+              title: a.question_title || a.parent_title || 'Soal Berhubungan',
+              question_text: a.question_text,
+              parent_question: a.parent_question || '',
+              parent_title: a.parent_title || 'Teks Bacaan',
+              linkedSubIndex: curSubIdx,
+              linkedGroupSize: groupSize,
+              options: a.options,
+              answers: [a]
+            });
+          } else if (isSub) {
+            // ── TABLE / NESTED: Dikelompokkan bersama ──
+            if (!tableNestedMap.has(a.question_id)) {
               const g: GroupedQuestion = {
                 question_id: a.question_id,
                 type: parentType,
@@ -94,11 +132,12 @@ const Review: React.FC = () => {
                 options: a.parent_options && a.parent_options.length > 0 ? a.parent_options : a.options || ['Benar', 'Salah'],
                 answers: []
               };
-              map.set(a.question_id, g);
+              tableNestedMap.set(a.question_id, g);
               groups.push(g);
             }
-            map.get(a.question_id)!.answers.push(a);
-          } else { // Single or multiple
+            tableNestedMap.get(a.question_id)!.answers.push(a);
+          } else {
+            // ── SINGLE / MULTIPLE BIASA ──
             groups.push({
               question_id: a.question_id,
               type: a.question_type || 'single',
@@ -233,11 +272,12 @@ const Review: React.FC = () => {
 
                 {/* Answer Map */}
                 <Card className="weightless-card border-none" title={<span className="font-black font-manrope">Peta Jawaban</span>}>
-                  <div className="flex items-center gap-3 mb-4 flex-wrap text-xs">
+                  <div className="flex items-center gap-3 mb-4 flex-wrap text-xs font-semibold text-on-surface/70">
                     <span className="flex items-center gap-1.5"><CheckCircleFilled className="text-green-500" /> Benar</span>
                     <span className="flex items-center gap-1.5"><CloseCircleFilled className="text-red-500" /> Salah</span>
                     <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-yellow-400 rounded-full" /> Sebagian</span>
                     <span className="flex items-center gap-1.5"><div className="w-3 h-3 bg-gray-200 rounded-full" /> Kosong</span>
+                    <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-emerald-600 rounded-full" /> Berhubungan</span>
                   </div>
                   <div className="grid grid-cols-5 sm:grid-cols-8 lg:grid-cols-5 gap-2">
                     {groupedQuestions.map((group, idx) => {
@@ -245,19 +285,25 @@ const Review: React.FC = () => {
                       const allEmpty = group.answers.every(a => a.selected_options.length === 0);
                       const allCorrect = !allEmpty && group.answers.every(a => a.is_correct);
                       const anyCorrect = !allEmpty && !allCorrect && group.answers.some(a => a.is_correct);
-                      const tooltip = allEmpty ? 'Tidak dijawab' : allCorrect ? 'Semua benar' : anyCorrect ? 'Sebagian benar' : 'Salah';
+                      const tooltip = allEmpty ? 'Tidak dijawab' : allCorrect ? 'Benar' : anyCorrect ? 'Sebagian benar' : 'Salah';
                       return (
                         <button
-                          key={group.question_id}
+                          key={`${group.question_id}_${group.sub_question_id || idx}`}
                           onClick={() => setSelectedIndex(idx)}
-                          title={`Soal ${idx + 1}: ${tooltip}`}
+                          title={`Soal ${idx + 1}: ${tooltip}${group.type === 'linked' ? ' (Soal Berhubungan)' : ''}`}
                           className={`
-                            w-full aspect-square rounded-xl flex items-center justify-center font-bold text-sm transition-all
+                            w-full aspect-square rounded-xl flex items-center justify-center font-bold text-sm transition-all relative
                             ${getGroupStatusColor(group)}
-                            ${isCurrent ? 'ring-4 ring-primary/30 scale-110 shadow-lg' : 'hover:opacity-80 hover:scale-105'}
+                            ${isCurrent ? 'ring-4 ring-primary/40 scale-110 shadow-lg' : 'hover:opacity-80 hover:scale-105'}
                           `}
                         >
                           {idx + 1}
+                          {group.type === 'linked' && (
+                            <span
+                              title="Soal berhubungan"
+                              className="absolute top-1 right-1 w-2 h-2 rounded-full bg-white ring-1 ring-black/20"
+                            />
+                          )}
                         </button>
                       );
                     })}
@@ -272,11 +318,11 @@ const Review: React.FC = () => {
               <Card className="weightless-card border-none h-full p-4 lg:p-8">
                 <div className="animate-fade-in flex flex-col h-full">
                   
-                  {/* General Header for the Question Group */}
+                  {/* General Header for the Question */}
                   <div className="flex items-center justify-between border-b border-on-surface/5 pb-6 mb-6">
-                    <Space align="center" size="middle">
+                    <Space align="center" size="middle" wrap>
                       <Tag className="rounded-full px-4 py-1 text-sm font-black border-none bg-surface-low text-on-surface">
-                        Bagian #{selectedIndex + 1}
+                        Soal #{selectedIndex + 1}
                       </Tag>
                       {currentGroup.type === 'nested' && (
                         <Tag color="blue" className="rounded-full border-none font-bold px-3">Skenario</Tag>
@@ -284,29 +330,200 @@ const Review: React.FC = () => {
                       {currentGroup.type === 'table' && (
                         <Tag color="blue" className="rounded-full border-none font-bold px-3">Tabel / Pernyataan</Tag>
                       )}
+                      {currentGroup.type === 'linked' && (
+                        <Tag color="green" className="rounded-full border-none font-bold px-3">
+                          📖 Soal Berhubungan (Bagian {(currentGroup.linkedSubIndex ?? 0) + 1}/{currentGroup.linkedGroupSize})
+                        </Tag>
+                      )}
                       {currentGroup.type === 'multiple' && (
                         <Tag color="blue" className="rounded-full border-none font-bold px-3">Pilih lebih dari satu</Tag>
                       )}
                     </Space>
                   </div>
 
-                  {/* Scenario or Table Header Narrative */}
-                  {(currentGroup.type === 'nested' || currentGroup.type === 'table') && (
-                    <div className="bg-surface-lowest rounded-[2rem] p-6 lg:p-8 shadow-sm border border-surface-container mb-8">
-                      {currentGroup.title && (
-                        <Tag color="blue" className="mb-4 rounded-full border-none font-bold px-3">{currentGroup.title}</Tag>
-                      )}
-                      {currentGroup.type === 'nested' && (
-                        <Title level={4} className="!font-manrope !font-black !text-xl mt-0">Skenario Kasus</Title>
-                      )}
-                      {currentGroup.question_text && (
+                  {currentGroup.type === 'linked' ? (
+                    /* ── SOAL BERHUBUNGAN (PASSAGE): SPLIT TWO-PANEL REVIEW ── */
+                    <div className="flex flex-col xl:flex-row gap-8 items-start mb-8">
+                      {/* Left: Sticky Passage */}
+                      <div className="w-full xl:w-1/2 bg-surface-lowest rounded-[2rem] p-6 lg:p-8 shadow-sm border border-surface-container xl:sticky xl:top-24 xl:max-h-[75vh] xl:overflow-y-auto">
+                        <div className="flex items-center gap-2 mb-4 flex-wrap">
+                          <Tag color="green" className="rounded-full border-none font-bold px-3">
+                            📖 {currentGroup.parent_title || 'Teks Bacaan'}
+                          </Tag>
+                          {currentGroup.linkedGroupSize && (
+                            <Tag className="rounded-full border-none font-bold px-3 bg-surface-low text-on-surface/60">
+                              Bagian {(currentGroup.linkedSubIndex ?? 0) + 1} dari {currentGroup.linkedGroupSize}
+                            </Tag>
+                          )}
+                        </div>
+                        <Title level={4} className="!font-manrope !font-black !text-xl mt-0 mb-4">Teks Bacaan / Passage</Title>
                         <div
-                          className="prose prose-lg prose-p:text-on-surface/90 prose-p:leading-loose max-w-none text-on-surface font-normal font-sans"
-                          dangerouslySetInnerHTML={{ __html: renderLatex(currentGroup.question_text) }}
+                          className="prose prose-p:text-on-surface/85 prose-p:leading-loose max-w-none text-on-surface font-normal font-sans"
+                          dangerouslySetInnerHTML={{ __html: renderLatex(currentGroup.parent_question || '') }}
                         />
-                      )}
+                      </div>
+
+                      {/* Right: Specific Sub-question review */}
+                      <div className="w-full xl:w-1/2 space-y-6">
+                        {currentGroup.answers.map((current) => (
+                          <div key={current.id} className="relative">
+                            {/* Sub-question Status & Points */}
+                            <div className="flex flex-wrap items-center gap-3 mb-4">
+                              {current.selected_options.length === 0 ? (
+                                <Tag className="rounded-full border-none px-3 font-bold text-gray-500 bg-gray-100">Tidak Dijawab</Tag>
+                              ) : current.is_correct ? (
+                                <Tag color="success" className="rounded-full border-none px-3 font-bold flex items-center gap-1">
+                                  <CheckCircleFilled /> Benar
+                                </Tag>
+                              ) : (
+                                <Tag color="error" className="rounded-full border-none px-3 font-bold flex items-center gap-1">
+                                  <CloseCircleFilled /> Salah
+                                </Tag>
+                              )}
+                              <Tag className="rounded-full border border-surface-container bg-white px-3 font-bold text-on-surface/60">
+                                {current.points_earned % 1 === 0 ? current.points_earned : current.points_earned.toFixed(2)} / {current.max_points} poin
+                              </Tag>
+                            </div>
+
+                            {/* Question Text */}
+                            <div className="bg-white rounded-3xl p-6 shadow-sm border border-surface-container mb-4">
+                              <Paragraph className="text-base leading-relaxed text-on-surface m-0">
+                                <span dangerouslySetInnerHTML={{ __html: renderLatex(current.question_text) }} />
+                              </Paragraph>
+                            </div>
+
+                            {/* Kamu Memilih */}
+                            <div className="flex items-start gap-2 mb-5 px-1">
+                              <Text className="text-xs font-bold text-on-surface/40 uppercase tracking-wider shrink-0 mt-1">Kamu memilih:</Text>
+                              {current.selected_options.length > 0 ? (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {current.selected_options.sort((a, b) => a - b).map(optIdx => {
+                                    const optLabel = String.fromCharCode(65 + optIdx);
+                                    const isThisCorrect = (current.correct_answers || []).includes(optIdx);
+                                    return (
+                                      <span
+                                        key={optIdx}
+                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-black ${
+                                          isThisCorrect ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                                        }`}
+                                      >
+                                        {optLabel} {isThisCorrect ? '✓' : '✗'}
+                                      </span>
+                                    );
+                                  })}
+                                  <Text className={`text-sm font-bold ${current.is_correct ? 'text-green-600' : 'text-red-500'}`}>
+                                    {current.is_correct ? '— Benar!' : '— Salah'}
+                                  </Text>
+                                </div>
+                              ) : (
+                                <Text className="text-sm font-bold text-gray-400 italic">— Tidak dijawab</Text>
+                              )}
+                            </div>
+
+                            {/* Options */}
+                            <div className="space-y-3">
+                              <Text className="text-xs font-bold uppercase tracking-widest text-on-surface/40 pl-2">Pilihan Jawaban</Text>
+                              {current.options
+                                .map((opt, idx) => ({ opt, idx }))
+                                .filter(({ opt, idx }) => {
+                                  const isCorrect = (current.correct_answers || []).includes(idx);
+                                  return isCorrect || (opt && opt.trim() !== '');
+                                })
+                                .map(({ opt, idx }) => {
+                                  const isCorrect = (current.correct_answers || []).includes(idx);
+                                  const isUserPick = (current.selected_options || []).includes(idx);
+                                  const label = String.fromCharCode(65 + idx);
+
+                                  let wrapCls = 'border border-surface-container bg-white';
+                                  let labelCls = 'bg-surface-low text-on-surface/60';
+                                  let textCls = 'text-on-surface/80';
+                                  let icon = null;
+
+                                  if (isCorrect && isUserPick) {
+                                    wrapCls = 'border-green-500 bg-green-50 ring-1 ring-green-500 shadow-sm';
+                                    labelCls = 'bg-green-500 text-white';
+                                    textCls = 'text-green-800 font-semibold';
+                                    icon = <CheckCircleFilled className="text-green-500 text-xl shrink-0" />;
+                                  } else if (isCorrect) {
+                                    wrapCls = 'border-green-400 bg-green-50/60 ring-1 ring-green-400';
+                                    labelCls = 'bg-green-400 text-white';
+                                    textCls = 'text-green-800 font-semibold';
+                                    icon = <CheckCircleFilled className="text-green-400 text-xl shrink-0" />;
+                                  } else if (isUserPick && !isCorrect) {
+                                    wrapCls = 'border-red-500 bg-red-50/60 ring-1 ring-red-500 shadow-sm';
+                                    labelCls = 'bg-red-500 text-white';
+                                    textCls = 'text-red-800';
+                                    icon = <CloseCircleFilled className="text-red-500 text-xl shrink-0" />;
+                                  }
+
+                                  return (
+                                    <div key={idx} className={`p-4 lg:p-5 rounded-2xl flex items-center justify-between transition-all ${wrapCls}`}>
+                                      <div className="flex items-center gap-4">
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-base shrink-0 transition-colors ${labelCls}`}>
+                                          {label}
+                                        </div>
+                                        {opt && opt.trim() !== '' ? (
+                                          <span
+                                            className={`text-base font-medium leading-relaxed ${textCls}`}
+                                            dangerouslySetInnerHTML={{ __html: renderLatex(opt) }}
+                                          />
+                                        ) : (
+                                          <span className={`text-base font-medium italic opacity-60 ${textCls}`}>
+                                            (Data opsi tidak tersedia)
+                                          </span>
+                                        )}
+                                      </div>
+                                      {icon}
+                                    </div>
+                                  );
+                                })}
+                            </div>
+
+                            {/* Discussion */}
+                            {current.discussion && (
+                              <div className="bg-blue-50/50 border border-blue-100 rounded-3xl p-6 lg:p-8 mt-6">
+                                <div className="flex gap-4">
+                                  <div className="shrink-0">
+                                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-500 text-xl">
+                                      <BulbOutlined />
+                                    </div>
+                                  </div>
+                                  <div className="w-full">
+                                    <Title level={5} className="!text-blue-900 !font-black !font-manrope !mb-3 mt-1">
+                                      Pembahasan
+                                    </Title>
+                                    <Paragraph className="text-blue-900/80 leading-loose text-base font-medium mb-0">
+                                      <span dangerouslySetInnerHTML={{ __html: renderLatex(current.discussion) }} />
+                                    </Paragraph>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  )}
+                  ) : (
+                    <>
+                      {/* Passage / Narrative Header (nested or table) */}
+                      {(currentGroup.type === 'nested' || currentGroup.type === 'table') && (
+                        <div className="bg-surface-lowest rounded-[2rem] p-6 lg:p-8 shadow-sm border border-surface-container mb-8">
+                          {currentGroup.title && (
+                            <Tag color="blue" className="mb-4 rounded-full border-none font-bold px-3">
+                              {currentGroup.title}
+                            </Tag>
+                          )}
+                          {currentGroup.type === 'nested' && (
+                            <Title level={4} className="!font-manrope !font-black !text-xl mt-0">Skenario Kasus</Title>
+                          )}
+                          {currentGroup.question_text && (
+                            <div
+                              className="prose prose-lg prose-p:text-on-surface/90 prose-p:leading-loose max-w-none text-on-surface font-normal font-sans"
+                              dangerouslySetInnerHTML={{ __html: renderLatex(currentGroup.question_text) }}
+                            />
+                          )}
+                        </div>
+                      )}
 
                   {currentGroup.type === 'table' ? (
                     /* ── TABLE QUESTION REVIEW ── */
@@ -452,7 +669,7 @@ const Review: React.FC = () => {
                         
                         {/* Sub-question Header (Points and Status) */}
                         <div className="flex flex-wrap items-center gap-3 mb-4">
-                          {currentGroup.type === 'nested' && (
+                          {(currentGroup.type === 'nested' || currentGroup.type === 'linked') && (
                             <Tag className="rounded-full px-4 py-1 text-sm font-black border-none bg-surface-low text-on-surface">
                               Soal #{ansIdx + 1}
                             </Tag>
@@ -600,6 +817,8 @@ const Review: React.FC = () => {
                     ))}
                   </div>
                   )}
+                    </>
+                  )}
 
                   <Divider className="border-on-surface/10 mt-10 mb-8" />
 
@@ -615,7 +834,7 @@ const Review: React.FC = () => {
                         onClick={() => setSelectedIndex(prev => Math.max(0, prev - 1))}
                         className="w-auto h-12 rounded-xl font-bold bg-surface-low hover:bg-surface-low/80 text-on-surface/80"
                       >
-                        Bagian Sebelumnya
+                        Soal Sebelumnya
                       </Button>
                       <Button
                         size="large"
@@ -624,7 +843,7 @@ const Review: React.FC = () => {
                         disabled={selectedIndex === groupedQuestions.length - 1}
                         onClick={() => setSelectedIndex(prev => Math.min(groupedQuestions.length - 1, prev + 1))}
                       >
-                        Bagian Selanjutnya <RightOutlined />
+                        Soal Selanjutnya <RightOutlined />
                       </Button>
                     </div>
                     {/* Mobile View - Fixed Bottom Nav */}
