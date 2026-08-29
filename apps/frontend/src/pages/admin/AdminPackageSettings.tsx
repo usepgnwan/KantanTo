@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import AdminLayout from '../../layouts/AdminLayout';
 import KantanEditor from '../../components/atoms/KantanEditor';
@@ -30,7 +30,7 @@ import type { UploadFile } from 'antd';
 const { Title, Text } = Typography;
 
 // ─── TYPES ──────────────────────────────────────────────────
-type QuestionType = 'single' | 'multiple' | 'nested' | 'table';
+type QuestionType = 'single' | 'multiple' | 'nested' | 'table' | 'linked';
 type ScoringMethod = 'all_or_nothing' | 'partial';
 
 interface SubQuestion {
@@ -532,7 +532,7 @@ const AdminPackageSettings: React.FC = () => {
     (question.subQuestions || []).reduce((sum, sub) => sum + (Number(sub.points) || 0), 0);
 
   const getEffectivePoints = (question: Question) =>
-    (question.type === 'nested' || question.type === 'table') ? getScenarioPoints(question) : question.points;
+    (question.type === 'nested' || question.type === 'table' || question.type === 'linked') ? getScenarioPoints(question) : question.points;
 
   const serializeQuestion = (question: Question) => ({
     id: question.id,
@@ -826,10 +826,26 @@ const AdminPackageSettings: React.FC = () => {
     });
   };
 
+  const effectiveQuestionsCount = useMemo(() => {
+    let total = 0;
+    for (const q of questions) {
+      if (q.type === 'linked' && q.subQuestions && q.subQuestions.length > 0) {
+        total += q.subQuestions.length;
+      } else {
+        total += 1;
+      }
+    }
+    return total;
+  }, [questions]);
+
   const tabItems = [
     {
       key: 'soal',
-      label: <span className="flex items-center gap-2"><ExperimentOutlined /> Soal ({questions.length})</span>,
+      label: (
+        <span className="flex items-center gap-2">
+          <ExperimentOutlined /> Soal ({effectiveQuestionsCount !== questions.length ? `${questions.length} paket / ${effectiveQuestionsCount} nomor` : questions.length})
+        </span>
+      ),
       children: (
         <div className="py-6 px-1">
           <Row gutter={24}>
@@ -844,18 +860,29 @@ const AdminPackageSettings: React.FC = () => {
                     <div
                       key={q.id}
                       onClick={() => setActiveQIndex(i)}
-                      className={`h-10 rounded-xl flex items-center justify-center font-bold text-sm cursor-pointer transition-all border-2
+                      className={`h-10 rounded-xl flex items-center justify-center font-bold text-sm cursor-pointer transition-all border-2 relative
                         ${activeQIndex === i
                           ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105'
                           : 'bg-white dark:bg-zinc-800 border-transparent text-on-surface/60 hover:border-primary/30'}`}
                     >
                       {i + 1}
+                      {q.type === 'linked' && (
+                        <span
+                          title={`Soal Berhubungan (${q.subQuestions?.length || 0} sub-soal)`}
+                          className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-green-500 border border-white dark:border-zinc-900"
+                        />
+                      )}
                     </div>
                   ))}
                   <div onClick={addQuestion} className="h-10 rounded-xl border-2 border-dashed border-primary/20 flex items-center justify-center text-primary/40 hover:text-primary hover:border-primary/40 cursor-pointer transition-all">
                     <PlusOutlined />
                   </div>
                 </div>
+                {effectiveQuestionsCount !== questions.length && (
+                  <div className="px-2 pt-3 text-[11px] font-bold text-green-600 dark:text-green-400">
+                    Total butir ujian: {effectiveQuestionsCount} nomor
+                  </div>
+                )}
                 <Divider className="my-4 border-on-surface/5" />
                 <div className="space-y-4 px-2">
                   <div className="flex items-center justify-between">
@@ -904,6 +931,15 @@ const AdminPackageSettings: React.FC = () => {
                           if (!newSubQuestions || newSubQuestions.length === 0) {
                             newSubQuestions = [{ id: '1', type: 'single', question: '', discussion: '', options: ['', '', '', '', ''], correct: 0, points: 1 }];
                           }
+                        } else if (newType === 'linked') {
+                          newTitle = activeQ.title || 'Teks Bacaan';
+                          if (!newSubQuestions || newSubQuestions.length === 0) {
+                            newSubQuestions = [
+                              { id: '1', type: 'single', question: '', discussion: '', options: ['', '', '', '', ''], correct: 0, points: 1 },
+                              { id: '2', type: 'single', question: '', discussion: '', options: ['', '', '', '', ''], correct: 0, points: 1 },
+                              { id: '3', type: 'single', question: '', discussion: '', options: ['', '', '', '', ''], correct: 0, points: 1 },
+                            ];
+                          }
                         } else {
                           if (!newOptions || newOptions.length < 2) {
                             newOptions = ['', '', '', '', ''];
@@ -915,7 +951,7 @@ const AdminPackageSettings: React.FC = () => {
                           title: newTitle,
                           options: newOptions,
                           correct: newType === 'multiple' ? getCorrectIndexes(activeQ.correct) : normalizeCorrectForType(newType, activeQ.correct),
-                          points: (newType === 'nested' || newType === 'table') ? getScenarioPoints({ ...activeQ, subQuestions: newSubQuestions }) : activeQ.points || 1,
+                          points: (newType === 'nested' || newType === 'table' || newType === 'linked') ? getScenarioPoints({ ...activeQ, subQuestions: newSubQuestions }) : activeQ.points || 1,
                           scoringMethod: newType === 'multiple' ? activeQ.scoringMethod : 'all_or_nothing',
                           subQuestions: newSubQuestions,
                         });
@@ -925,6 +961,7 @@ const AdminPackageSettings: React.FC = () => {
                         { value: 'multiple', label: 'Multiple Choice' },
                         { value: 'nested', label: 'Scenario Based' },
                         { value: 'table', label: 'Tabel / Pernyataan' },
+                        { value: 'linked', label: '📖 Soal Berhubungan (Passage)' },
                       ]}
                     />
                   </Col>
@@ -935,12 +972,12 @@ const AdminPackageSettings: React.FC = () => {
                       style={{ height: 44, display: 'flex', alignItems: 'center' }}
                       value={getEffectivePoints(activeQ)}
                       min={0}
-                      disabled={activeQ.type === 'nested' || activeQ.type === 'table'}
+                      disabled={activeQ.type === 'nested' || activeQ.type === 'table' || activeQ.type === 'linked'}
                       onChange={val => updateActiveQ({ points: Number(val) || 0 })}
-                      addonAfter={(activeQ.type === 'nested' || activeQ.type === 'table') ? 'auto' : undefined}
+                      addonAfter={(activeQ.type === 'nested' || activeQ.type === 'table' || activeQ.type === 'linked') ? 'auto' : undefined}
                       placeholder="1"
                     />
-                    {(activeQ.type === 'nested' || activeQ.type === 'table') && (
+                    {(activeQ.type === 'nested' || activeQ.type === 'table' || activeQ.type === 'linked') && (
                       <Text className="text-[10px] text-on-surface/40 font-bold mt-1 block">
                         Total otomatis: {getScenarioPoints(activeQ)} poin dari sub-soal / baris.
                       </Text>
@@ -973,13 +1010,13 @@ const AdminPackageSettings: React.FC = () => {
 
                 <div className="mb-8">
                   <Text className="text-xs font-black uppercase tracking-widest text-on-surface/40 block mb-2">
-                    {activeQ.type === 'nested' ? 'Isi Cerita / Skenario' : activeQ.type === 'table' ? 'Petunjuk / Soal Utama' : 'Pertanyaan'}
+                    {activeQ.type === 'nested' ? 'Isi Cerita / Skenario' : activeQ.type === 'table' ? 'Petunjuk / Soal Utama' : activeQ.type === 'linked' ? 'Teks Bacaan / Passage' : 'Pertanyaan'}
                   </Text>
                   <KantanEditor
                     value={activeQ.question}
                     onChange={(val) => updateActiveQ({ question: val })}
-                    placeholder={activeQ.type === 'nested' ? 'Tuliskan cerita, paragraf, atau skenario di sini...' : activeQ.type === 'table' ? 'Tuliskan pengantar soal atau petunjuk tabel di sini...' : 'Tuliskan teks pertanyaan...'}
-                    rows={activeQ.type === 'nested' || activeQ.type === 'table' ? 8 : 5}
+                    placeholder={activeQ.type === 'nested' ? 'Tuliskan cerita, paragraf, atau skenario di sini...' : activeQ.type === 'table' ? 'Tuliskan pengantar soal atau petunjuk tabel di sini...' : activeQ.type === 'linked' ? 'Tuliskan teks bacaan / passage di sini. Teks ini akan ditampilkan di semua soal yang berhubungan...' : 'Tuliskan teks pertanyaan...'}
+                    rows={activeQ.type === 'nested' || activeQ.type === 'table' || activeQ.type === 'linked' ? 8 : 5}
                     label="Rich Question Editor"
                   />
                   {hasPreviewContent(activeQ.question) && (
@@ -1037,6 +1074,46 @@ const AdminPackageSettings: React.FC = () => {
                             updateActiveQ({ subQuestions: next });
                           }}
                           onDelete={() => {
+                            updateActiveQ({ subQuestions: activeQ.subQuestions?.filter(s => s.id !== sub.id) });
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                ) : activeQ.type === 'linked' ? (
+                  <div className="mt-8">
+                    {/* Linked type info banner */}
+                    <div className="mb-6 p-4 rounded-2xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 flex gap-3">
+                      <span className="text-2xl">📖</span>
+                      <div>
+                        <Text className="font-black text-blue-700 dark:text-blue-300 block text-sm">Soal Berhubungan (Passage)</Text>
+                        <Text className="text-xs text-blue-600/80 dark:text-blue-400/80">
+                          Teks bacaan di atas akan ditampilkan sebagai panel kiri yang sticky. Setiap soal di bawah ini akan muncul sebagai <strong>nomor soal terpisah</strong> di peta ujian.
+                        </Text>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <Title level={5} className="!m-0 !font-manrope !font-black">Soal-Soal ({activeQ.subQuestions?.length || 0} nomor)</Title>
+                        <Text className="text-xs text-on-surface/50">Setiap soal akan muncul sebagai nomor terpisah di peta ujian.</Text>
+                      </div>
+                      <Button type="primary" ghost icon={<PlusOutlined />} onClick={addSubQuestion} className="rounded-xl font-bold">Tambah Soal</Button>
+                    </div>
+                    <div className="space-y-4">
+                      {activeQ.subQuestions?.map((sub, si) => (
+                        <SubQuestionEditor
+                          key={sub.id || String(si)}
+                          sub={sub}
+                          index={si}
+                          onUpdate={updatedSub => {
+                            const next = (activeQ.subQuestions || []).map(s => s.id === sub.id ? updatedSub : s);
+                            updateActiveQ({ subQuestions: next });
+                          }}
+                          onDelete={() => {
+                            if ((activeQ.subQuestions?.length || 0) <= 1) {
+                              message.warning('Minimal harus ada 1 soal');
+                              return;
+                            }
                             updateActiveQ({ subQuestions: activeQ.subQuestions?.filter(s => s.id !== sub.id) });
                           }}
                         />
@@ -1143,17 +1220,19 @@ const AdminPackageSettings: React.FC = () => {
                   Pratinjau Soal #{activeQIndex + 1}
                 </Tag>
                 <Tag color="blue" className="rounded-full border-none font-bold text-xs capitalize">
-                  {activeQ.type === 'single' ? 'Single Choice' : activeQ.type === 'multiple' ? 'Multiple Choice' : activeQ.type === 'table' ? 'Tabel / Pernyataan' : 'Scenario Based'}
+                  {activeQ.type === 'single' ? 'Single Choice' : activeQ.type === 'multiple' ? 'Multiple Choice' : activeQ.type === 'table' ? 'Tabel / Pernyataan' : activeQ.type === 'linked' ? '📖 Soal Berhubungan' : 'Scenario Based'}
                 </Tag>
                 <Text className="text-xs text-on-surface/50 font-bold ml-auto mr-4">{getEffectivePoints(activeQ)} Poin</Text>
               </div>
             }
           >
             <div className="py-4 space-y-6 max-h-[70vh] overflow-y-auto pr-2">
-              {/* Scenario Passage (if nested) */}
-              {activeQ.type === 'nested' && (
+              {/* Scenario Passage (if nested or linked) */}
+              {(activeQ.type === 'nested' || activeQ.type === 'linked') && (
                 <div className="bg-surface-low/40 dark:bg-zinc-800/50 rounded-2xl p-6 border border-on-surface/5">
-                  <Tag color="blue" className="mb-3 rounded-full border-none font-bold text-xs">{activeQ.title || 'Skenario Kasus'}</Tag>
+                  <Tag color={activeQ.type === 'linked' ? 'green' : 'blue'} className="mb-3 rounded-full border-none font-bold text-xs">
+                    {activeQ.type === 'linked' ? '📖 Teks Bacaan / Passage' : (activeQ.title || 'Skenario Kasus')}
+                  </Tag>
                   <div
                     className="blog-content kantan-quill-preview prose prose-base dark:prose-invert max-w-none text-on-surface/90 dark:text-zinc-200 leading-relaxed font-sans"
                     dangerouslySetInnerHTML={{ __html: renderContent(activeQ.question) }}
@@ -1161,8 +1240,8 @@ const AdminPackageSettings: React.FC = () => {
                 </div>
               )}
 
-              {/* Main Question (if not nested) */}
-              {activeQ.type !== 'nested' && (
+              {/* Main Question (if not nested or linked) */}
+              {activeQ.type !== 'nested' && activeQ.type !== 'linked' && (
                 <div className="bg-white dark:bg-zinc-800/40 rounded-2xl p-6 border border-on-surface/10 shadow-sm">
                   {activeQ.title && (
                     <Tag color="blue" className="mb-3 rounded-full border-none font-bold text-xs">{activeQ.title}</Tag>
@@ -1317,6 +1396,61 @@ const AdminPackageSettings: React.FC = () => {
                       {hasPreviewContent(sub.discussion) && (
                         <div className="p-3.5 rounded-xl bg-green-500/5 dark:bg-green-900/10 border border-green-500/20 text-xs">
                           <Text className="text-[10px] font-black uppercase text-green-600 block mb-1">Pembahasan Sub-Soal:</Text>
+                          <div className="blog-content kantan-quill-preview prose prose-xs dark:prose-invert max-w-none text-green-800 dark:text-green-300" dangerouslySetInnerHTML={{ __html: renderContent(sub.discussion) }} />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Sub-questions preview (if linked) */}
+              {activeQ.type === 'linked' && (
+                <div className="space-y-6">
+                  <Text className="text-xs font-black uppercase tracking-wider text-on-surface/40 block">
+                    Soal-Soal ({activeQ.subQuestions?.length || 0} nomor — masing-masing tampil sebagai nomor terpisah):
+                  </Text>
+                  {activeQ.subQuestions?.map((sub, si) => (
+                    <div key={sub.id || si} className="p-5 rounded-2xl bg-white dark:bg-zinc-800/40 border border-on-surface/10 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <Tag className="rounded-lg bg-green-500 text-white border-none font-black text-xs px-3 py-0.5">
+                          Soal #{si + 1}
+                        </Tag>
+                        <Text className="text-xs font-bold text-on-surface/50">{sub.points} Poin</Text>
+                      </div>
+                      <div
+                        className="blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none text-on-surface/90 dark:text-zinc-200 font-sans"
+                        dangerouslySetInnerHTML={{ __html: renderContent(sub.question) }}
+                      />
+                      <div className="space-y-2">
+                        {sub.options.map((opt, oi) => {
+                          if (!opt && !hasPreviewContent(opt)) return null;
+                          const isCorrect = sub.correct === oi;
+                          return (
+                            <div
+                              key={oi}
+                              className={`p-3 rounded-xl border flex items-start gap-3 ${
+                                isCorrect
+                                  ? 'bg-green-50 dark:bg-green-900/20 border-green-500'
+                                  : 'bg-surface-low/30 dark:bg-zinc-800 border-on-surface/5'
+                              }`}
+                            >
+                              <div
+                                className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+                                  isCorrect ? 'bg-green-500 text-white' : 'bg-surface-low dark:bg-zinc-700 text-on-surface/60'
+                                }`}
+                              >
+                                {String.fromCharCode(65 + oi)}
+                              </div>
+                              <div className="flex-1 blog-content kantan-quill-preview prose prose-xs dark:prose-invert max-w-none font-sans" dangerouslySetInnerHTML={{ __html: renderContent(opt) }} />
+                              {isCorrect && <Tag color="success" className="rounded-full border-none font-bold text-[10px]">Kunci</Tag>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {hasPreviewContent(sub.discussion) && (
+                        <div className="p-3.5 rounded-xl bg-green-500/5 dark:bg-green-900/10 border border-green-500/20 text-xs">
+                          <Text className="text-[10px] font-black uppercase text-green-600 block mb-1">Pembahasan:</Text>
                           <div className="blog-content kantan-quill-preview prose prose-xs dark:prose-invert max-w-none text-green-800 dark:text-green-300" dangerouslySetInnerHTML={{ __html: renderContent(sub.discussion) }} />
                         </div>
                       )}

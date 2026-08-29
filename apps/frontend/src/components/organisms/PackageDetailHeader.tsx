@@ -4,7 +4,8 @@ import {
   UserOutlined,
   ClockCircleOutlined,
   TeamOutlined,
-  SafetyCertificateFilled
+  SafetyCertificateFilled,
+  ExperimentOutlined
 } from '@ant-design/icons';
 
 const { Title, Paragraph, Text } = Typography;
@@ -14,6 +15,7 @@ interface PackageDetailHeaderProps {
   description: string;
   joinedCount: number;
   duration: string;
+  questionCount?: number;
   category: string;
   classes: string[];
   subjects: string[];
@@ -24,6 +26,7 @@ const PackageDetailHeader: React.FC<PackageDetailHeaderProps> = ({
   description,
   joinedCount,
   duration,
+  questionCount,
   category,
   classes,
   subjects
@@ -84,6 +87,18 @@ const PackageDetailHeader: React.FC<PackageDetailHeaderProps> = ({
                     <Title level={4} className="!m-0">{duration}</Title>
                   </div>
                 </div>
+
+                {typeof questionCount === 'number' && questionCount > 0 && (
+                  <div className="flex items-center gap-3">
+                    <div className="bg-primary/10 p-3 rounded-2xl">
+                      <ExperimentOutlined className="text-primary text-xl" />
+                    </div>
+                    <div>
+                      <Text className="block text-[10px] text-surface-on/40 uppercase font-bold tracking-widest">Total Soal</Text>
+                      <Title level={4} className="!m-0">{questionCount} Soal</Title>
+                    </div>
+                  </div>
+                )}
               </div>
             </Space>
           </Col>

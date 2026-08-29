@@ -87,6 +87,22 @@ func mapPackageResponse(pkg model.Package, qCount, mCount, vCount int64) package
 	}
 }
 
+func countEffectiveQuestions(packageID uint) int64 {
+	var questions []model.PackageQuestion
+	if err := connection.DB.Where("package_id = ?", packageID).Preload("SubQuestions").Find(&questions).Error; err != nil {
+		return 0
+	}
+	var count int64 = 0
+	for _, q := range questions {
+		if q.Type == "linked" && len(q.SubQuestions) > 0 {
+			count += int64(len(q.SubQuestions))
+		} else {
+			count++
+		}
+	}
+	return count
+}
+
 func GetPackages(c echo.Context) error {
 	var packages []model.Package
 	if err := connection.DB.Order("id asc").Find(&packages).Error; err != nil {
@@ -95,8 +111,8 @@ func GetPackages(c echo.Context) error {
 
 	result := make([]packageListResponse, 0, len(packages))
 	for _, pkg := range packages {
-		var qCount, mCount, vCount int64
-		connection.DB.Model(&model.PackageQuestion{}).Where("package_id = ?", pkg.ID).Count(&qCount)
+		var mCount, vCount int64
+		qCount := countEffectiveQuestions(pkg.ID)
 		connection.DB.Model(&model.PackageMaterial{}).Where("package_id = ?", pkg.ID).Count(&mCount)
 		connection.DB.Model(&model.PackageVideo{}).Where("package_id = ?", pkg.ID).Count(&vCount)
 		result = append(result, mapPackageResponse(pkg, qCount, mCount, vCount))
@@ -184,8 +200,8 @@ func UpdatePackage(c echo.Context) error {
 			Updates(map[string]interface{}{"is_lifetime": true, "active_until": nil})
 	}
 
-	var qCount, mCount, vCount int64
-	connection.DB.Model(&model.PackageQuestion{}).Where("package_id = ?", pkg.ID).Count(&qCount)
+	var mCount, vCount int64
+	qCount := countEffectiveQuestions(pkg.ID)
 	connection.DB.Model(&model.PackageMaterial{}).Where("package_id = ?", pkg.ID).Count(&mCount)
 	connection.DB.Model(&model.PackageVideo{}).Where("package_id = ?", pkg.ID).Count(&vCount)
 

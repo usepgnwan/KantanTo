@@ -105,7 +105,7 @@ func SubmitExam(c echo.Context) error {
 			selected = []int{}
 		}
 
-		if q.Type == "nested" || q.Type == "scenario" || q.Type == "table" {
+		if q.Type == "nested" || q.Type == "scenario" || q.Type == "table" || q.Type == "linked" {
 			// Scenario / Table Based: Independent Scoring for each sub-question
 			for _, sub := range q.SubQuestions {
 				subSelected, hasSubAns := req.Answers[sub.ClientID] // Frontend sends ClientID keys
@@ -360,7 +360,7 @@ func GetExamSession(c echo.Context) error {
 				return db.Order("id asc")
 			}).Where("id = ?", ans.QuestionID).First(&parent).Error == nil
 
-			if parentFound && parent.Type == "table" {
+			if parentFound && (parent.Type == "table") {
 				// TABLE TYPE: always rebuild from CURRENT sub-questions of the parent.
 				// Only process each parent question once (skip duplicate answer rows).
 				if expandedTableQuestions[ans.QuestionID] {
@@ -428,7 +428,7 @@ func GetExamSession(c echo.Context) error {
 			}
 
 			if parentFound {
-				// Non-table sub-question (nested/scenario): use stored sub-question data
+				// Non-table sub-question (nested/scenario/linked): use stored sub-question data
 				detail.ParentQuestion = parent.Question
 				detail.ParentTitle = parent.Title
 				detail.QuestionTitle = parent.Title
@@ -460,7 +460,7 @@ func GetExamSession(c echo.Context) error {
 			if err := connection.DB.Preload("SubQuestions", func(db *gorm.DB) *gorm.DB {
 				return db.Order("id asc")
 			}).Where("id = ?", ans.QuestionID).First(&q).Error; err == nil {
-				if (q.Type == "table" || q.Type == "nested" || q.Type == "scenario") && len(q.SubQuestions) > 0 {
+			if (q.Type == "table" || q.Type == "nested" || q.Type == "scenario" || q.Type == "linked") && len(q.SubQuestions) > 0 {
 					var parentOpts []string
 					json.Unmarshal([]byte(q.OptionsJSON), &parentOpts)
 					for _, sub := range q.SubQuestions {

@@ -74,15 +74,29 @@ const PackageDetailPage: React.FC = () => {
   }, [ownedTx, ownsPackage]);
 
   const hasAccess = isPreviewMode || isPackageValid;
+
+  const totalQuestionsCount = useMemo(() => {
+    let total = 0;
+    for (const q of questions) {
+      if (q.type === 'linked' && q.sub_questions && q.sub_questions.length > 0) {
+        total += q.sub_questions.length;
+      } else {
+        total += 1;
+      }
+    }
+    return total;
+  }, [questions]);
+
   const headerData = useMemo(() => ({
     title: packageData?.title || 'Paket tidak ditemukan',
     description: packageData?.description || '',
     joinedCount: 0,
     duration: packageData?.duration ? `${packageData.duration} Menit` : 'Tryout',
+    questionCount: totalQuestionsCount,
     category: packageData?.category || 'Tryout',
     classes: packageData?.classes || [],
     subjects: packageData?.subjects || [],
-  }), [packageData]);
+  }), [packageData, totalQuestionsCount]);
 
   useEffect(() => {
     if (!slug) return;
@@ -229,15 +243,16 @@ const PackageDetailPage: React.FC = () => {
       key: 'soal',
       label: (
         <span className="flex items-center gap-2 px-2">
-          <ExperimentOutlined /> Soal
+          <ExperimentOutlined /> Soal ({totalQuestionsCount})
         </span>
       ),
       children: (
-        questions.length > 0 ? (
+        totalQuestionsCount > 0 ? (
           <QuestionGrid
-            count={questions.length}
+            count={totalQuestionsCount}
             duration={packageData?.duration || 45}
             answersLocked={!hasAccess}
+            rawQuestions={questions}
           />
         ) : (
           <Empty description="Belum ada soal untuk paket ini" className="py-12" />
