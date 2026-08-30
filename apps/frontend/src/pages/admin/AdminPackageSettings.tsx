@@ -33,13 +33,24 @@ const { Title, Text } = Typography;
 type QuestionType = 'single' | 'multiple' | 'nested' | 'table' | 'linked';
 type ScoringMethod = 'all_or_nothing' | 'partial';
 
+export interface SubQuestionTableRow {
+  id: string;
+  question: string;
+  discussion?: string;
+  correct: number;
+  points: number;
+}
+
 interface SubQuestion {
   id: string;
   type?: QuestionType;
+  title?: string;
   question: string;
   discussion: string;
   options: string[];
-  correct: number;
+  correct: number | number[];
+  rows?: SubQuestionTableRow[];
+  scoringMethod?: ScoringMethod;
   points: number;
 }
 
@@ -98,142 +109,33 @@ const normalizeCorrectForType = (type: QuestionType, correct: number | number[] 
   return indexes[0] ?? 0;
 };
 
-// ─── COMPONENT: Sub-Question Editor ─────────────────────────
-interface SubQuestionEditorProps {
-  sub: SubQuestion;
-  index: number;
-  onUpdate: (updatedSub: SubQuestion) => void;
-  onDelete: () => void;
+// ─── COMPONENT: Table Matrix Editor (Reusable) ───────────────
+interface TableMatrixEditorProps {
+  title: string;
+  columns: string[];
+  rows: SubQuestionTableRow[];
+  onChangeTitle: (newTitle: string) => void;
+  onChangeColumns: (nextCols: string[]) => void;
+  onChangeRows: (nextRows: SubQuestionTableRow[]) => void;
 }
 
-const SubQuestionEditor: React.FC<SubQuestionEditorProps> = React.memo(({
-  sub,
-  index,
-  onUpdate,
-  onDelete,
-}) => (
-  <div className="p-5 bg-white dark:bg-zinc-800/80 rounded-2xl border border-on-surface/5 mb-6 relative group shadow-sm">
-    <div className="flex items-center justify-between mb-4">
-      <div className="flex items-center gap-3">
-        <Tag className="rounded-lg bg-primary text-white border-none font-black px-4 py-1">Pertanyaan {index + 1}</Tag>
-        <div className="flex items-center gap-2 px-3 py-1 bg-on-surface/5 rounded-lg border border-on-surface/10">
-          <Text className="text-[10px] font-black uppercase text-on-surface/40">Poin</Text>
-          <InputNumber
-            size="small"
-            min={0}
-            value={sub.points}
-            onChange={val => onUpdate({ ...sub, points: Number(val) || 0 })}
-            className="w-16 rounded-lg font-bold text-xs"
-            controls={false}
-          />
-        </div>
-      </div>
-      <Button
-        danger
-        type="text"
-        icon={<DeleteOutlined />}
-        size="small"
-        className="hover:bg-red-50 dark:hover:bg-red-900/20"
-        onClick={onDelete}
-      />
-    </div>
-
-    <div className="mb-6">
-      <KantanEditor
-        value={sub.question}
-        onChange={val => onUpdate({ ...sub, question: val })}
-        placeholder="Tulis pertanyaan sub-soal di sini..."
-        rows={3}
-        label={`Pertanyaan #${index + 1}`}
-      />
-      {hasPreviewContent(sub.question) && (
-        <div className="mt-3 p-4 rounded-xl bg-surface-low/30 dark:bg-zinc-900/40 border border-on-surface/5">
-          <div className="flex items-center justify-between mb-2">
-            <Text className="text-[10px] font-black uppercase text-on-surface/40 tracking-wider">Live Preview Sub-Pertanyaan (LaTeX)</Text>
-            <Tag color="blue" className="rounded-full border-none text-[8px] font-black uppercase m-0">KaTeX</Tag>
-          </div>
-          <div className="blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none font-sans text-on-surface/90 dark:text-zinc-200" dangerouslySetInnerHTML={{ __html: renderContent(sub.question) }} />
-        </div>
-      )}
-    </div>
-
-    <div className="mb-6">
-      <Text className="text-[10px] font-black uppercase text-on-surface/40 block mb-2">Pembahasan Singkat Sub-Soal</Text>
-      <KantanEditor
-        value={sub.discussion}
-        onChange={val => onUpdate({ ...sub, discussion: val })}
-        placeholder="Tulis pembahasan singkat sub-soal di sini..."
-        rows={3}
-        label={`Pembahasan #${index + 1}`}
-      />
-      {hasPreviewContent(sub.discussion) && (
-        <div className="mt-3 p-4 rounded-xl bg-green-500/5 dark:bg-green-900/10 border border-green-500/20">
-          <div className="flex items-center justify-between mb-2">
-            <Text className="text-[10px] font-black uppercase text-green-600/70 dark:text-green-400/70 tracking-wider">Preview Pembahasan Sub-Soal (LaTeX)</Text>
-            <Tag color="green" className="rounded-full border-none text-[8px] font-black uppercase m-0">KaTeX</Tag>
-          </div>
-          <div className="blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none text-green-800 dark:text-green-300" dangerouslySetInnerHTML={{ __html: renderContent(sub.discussion) }} />
-        </div>
-      )}
-    </div>
-
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      {sub.options.map((opt, oi) => (
-        <div key={oi} className="flex flex-col gap-2">
-          <div className="flex items-start gap-2">
-            <div
-              onClick={() => onUpdate({ ...sub, correct: oi })}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs cursor-pointer border-2 shadow-sm transition-all shrink-0 mt-1
-                ${sub.correct === oi ? 'bg-green-500 border-green-500 text-white' : 'bg-white dark:bg-zinc-700 border-on-surface/10 text-on-surface/40'}`}
-            >
-              {String.fromCharCode(65 + oi)}
-            </div>
-            <KantanEditor
-              value={opt}
-              onChange={val => {
-                const nextOptions = sub.options.map((o, idx) => (idx === oi ? val : o));
-                onUpdate({ ...sub, options: nextOptions });
-              }}
-              placeholder={`Opsi ${String.fromCharCode(65 + oi)}`}
-              rows={2}
-              className="flex-1"
-            />
-          </div>
-          {hasPreviewContent(opt) && (
-            <div className="ml-10 px-3 py-1.5 bg-primary/5 rounded-xl border border-primary/10 text-xs blog-content kantan-quill-preview prose prose-xs dark:prose-invert max-w-none kantan-option-math">
-              <span className="font-bold text-primary mr-1.5 text-xs">{String.fromCharCode(65 + oi)}.</span>
-              <div className="inline-block" dangerouslySetInnerHTML={{ __html: renderContent(opt) }} />
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  </div>
-));
-
-// ─── COMPONENT: Table Question Editor ───────────────────────
-interface TableQuestionEditorProps {
-  question: Question;
-  onUpdate: (updatedQuestion: Partial<Question>) => void;
-}
-
-const TableQuestionEditor: React.FC<TableQuestionEditorProps> = React.memo(({
-  question,
-  onUpdate,
+const TableMatrixEditor: React.FC<TableMatrixEditorProps> = React.memo(({
+  title,
+  columns,
+  rows,
+  onChangeTitle,
+  onChangeColumns,
+  onChangeRows,
 }) => {
-  const columns = question.options && question.options.length >= 2 ? question.options : ['Benar', 'Salah'];
-  const statementTitle = question.title || 'Pernyataan';
-  const rows = question.subQuestions || [];
-
   const handleUpdateColumnTitle = (colIdx: number, newTitle: string) => {
     const nextCols = [...columns];
     nextCols[colIdx] = newTitle;
-    onUpdate({ options: nextCols });
+    onChangeColumns(nextCols);
   };
 
   const handleAddColumn = () => {
     const nextCols = [...columns, `Pilihan ${String.fromCharCode(65 + columns.length)}`];
-    onUpdate({ options: nextCols });
+    onChangeColumns(nextCols);
   };
 
   const handleRemoveColumn = (colIdx: number) => {
@@ -242,7 +144,7 @@ const TableQuestionEditor: React.FC<TableQuestionEditorProps> = React.memo(({
       return;
     }
     const nextCols = columns.filter((_, idx) => idx !== colIdx);
-    const nextSubs = rows.map(sub => {
+    const nextRows = rows.map(sub => {
       const currentCorrect = typeof sub.correct === 'number' ? sub.correct : 0;
       let newCorrect = currentCorrect;
       if (currentCorrect === colIdx) {
@@ -252,25 +154,24 @@ const TableQuestionEditor: React.FC<TableQuestionEditorProps> = React.memo(({
       }
       return { ...sub, correct: newCorrect };
     });
-    onUpdate({ options: nextCols, subQuestions: nextSubs });
+    onChangeColumns(nextCols);
+    onChangeRows(nextRows);
   };
 
   const handleAddRow = () => {
-    const newRow: SubQuestion = {
+    const newRow: SubQuestionTableRow = {
       id: Date.now().toString(),
-      type: 'single',
       question: '',
       discussion: '',
-      options: [],
       correct: 0,
       points: 1,
     };
-    onUpdate({ subQuestions: [...rows, newRow] });
+    onChangeRows([...rows, newRow]);
   };
 
-  const handleUpdateRow = (rowIdx: number, updatedRow: Partial<SubQuestion>) => {
-    const nextSubs = rows.map((r, idx) => (idx === rowIdx ? { ...r, ...updatedRow } : r));
-    onUpdate({ subQuestions: nextSubs });
+  const handleUpdateRow = (rowIdx: number, updatedRow: Partial<SubQuestionTableRow>) => {
+    const nextRows = rows.map((r, idx) => (idx === rowIdx ? { ...r, ...updatedRow } : r));
+    onChangeRows(nextRows);
   };
 
   const handleDeleteRow = (rowIdx: number) => {
@@ -278,14 +179,14 @@ const TableQuestionEditor: React.FC<TableQuestionEditorProps> = React.memo(({
       message.warning('Minimal harus ada 1 baris pernyataan');
       return;
     }
-    const nextSubs = rows.filter((_, idx) => idx !== rowIdx);
-    onUpdate({ subQuestions: nextSubs });
+    const nextRows = rows.filter((_, idx) => idx !== rowIdx);
+    onChangeRows(nextRows);
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* ── 1. HEADER & KOLOM CONFIGURATION ── */}
-      <div className="p-6 bg-surface-low/50 dark:bg-zinc-800/60 rounded-3xl border border-on-surface/10 space-y-6">
+      <div className="p-5 bg-surface-low/50 dark:bg-zinc-800/60 rounded-3xl border border-on-surface/10 space-y-5">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
             <Title level={5} className="!m-0 !font-manrope !font-black text-on-surface">
@@ -307,20 +208,18 @@ const TableQuestionEditor: React.FC<TableQuestionEditorProps> = React.memo(({
         </div>
 
         <Row gutter={[16, 16]}>
-          {/* Judul Kolom Baris / Pernyataan */}
           <Col xs={24} sm={10}>
             <Text className="text-[10px] font-black uppercase tracking-wider text-on-surface/50 block mb-1">
               Judul Kolom Pernyataan
             </Text>
             <Input
-              value={statementTitle}
-              onChange={e => onUpdate({ title: e.target.value })}
+              value={title}
+              onChange={e => onChangeTitle(e.target.value)}
               placeholder="Contoh: Pernyataan, Karakteristik, dll."
               className="rounded-xl font-semibold h-10 bg-white dark:bg-zinc-700"
             />
           </Col>
 
-          {/* Kolom Opsi Jawaban */}
           <Col xs={24} sm={14}>
             <Text className="text-[10px] font-black uppercase tracking-wider text-on-surface/50 block mb-1">
               Kolom Pilihan Jawaban ({columns.length} Kolom)
@@ -373,15 +272,14 @@ const TableQuestionEditor: React.FC<TableQuestionEditorProps> = React.memo(({
           </Button>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-5">
           {rows.map((row, rIdx) => {
             const currentCorrect = typeof row.correct === 'number' ? row.correct : 0;
             return (
               <div
                 key={row.id || String(rIdx)}
-                className="p-6 bg-white dark:bg-zinc-800/80 rounded-3xl border border-on-surface/10 shadow-sm space-y-5"
+                className="p-5 bg-white dark:bg-zinc-800/80 rounded-2xl border border-on-surface/10 shadow-sm space-y-4"
               >
-                {/* Row Header */}
                 <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-on-surface/5">
                   <div className="flex items-center gap-3">
                     <Tag className="rounded-xl bg-primary text-white border-none font-black text-xs px-3 py-1">
@@ -412,7 +310,6 @@ const TableQuestionEditor: React.FC<TableQuestionEditorProps> = React.memo(({
                   </Button>
                 </div>
 
-                {/* Row Statement Editor */}
                 <div>
                   <Text className="text-[10px] font-black uppercase tracking-wider text-on-surface/40 block mb-1">
                     Teks Pernyataan #{rIdx + 1}
@@ -425,7 +322,7 @@ const TableQuestionEditor: React.FC<TableQuestionEditorProps> = React.memo(({
                     label={`Pernyataan #${rIdx + 1}`}
                   />
                   {hasPreviewContent(row.question) && (
-                    <div className="mt-3 p-4 rounded-2xl bg-surface-low/30 dark:bg-zinc-900/40 border border-on-surface/5">
+                    <div className="mt-3 p-4 rounded-xl bg-surface-low/30 dark:bg-zinc-900/40 border border-on-surface/5">
                       <div className="flex items-center justify-between mb-2">
                         <Text className="text-[10px] font-black uppercase text-primary tracking-wider">Preview Pernyataan (KaTeX)</Text>
                         <Tag color="blue" className="rounded-full border-none text-[8px] font-black uppercase m-0">KaTeX</Tag>
@@ -435,8 +332,7 @@ const TableQuestionEditor: React.FC<TableQuestionEditorProps> = React.memo(({
                   )}
                 </div>
 
-                {/* Kunci Jawaban (Radio Selector across Dynamic Columns) */}
-                <div className="p-4 rounded-2xl bg-surface-low/40 dark:bg-zinc-900/50 border border-on-surface/5">
+                <div className="p-4 rounded-xl bg-surface-low/40 dark:bg-zinc-900/50 border border-on-surface/5">
                   <Text className="text-[10px] font-black uppercase tracking-wider text-on-surface/50 block mb-3">
                     Kunci Jawaban Benar Baris #{rIdx + 1}:
                   </Text>
@@ -447,7 +343,7 @@ const TableQuestionEditor: React.FC<TableQuestionEditorProps> = React.memo(({
                         <div
                           key={cIdx}
                           onClick={() => handleUpdateRow(rIdx, { correct: cIdx })}
-                          className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-all ${
+                          className={`flex items-center gap-3 px-4 py-2 rounded-xl border-2 cursor-pointer transition-all ${
                             isSelected
                               ? 'bg-green-500/10 border-green-500 shadow-sm text-green-700 dark:text-green-300 font-bold'
                               : 'bg-white dark:bg-zinc-800 border-on-surface/10 text-on-surface/70 hover:border-primary/40'
@@ -471,25 +367,24 @@ const TableQuestionEditor: React.FC<TableQuestionEditorProps> = React.memo(({
                   </div>
                 </div>
 
-                {/* Row Discussion */}
                 <div>
                   <Text className="text-[10px] font-black uppercase tracking-wider text-on-surface/40 block mb-1">
                     Pembahasan Baris #{rIdx + 1} (Opsional)
                   </Text>
                   <KantanEditor
-                    value={row.discussion}
+                    value={row.discussion || ''}
                     onChange={val => handleUpdateRow(rIdx, { discussion: val })}
                     placeholder="Tuliskan alasan atau pembahasan untuk baris ini..."
                     rows={2}
                     label={`Pembahasan #${rIdx + 1}`}
                   />
                   {hasPreviewContent(row.discussion) && (
-                    <div className="mt-3 p-4 rounded-2xl bg-green-500/5 dark:bg-green-900/10 border border-green-500/20">
+                    <div className="mt-3 p-4 rounded-xl bg-green-500/5 dark:bg-green-900/10 border border-green-500/20">
                       <div className="flex items-center justify-between mb-2">
                         <Text className="text-[10px] font-black uppercase text-green-600 dark:text-green-400 tracking-wider">Preview Pembahasan (KaTeX)</Text>
                         <Tag color="green" className="rounded-full border-none text-[8px] font-black uppercase m-0">KaTeX</Tag>
                       </div>
-                      <div className="blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none text-green-800 dark:text-green-300 font-sans" dangerouslySetInnerHTML={{ __html: renderContent(row.discussion) }} />
+                      <div className="blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none text-green-800 dark:text-green-300 font-sans" dangerouslySetInnerHTML={{ __html: renderContent(row.discussion || '') }} />
                     </div>
                   )}
                 </div>
@@ -498,6 +393,427 @@ const TableQuestionEditor: React.FC<TableQuestionEditorProps> = React.memo(({
           })}
         </div>
       </div>
+    </div>
+  );
+});
+
+// ─── COMPONENT: Table Question Editor (Parent) ──────────────
+interface TableQuestionEditorProps {
+  question: Question;
+  onUpdate: (updatedQuestion: Partial<Question>) => void;
+}
+
+const TableQuestionEditor: React.FC<TableQuestionEditorProps> = React.memo(({
+  question,
+  onUpdate,
+}) => {
+  const columns = question.options && question.options.length >= 2 ? question.options : ['Benar', 'Salah'];
+  const statementTitle = question.title || 'Pernyataan';
+  const rows: SubQuestionTableRow[] = (question.subQuestions || []).map((s, idx) => ({
+    id: s.id || String(idx + 1),
+    question: s.question || '',
+    discussion: s.discussion || '',
+    correct: typeof s.correct === 'number' ? s.correct : 0,
+    points: s.points || 1,
+  }));
+
+  return (
+    <TableMatrixEditor
+      title={statementTitle}
+      columns={columns}
+      rows={rows}
+      onChangeTitle={newTitle => onUpdate({ title: newTitle })}
+      onChangeColumns={nextCols => onUpdate({ options: nextCols })}
+      onChangeRows={nextRows => onUpdate({
+        subQuestions: nextRows.map(r => ({
+          id: r.id,
+          type: 'single',
+          question: r.question,
+          discussion: r.discussion || '',
+          options: [],
+          correct: r.correct,
+          points: r.points,
+        }))
+      })}
+    />
+  );
+});
+
+// ─── COMPONENT: Sub-Question Editor ─────────────────────────
+interface SubQuestionEditorProps {
+  sub: SubQuestion;
+  index: number;
+  onUpdate: (updatedSub: SubQuestion) => void;
+  onDelete: () => void;
+}
+
+const SubQuestionEditor: React.FC<SubQuestionEditorProps> = React.memo(({
+  sub,
+  index,
+  onUpdate,
+  onDelete,
+}) => {
+  const subType: QuestionType = sub.type || 'single';
+  const options = (sub.options && sub.options.length > 0) ? sub.options : ['', '', '', '', ''];
+  const correctIndexes = getCorrectIndexes(sub.correct);
+  const rows: SubQuestionTableRow[] = (sub.rows && sub.rows.length > 0)
+    ? sub.rows
+    : [
+        { id: '1', question: '', discussion: '', correct: 0, points: 1 },
+        { id: '2', question: '', discussion: '', correct: 1, points: 1 },
+      ];
+  const tableCols = (sub.options && sub.options.length >= 2) ? sub.options : ['Benar', 'Salah'];
+
+  const handleTypeChange = (newType: QuestionType) => {
+    if (newType === 'table') {
+      const defaultRows: SubQuestionTableRow[] = (sub.rows && sub.rows.length > 0) ? sub.rows : [
+        { id: '1', question: '', discussion: '', correct: 0, points: 1 },
+        { id: '2', question: '', discussion: '', correct: 1, points: 1 },
+      ];
+      const defaultCols = (sub.options && sub.options.length >= 2) ? sub.options : ['Benar', 'Salah'];
+      const totalPts = defaultRows.reduce((s, r) => s + (Number(r.points) || 0), 0);
+      onUpdate({
+        ...sub,
+        type: 'table',
+        title: sub.title || 'Pernyataan',
+        options: defaultCols,
+        rows: defaultRows,
+        points: totalPts,
+      });
+    } else if (newType === 'multiple') {
+      const nextOpts = (!sub.options || sub.options.length < 2) ? ['', '', '', '', ''] : sub.options;
+      const currentCorrectArr = getCorrectIndexes(sub.correct);
+      const nextCorrect = currentCorrectArr.length > 0 ? currentCorrectArr : [0];
+      onUpdate({
+        ...sub,
+        type: 'multiple',
+        options: nextOpts,
+        correct: nextCorrect,
+        scoringMethod: sub.scoringMethod || 'all_or_nothing',
+        points: sub.points || 1,
+      });
+    } else {
+      // single
+      const nextOpts = (!sub.options || sub.options.length < 2) ? ['', '', '', '', ''] : sub.options;
+      const singleCorrect = Array.isArray(sub.correct) ? (sub.correct[0] ?? 0) : (typeof sub.correct === 'number' ? sub.correct : 0);
+      onUpdate({
+        ...sub,
+        type: 'single',
+        options: nextOpts,
+        correct: singleCorrect,
+        points: sub.points || 1,
+      });
+    }
+  };
+
+  const toggleCorrect = (oi: number) => {
+    if (subType === 'single') {
+      onUpdate({ ...sub, correct: oi });
+    } else if (subType === 'multiple') {
+      const current = getCorrectIndexes(sub.correct);
+      let next: number[];
+      if (current.includes(oi)) {
+        if (current.length === 1) {
+          message.warning('Minimal harus ada 1 jawaban benar');
+          return;
+        }
+        next = current.filter(i => i !== oi);
+      } else {
+        next = [...current, oi].sort((a, b) => a - b);
+      }
+      onUpdate({ ...sub, correct: next });
+    }
+  };
+
+  const handleAddOption = () => {
+    onUpdate({ ...sub, options: [...options, ''] });
+  };
+
+  const handleRemoveOption = (oi: number) => {
+    if (options.length <= 2) {
+      message.warning('Minimal harus ada 2 opsi pilihan');
+      return;
+    }
+    const nextOptions = options.filter((_, idx) => idx !== oi);
+    if (subType === 'single') {
+      let nextCorrect = typeof sub.correct === 'number' ? sub.correct : 0;
+      if (nextCorrect === oi) {
+        nextCorrect = 0;
+      } else if (nextCorrect > oi) {
+        nextCorrect -= 1;
+      }
+      onUpdate({ ...sub, options: nextOptions, correct: nextCorrect });
+    } else {
+      const current = getCorrectIndexes(sub.correct);
+      const filtered = current.filter(i => i !== oi).map(i => i > oi ? i - 1 : i);
+      const nextCorrect = filtered.length > 0 ? filtered : [0];
+      onUpdate({ ...sub, options: nextOptions, correct: nextCorrect });
+    }
+  };
+
+  return (
+    <div className="p-6 bg-white dark:bg-zinc-800/90 rounded-3xl border border-on-surface/10 mb-8 relative group shadow-sm space-y-6">
+      {/* Top Header Controls */}
+      <div className="flex items-center justify-between flex-wrap gap-3 pb-4 border-b border-on-surface/5">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Tag className="rounded-xl bg-primary text-white border-none font-black px-4 py-1.5 text-xs">
+            Pertanyaan #{index + 1}
+          </Tag>
+
+          {/* Question Type Selector */}
+          <div className="flex items-center gap-2">
+            <Text className="text-[10px] font-black uppercase tracking-wider text-on-surface/40">Tipe:</Text>
+            <Select
+              value={subType}
+              onChange={handleTypeChange}
+              options={[
+                { value: 'single', label: 'Single Choice' },
+                { value: 'multiple', label: 'Multiple Choice' },
+                { value: 'table', label: 'Tabel / Pernyataan' },
+              ]}
+              className="w-44 font-bold rounded-xl"
+            />
+          </div>
+
+          {/* Points */}
+          <div className="flex items-center gap-2 px-3 py-1 bg-on-surface/5 rounded-xl border border-on-surface/10">
+            <Text className="text-[10px] font-black uppercase text-on-surface/40">Poin</Text>
+            <InputNumber
+              size="small"
+              min={0}
+              value={subType === 'table' ? rows.reduce<number>((s, r) => s + (Number(r.points) || 0), 0) : sub.points}
+              disabled={subType === 'table'}
+              addonAfter={subType === 'table' ? 'auto' : undefined}
+              onChange={val => onUpdate({ ...sub, points: Number(val) || 0 })}
+              className="w-20 rounded-lg font-bold text-xs"
+              controls={false}
+            />
+          </div>
+
+          {/* Scoring Method (for multiple choice) */}
+          {subType === 'multiple' && (
+            <div className="flex items-center gap-2">
+              <Text className="text-[10px] font-black uppercase text-on-surface/40">Skor:</Text>
+              <Select
+                value={sub.scoringMethod || 'all_or_nothing'}
+                onChange={val => onUpdate({ ...sub, scoringMethod: val as ScoringMethod })}
+                options={[
+                  { value: 'all_or_nothing', label: 'Semua Benar (All or Nothing)' },
+                  { value: 'partial', label: 'Parsial (Proporsional)' },
+                ]}
+                className="w-48 text-xs font-semibold rounded-xl"
+              />
+            </div>
+          )}
+        </div>
+
+        <Button
+          danger
+          type="text"
+          icon={<DeleteOutlined />}
+          size="middle"
+          className="hover:bg-red-50 dark:hover:bg-red-900/20 font-bold"
+          onClick={onDelete}
+        >
+          Hapus Soal
+        </Button>
+      </div>
+
+      {/* QUESTION BODY DEPENDING ON TYPE */}
+      {subType === 'table' ? (
+        <div className="space-y-6">
+          {/* Table Instructions / Prompt */}
+          <div>
+            <Text className="text-[10px] font-black uppercase tracking-wider text-on-surface/40 block mb-1">
+              Petunjuk / Soal Pengantar Tabel #{index + 1}
+            </Text>
+            <KantanEditor
+              value={sub.question}
+              onChange={val => onUpdate({ ...sub, question: val })}
+              placeholder="Contoh: Berdasarkan teks bacaan di samping, tentukan apakah pernyataan-pernyataan berikut Benar atau Salah..."
+              rows={3}
+              label={`Petunjuk Soal #${index + 1}`}
+            />
+            {hasPreviewContent(sub.question) && (
+              <div className="mt-3 p-4 rounded-2xl bg-surface-low/30 dark:bg-zinc-900/40 border border-on-surface/5">
+                <div className="flex items-center justify-between mb-2">
+                  <Text className="text-[10px] font-black uppercase text-primary tracking-wider">Preview Petunjuk (KaTeX)</Text>
+                  <Tag color="blue" className="rounded-full border-none text-[8px] font-black uppercase m-0">KaTeX</Tag>
+                </div>
+                <div className="blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none text-on-surface/90 dark:text-zinc-200 font-sans" dangerouslySetInnerHTML={{ __html: renderContent(sub.question) }} />
+              </div>
+            )}
+          </div>
+
+          {/* Interactive Table Matrix Editor */}
+          <TableMatrixEditor
+            title={sub.title || 'Pernyataan'}
+            columns={tableCols}
+            rows={rows}
+            onChangeTitle={newTitle => onUpdate({ ...sub, title: newTitle })}
+            onChangeColumns={nextCols => onUpdate({ ...sub, options: nextCols })}
+            onChangeRows={nextRows => {
+              const totalPts = nextRows.reduce<number>((s, r) => s + (Number(r.points) || 0), 0);
+              onUpdate({ ...sub, rows: nextRows, points: totalPts });
+            }}
+          />
+
+          {/* Overall discussion for table */}
+          <div>
+            <Text className="text-[10px] font-black uppercase tracking-wider text-on-surface/40 block mb-1">
+              Pembahasan Umum Soal Tabel #{index + 1} (Opsional)
+            </Text>
+            <KantanEditor
+              value={sub.discussion || ''}
+              onChange={val => onUpdate({ ...sub, discussion: val })}
+              placeholder="Tuliskan rangkuman pembahasan untuk soal tabel ini..."
+              rows={2}
+              label={`Pembahasan Tabel #${index + 1}`}
+            />
+            {hasPreviewContent(sub.discussion) && (
+              <div className="mt-3 p-4 rounded-2xl bg-green-500/5 dark:bg-green-900/10 border border-green-500/20">
+                <div className="flex items-center justify-between mb-2">
+                  <Text className="text-[10px] font-black uppercase text-green-600 dark:text-green-400 tracking-wider">Preview Pembahasan (KaTeX)</Text>
+                  <Tag color="green" className="rounded-full border-none text-[8px] font-black uppercase m-0">KaTeX</Tag>
+                </div>
+                <div className="blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none text-green-800 dark:text-green-300 font-sans" dangerouslySetInnerHTML={{ __html: renderContent(sub.discussion || '') }} />
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* Single or Multiple Choice */
+        <div className="space-y-6">
+          {/* Question Text */}
+          <div>
+            <Text className="text-[10px] font-black uppercase tracking-wider text-on-surface/40 block mb-1">
+              Pertanyaan #{index + 1}
+            </Text>
+            <KantanEditor
+              value={sub.question}
+              onChange={val => onUpdate({ ...sub, question: val })}
+              placeholder="Tulis pertanyaan sub-soal di sini..."
+              rows={3}
+              label={`Pertanyaan #${index + 1}`}
+            />
+            {hasPreviewContent(sub.question) && (
+              <div className="mt-3 p-4 rounded-xl bg-surface-low/30 dark:bg-zinc-900/40 border border-on-surface/5">
+                <div className="flex items-center justify-between mb-2">
+                  <Text className="text-[10px] font-black uppercase text-on-surface/40 tracking-wider">Live Preview Sub-Pertanyaan (LaTeX)</Text>
+                  <Tag color="blue" className="rounded-full border-none text-[8px] font-black uppercase m-0">KaTeX</Tag>
+                </div>
+                <div className="blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none font-sans text-on-surface/90 dark:text-zinc-200" dangerouslySetInnerHTML={{ __html: renderContent(sub.question) }} />
+              </div>
+            )}
+          </div>
+
+          {/* Options Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <Text className="text-xs font-black uppercase tracking-wider text-on-surface/50 block">
+                Opsi Pilihan Jawaban & Kunci
+              </Text>
+              <Text className="text-[11px] text-on-surface/40">
+                {subType === 'single' ? 'Pilih 1 opsi yang merupakan kunci jawaban benar.' : 'Centang semua opsi yang merupakan kunci jawaban benar.'}
+              </Text>
+            </div>
+            <Button
+              type="dashed"
+              icon={<PlusOutlined />}
+              size="small"
+              onClick={handleAddOption}
+              className="rounded-xl font-bold text-xs"
+            >
+              Tambah Opsi
+            </Button>
+          </div>
+
+          {/* Options Grid */}
+          <div className="grid grid-cols-1 gap-3">
+            {options.map((opt, oi) => {
+              const isCorrect = subType === 'single' ? sub.correct === oi : correctIndexes.includes(oi);
+              return (
+                <div key={oi} className="flex flex-col gap-1.5 p-3 rounded-2xl border transition-all bg-surface-low/30 dark:bg-zinc-900/40 border-on-surface/5">
+                  <div className="flex items-start gap-3">
+                    {subType === 'single' ? (
+                      <Radio
+                        checked={sub.correct === oi}
+                        onChange={() => toggleCorrect(oi)}
+                        className="scale-110 mt-2.5"
+                      />
+                    ) : (
+                      <Checkbox
+                        checked={correctIndexes.includes(oi)}
+                        onChange={() => toggleCorrect(oi)}
+                        className="scale-110 mt-2.5"
+                      />
+                    )}
+                    <div
+                      onClick={() => toggleCorrect(oi)}
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs cursor-pointer border-2 shadow-sm transition-all shrink-0 mt-0.5 ${
+                        isCorrect
+                          ? 'bg-green-500 border-green-500 text-white shadow-green-500/20'
+                          : 'bg-white dark:bg-zinc-700 border-on-surface/10 text-on-surface/50 hover:border-primary/40'
+                      }`}
+                    >
+                      {String.fromCharCode(65 + oi)}
+                    </div>
+                    <div className="flex-1">
+                      <KantanEditor
+                        value={opt}
+                        onChange={val => {
+                          const nextOptions = options.map((o, idx) => (idx === oi ? val : o));
+                          onUpdate({ ...sub, options: nextOptions });
+                        }}
+                        placeholder={`Opsi ${String.fromCharCode(65 + oi)}`}
+                        rows={2}
+                        className="w-full"
+                      />
+                    </div>
+                    {options.length > 2 && (
+                      <Button
+                        type="text"
+                        danger
+                        icon={<DeleteOutlined />}
+                        size="small"
+                        onClick={() => handleRemoveOption(oi)}
+                        className="mt-1 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      />
+                    )}
+                  </div>
+                  {hasPreviewContent(opt) && (
+                    <div className="ml-16 px-3.5 py-1.5 bg-primary/5 rounded-xl border border-primary/10 text-xs blog-content kantan-quill-preview prose prose-xs dark:prose-invert max-w-none kantan-option-math">
+                      <span className="font-bold text-primary mr-1.5 text-xs">{String.fromCharCode(65 + oi)}.</span>
+                      <div className="inline-block" dangerouslySetInnerHTML={{ __html: renderContent(opt) }} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Discussion */}
+          <div>
+            <Text className="text-[10px] font-black uppercase text-on-surface/40 block mb-1">Pembahasan Singkat Sub-Soal #{index + 1}</Text>
+            <KantanEditor
+              value={sub.discussion}
+              onChange={val => onUpdate({ ...sub, discussion: val })}
+              placeholder="Tulis pembahasan singkat sub-soal di sini..."
+              rows={3}
+              label={`Pembahasan #${index + 1}`}
+            />
+            {hasPreviewContent(sub.discussion) && (
+              <div className="mt-3 p-4 rounded-xl bg-green-500/5 dark:bg-green-900/10 border border-green-500/20">
+                <div className="flex items-center justify-between mb-2">
+                  <Text className="text-[10px] font-black uppercase text-green-600/70 dark:text-green-400/70 tracking-wider">Preview Pembahasan Sub-Soal (LaTeX)</Text>
+                  <Tag color="green" className="rounded-full border-none text-[8px] font-black uppercase m-0">KaTeX</Tag>
+                </div>
+                <div className="blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none text-green-800 dark:text-green-300" dangerouslySetInnerHTML={{ __html: renderContent(sub.discussion) }} />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 });
@@ -529,7 +845,13 @@ const AdminPackageSettings: React.FC = () => {
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
 
   const getScenarioPoints = (question: Question) =>
-    (question.subQuestions || []).reduce((sum, sub) => sum + (Number(sub.points) || 0), 0);
+    (question.subQuestions || []).reduce((sum, sub) => {
+      if (sub.type === 'table') {
+        const rowSum = (sub.rows || []).reduce((rSum, r) => rSum + (Number(r.points) || 0), 0);
+        return sum + (rowSum || sub.points || 0);
+      }
+      return sum + (Number(sub.points) || 0);
+    }, 0);
 
   const getEffectivePoints = (question: Question) =>
     (question.type === 'nested' || question.type === 'table' || question.type === 'linked') ? getScenarioPoints(question) : question.points;
@@ -548,11 +870,16 @@ const AdminPackageSettings: React.FC = () => {
     sub_questions: (question.subQuestions || []).map(sub => ({
       id: sub.id,
       type: sub.type || 'single' as QuestionType,
+      title: sub.title || '',
       question: sub.question,
       discussion: sub.discussion,
-      options: sub.options,
+      options: sub.options || (sub.type === 'table' ? ['Benar', 'Salah'] : []),
       correct: normalizeCorrectForType(sub.type || 'single', sub.correct),
-      points: sub.points,
+      rows: sub.rows || [],
+      scoring_method: sub.type === 'multiple' ? (sub.scoringMethod || 'all_or_nothing') : 'all_or_nothing',
+      points: sub.type === 'table'
+        ? (sub.rows || []).reduce((rSum, r) => rSum + (Number(r.points) || 0), 0)
+        : (Number(sub.points) || 0),
     })),
   });
 
@@ -575,7 +902,16 @@ const AdminPackageSettings: React.FC = () => {
       subQuestions: (question.sub_questions || []).map((sub: any) => ({
         ...sub,
         type: sub.type || 'single',
+        title: sub.title || (sub.type === 'table' ? 'Pernyataan' : ''),
+        options: sub.options || (sub.type === 'table' ? ['Benar', 'Salah'] : ['', '', '', '', '']),
         correct: normalizeCorrectForType(sub.type || 'single', sub.correct),
+        rows: sub.rows || [],
+        scoringMethod: sub.scoring_method || 'all_or_nothing',
+        points: sub.type === 'table'
+          ? (sub.rows && sub.rows.length > 0
+              ? sub.rows.reduce((rSum: number, r: any) => rSum + (Number(r.points) || 0), 0)
+              : Number(sub.points) || 1)
+          : Number(sub.points) || 1,
       })),
     };
   };
@@ -1410,52 +1746,141 @@ const AdminPackageSettings: React.FC = () => {
                   <Text className="text-xs font-black uppercase tracking-wider text-on-surface/40 block">
                     Soal-Soal ({activeQ.subQuestions?.length || 0} nomor — masing-masing tampil sebagai nomor terpisah):
                   </Text>
-                  {activeQ.subQuestions?.map((sub, si) => (
-                    <div key={sub.id || si} className="p-5 rounded-2xl bg-white dark:bg-zinc-800/40 border border-on-surface/10 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <Tag className="rounded-lg bg-green-500 text-white border-none font-black text-xs px-3 py-0.5">
-                          Soal #{si + 1}
-                        </Tag>
-                        <Text className="text-xs font-bold text-on-surface/50">{sub.points} Poin</Text>
-                      </div>
-                      <div
-                        className="blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none text-on-surface/90 dark:text-zinc-200 font-sans"
-                        dangerouslySetInnerHTML={{ __html: renderContent(sub.question) }}
-                      />
-                      <div className="space-y-2">
-                        {sub.options.map((opt, oi) => {
-                          if (!opt && !hasPreviewContent(opt)) return null;
-                          const isCorrect = sub.correct === oi;
-                          return (
-                            <div
-                              key={oi}
-                              className={`p-3 rounded-xl border flex items-start gap-3 ${
-                                isCorrect
-                                  ? 'bg-green-50 dark:bg-green-900/20 border-green-500'
-                                  : 'bg-surface-low/30 dark:bg-zinc-800 border-on-surface/5'
-                              }`}
-                            >
-                              <div
-                                className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
-                                  isCorrect ? 'bg-green-500 text-white' : 'bg-surface-low dark:bg-zinc-700 text-on-surface/60'
-                                }`}
-                              >
-                                {String.fromCharCode(65 + oi)}
-                              </div>
-                              <div className="flex-1 blog-content kantan-quill-preview prose prose-xs dark:prose-invert max-w-none font-sans" dangerouslySetInnerHTML={{ __html: renderContent(opt) }} />
-                              {isCorrect && <Tag color="success" className="rounded-full border-none font-bold text-[10px]">Kunci</Tag>}
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {hasPreviewContent(sub.discussion) && (
-                        <div className="p-3.5 rounded-xl bg-green-500/5 dark:bg-green-900/10 border border-green-500/20 text-xs">
-                          <Text className="text-[10px] font-black uppercase text-green-600 block mb-1">Pembahasan:</Text>
-                          <div className="blog-content kantan-quill-preview prose prose-xs dark:prose-invert max-w-none text-green-800 dark:text-green-300" dangerouslySetInnerHTML={{ __html: renderContent(sub.discussion) }} />
+                  {activeQ.subQuestions?.map((sub, si) => {
+                    const subType = sub.type || 'single';
+                    const correctIdxs = getCorrectIndexes(sub.correct);
+                    const subPoints = subType === 'table'
+                      ? (sub.rows || []).reduce((sum, r) => sum + (Number(r.points) || 0), 0)
+                      : (sub.points || 1);
+
+                    return (
+                      <div key={sub.id || si} className="p-5 rounded-2xl bg-white dark:bg-zinc-800/40 border border-on-surface/10 space-y-4 shadow-sm">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2">
+                            <Tag className="rounded-lg bg-green-500 text-white border-none font-black text-xs px-3 py-0.5">
+                              Soal #{si + 1}
+                            </Tag>
+                            <Tag color={subType === 'table' ? 'blue' : subType === 'multiple' ? 'purple' : 'cyan'} className="rounded-full border-none font-bold text-[11px] capitalize">
+                              {subType === 'table' ? 'Tabel / Pernyataan' : subType === 'multiple' ? 'Multiple Choice' : 'Single Choice'}
+                            </Tag>
+                            {subType === 'multiple' && (
+                              <Tag className="rounded-full border-none text-[10px] font-semibold bg-surface-low text-on-surface/60">
+                                {sub.scoringMethod === 'partial' ? 'Parsial' : 'All or Nothing'}
+                              </Tag>
+                            )}
+                          </div>
+                          <Text className="text-xs font-bold text-on-surface/50">{subPoints} Poin</Text>
                         </div>
-                      )}
-                    </div>
-                  ))}
+
+                        {/* Sub-question text / prompt */}
+                        {sub.question && (
+                          <div
+                            className="blog-content kantan-quill-preview prose prose-sm dark:prose-invert max-w-none text-on-surface/90 dark:text-zinc-200 font-sans"
+                            dangerouslySetInnerHTML={{ __html: renderContent(sub.question) }}
+                          />
+                        )}
+
+                        {/* If table */}
+                        {subType === 'table' ? (
+                          <div className="overflow-x-auto rounded-xl border border-on-surface/10 bg-white dark:bg-zinc-900 shadow-xs">
+                            <table className="w-full text-left border-collapse">
+                              <thead>
+                                <tr className="bg-surface-low/70 dark:bg-zinc-800 border-b border-on-surface/10">
+                                  <th className="p-3 font-black text-xs text-on-surface">
+                                    {sub.title || 'Pernyataan'}
+                                  </th>
+                                  {(sub.options && sub.options.length > 0 ? sub.options : ['Benar', 'Salah']).map((col, ci) => (
+                                    <th key={ci} className="p-3 font-black text-xs text-center text-on-surface w-28 border-l border-on-surface/10">
+                                      {col}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-on-surface/5">
+                                {(sub.rows || []).map((row, ri) => {
+                                  const correctCol = typeof row.correct === 'number' ? row.correct : 0;
+                                  const colList = sub.options && sub.options.length > 0 ? sub.options : ['Benar', 'Salah'];
+                                  return (
+                                    <tr key={row.id || ri} className="hover:bg-surface-low/20 transition-colors">
+                                      <td className="p-3 align-middle">
+                                        <div
+                                          className="blog-content kantan-quill-preview prose prose-xs dark:prose-invert max-w-none font-medium text-on-surface/90"
+                                          dangerouslySetInnerHTML={{ __html: renderContent(row.question || `Pernyataan baris ke-${ri + 1}`) }}
+                                        />
+                                        <div className="mt-1">
+                                          <span className="text-[10px] font-bold text-on-surface/40">{row.points || 1} Poin</span>
+                                        </div>
+                                      </td>
+                                      {colList.map((_, ci) => {
+                                        const isKey = correctCol === ci;
+                                        return (
+                                          <td key={ci} className="p-3 text-center align-middle border-l border-on-surface/10">
+                                            <div className="flex justify-center items-center gap-1">
+                                              <div
+                                                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                                                  isKey
+                                                    ? 'border-green-500 bg-green-500 text-white shadow-sm'
+                                                    : 'border-on-surface/20 bg-surface-low/50'
+                                                }`}
+                                              >
+                                                {isKey && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                                              </div>
+                                              {isKey && (
+                                                <Tag color="success" className="rounded-full border-none text-[8px] font-black uppercase m-0">
+                                                  Kunci
+                                                </Tag>
+                                              )}
+                                            </div>
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          /* Single or Multiple Options Preview */
+                          <div className="space-y-2">
+                            {(sub.options || []).map((opt, oi) => {
+                              if (!opt && !hasPreviewContent(opt)) return null;
+                              const isCorrect = subType === 'single'
+                                ? sub.correct === oi
+                                : correctIdxs.includes(oi);
+                              return (
+                                <div
+                                  key={oi}
+                                  className={`p-3 rounded-xl border flex items-start gap-3 transition-all ${
+                                    isCorrect
+                                      ? 'bg-green-50 dark:bg-green-900/20 border-green-500'
+                                      : 'bg-surface-low/30 dark:bg-zinc-800 border-on-surface/5'
+                                  }`}
+                                >
+                                  <div
+                                    className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+                                      isCorrect ? 'bg-green-500 text-white' : 'bg-surface-low dark:bg-zinc-700 text-on-surface/60'
+                                    }`}
+                                  >
+                                    {String.fromCharCode(65 + oi)}
+                                  </div>
+                                  <div className="flex-1 blog-content kantan-quill-preview prose prose-xs dark:prose-invert max-w-none font-sans" dangerouslySetInnerHTML={{ __html: renderContent(opt) }} />
+                                  {isCorrect && <Tag color="success" className="rounded-full border-none font-bold text-[10px]">Kunci</Tag>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {hasPreviewContent(sub.discussion) && (
+                          <div className="p-3.5 rounded-xl bg-green-500/5 dark:bg-green-900/10 border border-green-500/20 text-xs">
+                            <Text className="text-[10px] font-black uppercase text-green-600 block mb-1">Pembahasan Sub-Soal:</Text>
+                            <div className="blog-content kantan-quill-preview prose prose-xs dark:prose-invert max-w-none text-green-800 dark:text-green-300" dangerouslySetInnerHTML={{ __html: renderContent(sub.discussion) }} />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 

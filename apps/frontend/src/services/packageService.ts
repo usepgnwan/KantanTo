@@ -142,13 +142,24 @@ export const deletePackage = async (slug: string): Promise<void> => {
 export type QuestionType = 'single' | 'multiple' | 'nested' | 'table' | 'linked';
 export type ScoringMethod = 'all_or_nothing' | 'partial';
 
+export interface SubQuestionTableRow {
+  id: string;
+  question: string;
+  discussion?: string;
+  correct: number;
+  points: number;
+}
+
 export interface PackageSubQuestionPayload {
   id: string;
   type?: QuestionType;
+  title?: string;
   question: string;
   discussion: string;
   options: string[];
   correct: number | number[];
+  rows?: SubQuestionTableRow[];
+  scoring_method?: ScoringMethod;
   points: number;
 }
 
@@ -204,10 +215,19 @@ const normalizeQuestion = (question: any): PackageQuestionPayload => ({
   sub_questions: (question.sub_questions || []).map((sub: any) => ({
     id: String(sub.id),
     type: sub.type || 'single',
+    title: sub.title || '',
     question: sub.question || '',
     discussion: sub.discussion || '',
-    options: sub.options || ['', '', '', '', ''],
+    options: sub.options || (sub.type === 'table' ? ['Benar', 'Salah'] : ['', '', '', '', '']),
     correct: normalizeCorrect(sub.correct),
+    rows: Array.isArray(sub.rows) ? sub.rows.map((r: any, rIdx: number) => ({
+      id: String(r.id || rIdx + 1),
+      question: r.question || '',
+      discussion: r.discussion || '',
+      correct: typeof r.correct === 'number' ? r.correct : 0,
+      points: Number(r.points) || 1,
+    })) : [],
+    scoring_method: sub.scoring_method || 'all_or_nothing',
     points: Number(sub.points) || 0,
   })),
 });
@@ -287,7 +307,7 @@ export interface ExamSubmitPayload {
   client_id: string;
   user_id: number;
   is_testing: boolean;
-  answers: Record<number, number[]>; // QuestionID -> array of selected options
+  answers: Record<string, number[]>; // QuestionID / subQuestionID / rowID -> array of selected options
 }
 
 export const submitExam = async (slug: string, payload: ExamSubmitPayload): Promise<any> => {

@@ -271,14 +271,25 @@ type packageQuestionPayload struct {
 	SubQuestions   []subQuestionPayload `json:"sub_questions"`
 }
 
+type tableRowPayload struct {
+	ID         string  `json:"id"`
+	Question   string  `json:"question"`
+	Discussion string  `json:"discussion"`
+	Correct    int     `json:"correct"`
+	Points     float64 `json:"points"`
+}
+
 type subQuestionPayload struct {
-	ID         string      `json:"id"`
-	Type       string      `json:"type"`
-	Question   string      `json:"question"`
-	Discussion string      `json:"discussion"`
-	Options    []string    `json:"options"`
-	Correct    interface{} `json:"correct"`
-	Points     float64     `json:"points"`
+	ID            string            `json:"id"`
+	Type          string            `json:"type"`
+	Title         string            `json:"title"`
+	Question      string            `json:"question"`
+	Discussion    string            `json:"discussion"`
+	Options       []string          `json:"options"`
+	Correct       interface{}       `json:"correct"`
+	Rows          []tableRowPayload `json:"rows"`
+	ScoringMethod string            `json:"scoring_method"`
+	Points        float64           `json:"points"`
 }
 
 type questionResponse struct {
@@ -296,13 +307,16 @@ type questionResponse struct {
 }
 
 type subQuestionResponse struct {
-	ID         string      `json:"id"`
-	Type       string      `json:"type"`
-	Question   string      `json:"question"`
-	Discussion string      `json:"discussion"`
-	Options    []string    `json:"options"`
-	Correct    interface{} `json:"correct"`
-	Points     float64     `json:"points"`
+	ID            string            `json:"id"`
+	Type          string            `json:"type"`
+	Title         string            `json:"title"`
+	Question      string            `json:"question"`
+	Discussion    string            `json:"discussion"`
+	Options       []string          `json:"options"`
+	Correct       interface{}       `json:"correct"`
+	Rows          []tableRowPayload `json:"rows,omitempty"`
+	ScoringMethod string            `json:"scoring_method,omitempty"`
+	Points        float64           `json:"points"`
 }
 
 type packageMaterialPayload struct {
@@ -685,14 +699,17 @@ func persistQuestionWithDB(db *gorm.DB, pkg model.Package, payload packageQuesti
 			sub.Type = QuestionTypeSingle
 		}
 		row := model.PackageSubQuestion{
-			QuestionID:  question.ID,
-			ClientID:    sub.ID,
-			Type:        sub.Type,
-			Question:    sub.Question,
-			Discussion:  sub.Discussion,
-			OptionsJSON: toJSON(sub.Options),
-			CorrectJSON: toJSON(sub.Correct),
-			Points:      sub.Points,
+			QuestionID:    question.ID,
+			ClientID:      sub.ID,
+			Type:          sub.Type,
+			Title:         sub.Title,
+			Question:      sub.Question,
+			Discussion:    sub.Discussion,
+			OptionsJSON:   toJSON(sub.Options),
+			CorrectJSON:   toJSON(sub.Correct),
+			RowsJSON:      toJSON(sub.Rows),
+			ScoringMethod: sub.ScoringMethod,
+			Points:        sub.Points,
 		}
 		if err := db.Create(&row).Error; err != nil {
 			return question, err
@@ -763,9 +780,16 @@ func normalizeQuestionPayload(payload *packageQuestionPayload) {
 	if payload.ScoringMethod == "" {
 		payload.ScoringMethod = ScoringAllOrNothing
 	}
-	if payload.Type == QuestionTypeNested || payload.Type == QuestionTypeTable {
+	if payload.Type == QuestionTypeNested || payload.Type == QuestionTypeTable || payload.Type == "linked" {
 		total := 0.0
 		for i := range payload.SubQuestions {
+			if payload.SubQuestions[i].Type == QuestionTypeTable && len(payload.SubQuestions[i].Rows) > 0 {
+				subTotal := 0.0
+				for _, r := range payload.SubQuestions[i].Rows {
+					subTotal += r.Points
+				}
+				payload.SubQuestions[i].Points = subTotal
+			}
 			total += payload.SubQuestions[i].Points
 		}
 		payload.Points = total
@@ -808,14 +832,24 @@ func mapQuestionResponse(question model.PackageQuestion) questionResponse {
 		SubQuestions:   make([]subQuestionResponse, 0, len(question.SubQuestions)),
 	}
 	for _, sub := range question.SubQuestions {
+		var rows []tableRowPayload
+		if sub.RowsJSON != "" {
+			json.Unmarshal([]byte(sub.RowsJSON), &rows)
+		}
+		if rows == nil {
+			rows = []tableRowPayload{}
+		}
 		response.SubQuestions = append(response.SubQuestions, subQuestionResponse{
-			ID:         sub.ClientID,
-			Type:       sub.Type,
-			Question:   sub.Question,
-			Discussion: sub.Discussion,
-			Options:    jsonStringSlice(sub.OptionsJSON),
-			Correct:    jsonAny(sub.CorrectJSON),
-			Points:     sub.Points,
+			ID:            sub.ClientID,
+			Type:          sub.Type,
+			Title:         sub.Title,
+			Question:      sub.Question,
+			Discussion:    sub.Discussion,
+			Options:       jsonStringSlice(sub.OptionsJSON),
+			Correct:       jsonAny(sub.CorrectJSON),
+			Rows:          rows,
+			ScoringMethod: sub.ScoringMethod,
+			Points:        sub.Points,
 		})
 	}
 	return response

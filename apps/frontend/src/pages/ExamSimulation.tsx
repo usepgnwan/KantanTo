@@ -203,14 +203,14 @@ const ExamSimulation: React.FC = () => {
     if (!slug || !payload) return;
     setSubmitting(true);
 
-    // Format answers from string map to number map for backend
-    // Keys may be namespaced as "parentId_subId" for table questions — extract the actual numeric sub-question ID.
-    const formattedAnswers: Record<number, number[]> = {};
+    // Format answers map for backend
+    const formattedAnswers: Record<string, number[]> = {};
     Object.keys(answersRef.current).forEach(k => {
+      formattedAnswers[k] = answersRef.current[k];
       const parts = k.split('_');
-      const numKey = Number(parts[parts.length - 1]);
-      if (!isNaN(numKey)) {
-        formattedAnswers[numKey] = answersRef.current[k];
+      const lastPart = parts[parts.length - 1];
+      if (lastPart && !formattedAnswers[lastPart]) {
+        formattedAnswers[lastPart] = answersRef.current[k];
       }
     });
 
@@ -256,6 +256,8 @@ const ExamSimulation: React.FC = () => {
     title: string;
     discussion: string;
     sub_questions?: any[];
+    rows?: any[];
+    scoring_method?: string;
     // for linked type:
     isLinked: boolean;
     linkedPassage?: string;
@@ -276,9 +278,11 @@ const ExamSimulation: React.FC = () => {
             id: String(sub.id),
             type: sub.type || 'single',
             question: sub.question || '',
-            options: (sub.options as string[]) || [],
+            options: (sub.options as string[]) || (sub.type === 'table' ? ['Benar', 'Salah'] : []),
             title: (sub as any).title || '',
             discussion: sub.discussion || '',
+            rows: (sub as any).rows || [],
+            scoring_method: (sub as any).scoring_method || 'all_or_nothing',
             isLinked: true,
             linkedPassage: q.question,
             linkedPassageTitle: q.title,
@@ -418,46 +422,145 @@ const ExamSimulation: React.FC = () => {
 
             {/* Right: Single sub-question — independent scroll */}
             <div className="lg:w-1/2 p-6 lg:p-10 bg-white flex flex-col">
-              <div className="flex items-center justify-between mb-6">
-                <Tag className="rounded-full px-4 py-1 text-sm font-black border-none bg-surface-low text-on-surface">
-                  Soal #{currentQuestionIndex + 1} <span className="opacity-60">(Teks Berhubungan {(currentData.linkedSubIndex ?? 0) + 1}/{currentData.linkedGroupSize})</span>
-                </Tag>
+              <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <Tag className="rounded-full px-4 py-1 text-sm font-black border-none bg-surface-low text-on-surface">
+                    Soal #{currentQuestionIndex + 1} <span className="opacity-60">(Teks Berhubungan {(currentData.linkedSubIndex ?? 0) + 1}/{currentData.linkedGroupSize})</span>
+                  </Tag>
+                  <Tag color={currentData.type === 'table' ? 'blue' : currentData.type === 'multiple' ? 'purple' : 'default'} className="rounded-full border-none font-bold text-xs">
+                    {currentData.type === 'table' ? 'Tabel / Pernyataan' : currentData.type === 'multiple' ? 'Pilihan Ganda Kompleks' : 'Pilihan Ganda'}
+                  </Tag>
+                </div>
                 <Button type="text" className="text-on-surface/40 hover:text-primary font-bold text-xs uppercase" icon={<WarningOutlined />}>Lapor Soal</Button>
               </div>
 
-              {/* Sub-question text */}
-              <div className="bg-white rounded-[2rem] p-6 lg:p-8 shadow-sm border border-surface-container mb-6">
-                <div
-                  className="prose prose-p:text-on-surface/90 prose-p:leading-loose max-w-none text-on-surface font-normal font-sans"
-                  style={{ fontSize: `${textSize}px` }}
-                  dangerouslySetInnerHTML={{ __html: renderLatex(currentData.question) }}
-                />
-              </div>
+              {/* Sub-question text / prompt */}
+              {currentData.question && (
+                <div className="bg-white rounded-[2rem] p-6 lg:p-8 shadow-sm border border-surface-container mb-6">
+                  <div
+                    className="prose prose-p:text-on-surface/90 prose-p:leading-loose max-w-none text-on-surface font-normal font-sans"
+                    style={{ fontSize: `${textSize}px` }}
+                    dangerouslySetInnerHTML={{ __html: renderLatex(currentData.question) }}
+                  />
+                </div>
+              )}
 
-              {/* Options */}
-              <div className="space-y-4">
-                {(currentData.options || []).filter(opt => opt && opt.trim() !== '').map((opt, idx) => {
-                  const currentAnsArr = answers[currentData.id] || [];
-                  const isSelected = currentAnsArr.includes(idx);
-                  const label = String.fromCharCode(65 + idx);
-                  return (
-                    <div
-                      key={idx}
-                      onClick={() => handleSelectOption(currentData.id, currentData.type, idx)}
-                      className={`rounded-xl flex items-center cursor-pointer transition-all border ${sizeClasses.nestedPadding} ${isSelected ? 'border-primary bg-primary/5 shadow-[0_0_0_2px_rgba(0,83,221,0.2)]' : 'border-surface-container bg-surface-lowest hover:border-primary/50'}`}
-                    >
-                      <div className={`rounded-full flex items-center justify-center font-bold shrink-0 transition-colors ${sizeClasses.nestedCircleSize} ${isSelected ? 'bg-primary text-white' : 'bg-surface-low text-on-surface/60'}`}>
-                        {label}
+              {/* IF SUB QUESTION IS TABLE */}
+              {currentData.type === 'table' ? (
+                <div className="bg-white rounded-3xl shadow-sm border border-surface-container overflow-hidden mb-6">
+                  <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="sticky top-0 z-10 bg-surface-low/95 backdrop-blur-sm shadow-sm border-b border-surface-container">
+                        <tr>
+                          <th className="p-4 sm:p-5 font-black text-sm sm:text-base text-on-surface">
+                            {currentData.title || 'Pernyataan'}
+                          </th>
+                          {(currentData.options && currentData.options.length > 0 ? currentData.options : ['Benar', 'Salah']).map((col, cIdx) => (
+                            <th key={cIdx} className="p-4 sm:p-5 font-black text-sm sm:text-base text-center text-on-surface w-28 sm:w-36 border-l border-surface-container/60">
+                              {col}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-surface-container/60">
+                        {(currentData.rows || []).map((row: any, rIdx: number) => {
+                          const answerKey = `${currentData.id}_${row.id || rIdx}`;
+                          const currentAnsArr = answers[answerKey] || [];
+                          const colList = currentData.options && currentData.options.length > 0 ? currentData.options : ['Benar', 'Salah'];
+                          return (
+                            <tr
+                              key={row.id || rIdx}
+                              className={`transition-colors ${rIdx % 2 === 0 ? 'bg-white' : 'bg-surface-lowest/50'} hover:bg-surface-low/50`}
+                            >
+                              <td className="p-4 sm:p-5 align-middle">
+                                <div
+                                  className="prose prose-p:text-on-surface/90 font-medium font-sans text-sm sm:text-base"
+                                  style={{ fontSize: `${textSize}px` }}
+                                  dangerouslySetInnerHTML={{ __html: renderLatex(row.question || `Pernyataan #${rIdx + 1}`) }}
+                                />
+                              </td>
+                              {colList.map((_, cIdx) => {
+                                const isSelected = currentAnsArr.includes(cIdx);
+                                return (
+                                  <td
+                                    key={cIdx}
+                                    onClick={() => handleSelectOption(answerKey, 'single', cIdx)}
+                                    className={`p-4 sm:p-5 text-center align-middle border-l border-surface-container/60 cursor-pointer transition-all ${isSelected ? 'bg-primary/10' : 'hover:bg-surface-low'}`}
+                                  >
+                                    <div className="flex justify-center items-center">
+                                      <div
+                                        className={`w-6 h-6 sm:w-7 sm:h-7 rounded-full border-2 flex items-center justify-center transition-all ${
+                                          isSelected
+                                            ? 'border-primary bg-primary text-white shadow-sm'
+                                            : 'border-on-surface/30 bg-white hover:border-primary/60'
+                                        }`}
+                                      >
+                                        {isSelected && (
+                                          <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-white" />
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : currentData.type === 'multiple' ? (
+                /* MULTIPLE CHOICE OPTIONS */
+                <div className="space-y-4">
+                  {(currentData.options || []).filter(opt => opt && opt.trim() !== '').map((opt, idx) => {
+                    const currentAnsArr = answers[currentData.id] || [];
+                    const isSelected = currentAnsArr.includes(idx);
+                    const label = String.fromCharCode(65 + idx);
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => handleSelectOption(currentData.id, 'multiple', idx)}
+                        className={`rounded-xl flex items-center cursor-pointer transition-all border ${sizeClasses.nestedPadding} ${isSelected ? 'border-primary bg-primary/5 shadow-[0_0_0_2px_rgba(0,83,221,0.2)]' : 'border-surface-container bg-surface-lowest hover:border-primary/50'}`}
+                      >
+                        <div className={`rounded-md flex items-center justify-center font-bold shrink-0 transition-colors ${sizeClasses.nestedCircleSize} ${isSelected ? 'bg-primary text-white' : 'bg-surface-low text-on-surface/60'}`}>
+                          {isSelected ? '✓' : label}
+                        </div>
+                        <span
+                          className={`font-normal font-sans ml-3 ${isSelected ? 'text-primary font-medium' : 'text-on-surface/80'}`}
+                          style={{ fontSize: `${textSize}px` }}
+                          dangerouslySetInnerHTML={{ __html: renderLatex(opt) }}
+                        />
                       </div>
-                      <span
-                        className={`font-normal font-sans ml-3 ${isSelected ? 'text-primary font-medium' : 'text-on-surface/80'}`}
-                        style={{ fontSize: `${textSize}px` }}
-                        dangerouslySetInnerHTML={{ __html: renderLatex(opt) }}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* SINGLE CHOICE OPTIONS */
+                <div className="space-y-4">
+                  {(currentData.options || []).filter(opt => opt && opt.trim() !== '').map((opt, idx) => {
+                    const currentAnsArr = answers[currentData.id] || [];
+                    const isSelected = currentAnsArr.includes(idx);
+                    const label = String.fromCharCode(65 + idx);
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => handleSelectOption(currentData.id, 'single', idx)}
+                        className={`rounded-xl flex items-center cursor-pointer transition-all border ${sizeClasses.nestedPadding} ${isSelected ? 'border-primary bg-primary/5 shadow-[0_0_0_2px_rgba(0,83,221,0.2)]' : 'border-surface-container bg-surface-lowest hover:border-primary/50'}`}
+                      >
+                        <div className={`rounded-full flex items-center justify-center font-bold shrink-0 transition-colors ${sizeClasses.nestedCircleSize} ${isSelected ? 'bg-primary text-white' : 'bg-surface-low text-on-surface/60'}`}>
+                          {label}
+                        </div>
+                        <span
+                          className={`font-normal font-sans ml-3 ${isSelected ? 'text-primary font-medium' : 'text-on-surface/80'}`}
+                          style={{ fontSize: `${textSize}px` }}
+                          dangerouslySetInnerHTML={{ __html: renderLatex(opt) }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
@@ -783,6 +886,8 @@ const ExamSimulation: React.FC = () => {
             let isAnswered = false;
             if (!q.isLinked && (q.type === 'nested' || q.type === 'table') && q.sub_questions) {
               isAnswered = q.sub_questions.some((sq: any, sqIdx: number) => (answers[`${q.id}_${sq.id || sqIdx}`] || []).length > 0);
+            } else if (q.isLinked && q.type === 'table' && q.rows && q.rows.length > 0) {
+              isAnswered = q.rows.some((r: any, rIdx: number) => (answers[`${q.id}_${r.id || rIdx}`] || []).length > 0);
             } else {
               isAnswered = (answers[q.id] || []).length > 0;
             }
