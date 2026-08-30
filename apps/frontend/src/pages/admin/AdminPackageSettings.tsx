@@ -110,37 +110,50 @@ const normalizeCorrectForType = (type: QuestionType, correct: number | number[] 
 };
 
 // ─── COMPONENT: Table Matrix Editor (Reusable) ───────────────
+interface TableMatrixUpdates {
+  title?: string;
+  columns?: string[];
+  rows?: SubQuestionTableRow[];
+}
+
 interface TableMatrixEditorProps {
   title: string;
   columns: string[];
   rows: SubQuestionTableRow[];
-  onChangeTitle: (newTitle: string) => void;
-  onChangeColumns: (nextCols: string[]) => void;
-  onChangeRows: (nextRows: SubQuestionTableRow[]) => void;
+  onChange: (updates: TableMatrixUpdates) => void;
 }
 
 const TableMatrixEditor: React.FC<TableMatrixEditorProps> = React.memo(({
   title,
   columns,
   rows,
-  onChangeTitle,
-  onChangeColumns,
-  onChangeRows,
+  onChange,
 }) => {
   const handleUpdateColumnTitle = (colIdx: number, newTitle: string) => {
     const nextCols = [...columns];
     nextCols[colIdx] = newTitle;
-    onChangeColumns(nextCols);
+    onChange({ columns: nextCols });
   };
 
   const handleAddColumn = () => {
     const nextCols = [...columns, `Pilihan ${String.fromCharCode(65 + columns.length)}`];
-    onChangeColumns(nextCols);
+    onChange({ columns: nextCols });
+    message.success('Kolom baru ditambahkan');
+  };
+
+  const handleApplyPreset = (presetCols: string[]) => {
+    const nextRows = rows.map(sub => {
+      const currentCorrect = typeof sub.correct === 'number' ? sub.correct : 0;
+      const newCorrect = currentCorrect < presetCols.length ? currentCorrect : 0;
+      return { ...sub, correct: newCorrect };
+    });
+    onChange({ columns: presetCols, rows: nextRows });
+    message.success(`Preset kolom "${presetCols.join(' / ')}" diterapkan`);
   };
 
   const handleRemoveColumn = (colIdx: number) => {
-    if (columns.length <= 2) {
-      message.warning('Minimal harus ada 2 kolom pilihan');
+    if (columns.length <= 1) {
+      message.warning('Minimal harus ada 1 kolom pilihan jawaban');
       return;
     }
     const nextCols = columns.filter((_, idx) => idx !== colIdx);
@@ -154,8 +167,8 @@ const TableMatrixEditor: React.FC<TableMatrixEditorProps> = React.memo(({
       }
       return { ...sub, correct: newCorrect };
     });
-    onChangeColumns(nextCols);
-    onChangeRows(nextRows);
+    onChange({ columns: nextCols, rows: nextRows });
+    message.success('Kolom berhasil dihapus');
   };
 
   const handleAddRow = () => {
@@ -166,12 +179,12 @@ const TableMatrixEditor: React.FC<TableMatrixEditorProps> = React.memo(({
       correct: 0,
       points: 1,
     };
-    onChangeRows([...rows, newRow]);
+    onChange({ rows: [...rows, newRow] });
   };
 
   const handleUpdateRow = (rowIdx: number, updatedRow: Partial<SubQuestionTableRow>) => {
     const nextRows = rows.map((r, idx) => (idx === rowIdx ? { ...r, ...updatedRow } : r));
-    onChangeRows(nextRows);
+    onChange({ rows: nextRows });
   };
 
   const handleDeleteRow = (rowIdx: number) => {
@@ -180,14 +193,14 @@ const TableMatrixEditor: React.FC<TableMatrixEditorProps> = React.memo(({
       return;
     }
     const nextRows = rows.filter((_, idx) => idx !== rowIdx);
-    onChangeRows(nextRows);
+    onChange({ rows: nextRows });
   };
 
   return (
     <div className="space-y-6">
       {/* ── 1. HEADER & KOLOM CONFIGURATION ── */}
       <div className="p-5 bg-surface-low/50 dark:bg-zinc-800/60 rounded-3xl border border-on-surface/10 space-y-5">
-        <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <Title level={5} className="!m-0 !font-manrope !font-black text-on-surface">
               Pengaturan Kolom Tabel
@@ -196,52 +209,82 @@ const TableMatrixEditor: React.FC<TableMatrixEditorProps> = React.memo(({
               Sesuaikan judul kolom pernyataan dan nama-nama opsi kolom jawaban secara dinamis.
             </Text>
           </div>
-          <Button
-            type="dashed"
-            icon={<PlusOutlined />}
-            size="small"
-            onClick={handleAddColumn}
-            className="rounded-xl font-bold text-xs"
-          >
-            Tambah Kolom Opsi
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Text className="text-[10px] font-bold text-on-surface/40 uppercase">Preset Cepat:</Text>
+            <Button
+              size="small"
+              className="rounded-lg text-xs font-semibold"
+              onClick={() => handleApplyPreset(['Benar', 'Salah'])}
+            >
+              Benar / Salah
+            </Button>
+            <Button
+              size="small"
+              className="rounded-lg text-xs font-semibold"
+              onClick={() => handleApplyPreset(['Ya', 'Tidak'])}
+            >
+              Ya / Tidak
+            </Button>
+            <Button
+              size="small"
+              className="rounded-lg text-xs font-semibold"
+              onClick={() => handleApplyPreset(['Setuju', 'Ragu-Ragu', 'Tidak Setuju'])}
+            >
+              Setuju / Ragu / Tidak
+            </Button>
+            <Button
+              type="dashed"
+              icon={<PlusOutlined />}
+              size="small"
+              onClick={handleAddColumn}
+              className="rounded-lg font-bold text-xs"
+            >
+              Tambah Kolom
+            </Button>
+          </div>
         </div>
 
         <Row gutter={[16, 16]}>
-          <Col xs={24} sm={10}>
+          <Col xs={24} sm={9}>
             <Text className="text-[10px] font-black uppercase tracking-wider text-on-surface/50 block mb-1">
               Judul Kolom Pernyataan
             </Text>
             <Input
               value={title}
-              onChange={e => onChangeTitle(e.target.value)}
+              onChange={e => onChange({ title: e.target.value })}
               placeholder="Contoh: Pernyataan, Karakteristik, dll."
               className="rounded-xl font-semibold h-10 bg-white dark:bg-zinc-700"
             />
           </Col>
 
-          <Col xs={24} sm={14}>
-            <Text className="text-[10px] font-black uppercase tracking-wider text-on-surface/50 block mb-1">
-              Kolom Pilihan Jawaban ({columns.length} Kolom)
-            </Text>
+          <Col xs={24} sm={15}>
+            <div className="flex items-center justify-between mb-1">
+              <Text className="text-[10px] font-black uppercase tracking-wider text-on-surface/50">
+                Kolom Pilihan Jawaban ({columns.length} Kolom)
+              </Text>
+              <Text className="text-[10px] text-on-surface/40">
+                Ketik teks untuk edit nama kolom, klik ikon sampah untuk hapus
+              </Text>
+            </div>
             <div className="flex flex-wrap gap-2">
               {columns.map((colName, cIdx) => (
-                <div key={cIdx} className="flex items-center gap-1.5 bg-white dark:bg-zinc-700 p-1 pl-3 rounded-xl border border-on-surface/10 shadow-sm">
-                  <span className="font-black text-xs text-primary">{String.fromCharCode(65 + cIdx)}.</span>
+                <div key={cIdx} className="flex items-center gap-1.5 bg-white dark:bg-zinc-700 p-1.5 pl-3 rounded-2xl border border-on-surface/10 shadow-sm focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/30 transition-all">
+                  <span className="font-black text-xs text-primary shrink-0">{String.fromCharCode(65 + cIdx)}.</span>
                   <Input
                     value={colName}
                     onChange={e => handleUpdateColumnTitle(cIdx, e.target.value)}
                     placeholder={`Opsi ${String.fromCharCode(65 + cIdx)}`}
-                    className="border-none shadow-none font-bold text-xs h-8 w-24 px-1"
+                    className="border-none shadow-none font-bold text-xs h-8 w-28 px-1 focus:ring-0"
                   />
-                  {columns.length > 2 && (
+                  {columns.length > 1 && (
                     <Button
                       type="text"
                       danger
                       size="small"
                       icon={<DeleteOutlined />}
                       onClick={() => handleRemoveColumn(cIdx)}
-                      className="text-xs p-1 h-7 w-7"
+                      className="text-xs p-1 h-7 w-7 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg flex items-center justify-center shrink-0"
+                      title={`Hapus kolom ${colName || String.fromCharCode(65 + cIdx)}`}
                     />
                   )}
                 </div>
@@ -407,8 +450,8 @@ const TableQuestionEditor: React.FC<TableQuestionEditorProps> = React.memo(({
   question,
   onUpdate,
 }) => {
-  const columns = question.options && question.options.length >= 2 ? question.options : ['Benar', 'Salah'];
-  const statementTitle = question.title || 'Pernyataan';
+  const columns = (question.options && question.options.length > 0) ? question.options : ['Benar', 'Salah'];
+  const statementTitle = question.title !== undefined ? question.title : 'Pernyataan';
   const rows: SubQuestionTableRow[] = (question.subQuestions || []).map((s, idx) => ({
     id: s.id || String(idx + 1),
     question: s.question || '',
@@ -422,19 +465,23 @@ const TableQuestionEditor: React.FC<TableQuestionEditorProps> = React.memo(({
       title={statementTitle}
       columns={columns}
       rows={rows}
-      onChangeTitle={newTitle => onUpdate({ title: newTitle })}
-      onChangeColumns={nextCols => onUpdate({ options: nextCols })}
-      onChangeRows={nextRows => onUpdate({
-        subQuestions: nextRows.map(r => ({
-          id: r.id,
-          type: 'single',
-          question: r.question,
-          discussion: r.discussion || '',
-          options: [],
-          correct: r.correct,
-          points: r.points,
-        }))
-      })}
+      onChange={({ title, columns: nextCols, rows: nextRows }) => {
+        const changes: Partial<Question> = {};
+        if (title !== undefined) changes.title = title;
+        if (nextCols !== undefined) changes.options = nextCols;
+        if (nextRows !== undefined) {
+          changes.subQuestions = nextRows.map(r => ({
+            id: r.id,
+            type: 'single',
+            question: r.question,
+            discussion: r.discussion || '',
+            options: [],
+            correct: r.correct,
+            points: r.points,
+          }));
+        }
+        onUpdate(changes);
+      }}
     />
   );
 });
@@ -462,7 +509,7 @@ const SubQuestionEditor: React.FC<SubQuestionEditorProps> = React.memo(({
         { id: '1', question: '', discussion: '', correct: 0, points: 1 },
         { id: '2', question: '', discussion: '', correct: 1, points: 1 },
       ];
-  const tableCols = (sub.options && sub.options.length >= 2) ? sub.options : ['Benar', 'Salah'];
+  const tableCols = (sub.options && sub.options.length > 0) ? sub.options : ['Benar', 'Salah'];
 
   const handleTypeChange = (newType: QuestionType) => {
     if (newType === 'table') {
@@ -470,12 +517,13 @@ const SubQuestionEditor: React.FC<SubQuestionEditorProps> = React.memo(({
         { id: '1', question: '', discussion: '', correct: 0, points: 1 },
         { id: '2', question: '', discussion: '', correct: 1, points: 1 },
       ];
-      const defaultCols = (sub.options && sub.options.length >= 2) ? sub.options : ['Benar', 'Salah'];
-      const totalPts = defaultRows.reduce((s, r) => s + (Number(r.points) || 0), 0);
+      const hasCustomTableCols = sub.type === 'table' && sub.options && sub.options.length > 0;
+      const defaultCols = hasCustomTableCols ? sub.options : ['Benar', 'Salah'];
+      const totalPts = defaultRows.reduce<number>((s, r) => s + (Number(r.points) || 0), 0);
       onUpdate({
         ...sub,
         type: 'table',
-        title: sub.title || 'Pernyataan',
+        title: sub.title !== undefined ? sub.title : 'Pernyataan',
         options: defaultCols,
         rows: defaultRows,
         points: totalPts,
@@ -647,14 +695,18 @@ const SubQuestionEditor: React.FC<SubQuestionEditorProps> = React.memo(({
 
           {/* Interactive Table Matrix Editor */}
           <TableMatrixEditor
-            title={sub.title || 'Pernyataan'}
+            title={sub.title !== undefined ? sub.title : 'Pernyataan'}
             columns={tableCols}
             rows={rows}
-            onChangeTitle={newTitle => onUpdate({ ...sub, title: newTitle })}
-            onChangeColumns={nextCols => onUpdate({ ...sub, options: nextCols })}
-            onChangeRows={nextRows => {
-              const totalPts = nextRows.reduce<number>((s, r) => s + (Number(r.points) || 0), 0);
-              onUpdate({ ...sub, rows: nextRows, points: totalPts });
+            onChange={({ title: nextTitle, columns: nextCols, rows: nextRows }) => {
+              const nextSub: SubQuestion = { ...sub };
+              if (nextTitle !== undefined) nextSub.title = nextTitle;
+              if (nextCols !== undefined) nextSub.options = nextCols;
+              if (nextRows !== undefined) {
+                nextSub.rows = nextRows;
+                nextSub.points = nextRows.reduce<number>((s, r) => s + (Number(r.points) || 0), 0);
+              }
+              onUpdate(nextSub);
             }}
           />
 
@@ -870,10 +922,12 @@ const AdminPackageSettings: React.FC = () => {
     sub_questions: (question.subQuestions || []).map(sub => ({
       id: sub.id,
       type: sub.type || 'single' as QuestionType,
-      title: sub.title || '',
+      title: sub.title !== undefined ? sub.title : '',
       question: sub.question,
       discussion: sub.discussion,
-      options: sub.options || (sub.type === 'table' ? ['Benar', 'Salah'] : []),
+      options: (sub.type === 'table' && sub.options && sub.options.length > 0)
+        ? sub.options
+        : (sub.type === 'table' ? ['Benar', 'Salah'] : (sub.options || [])),
       correct: normalizeCorrectForType(sub.type || 'single', sub.correct),
       rows: sub.rows || [],
       scoring_method: sub.type === 'multiple' ? (sub.scoringMethod || 'all_or_nothing') : 'all_or_nothing',
@@ -885,13 +939,13 @@ const AdminPackageSettings: React.FC = () => {
 
   const deserializeQuestion = (question: any): Question => {
     let opts = question.options || [];
-    if (question.type === 'table' && (!opts || opts.length < 2 || opts.every((o: string) => !o))) {
+    if (question.type === 'table' && (!opts || opts.length < 1 || opts.every((o: string) => !o))) {
       opts = ['Benar', 'Salah'];
     }
     return {
       id: question.id,
       type: question.type,
-      title: question.title || (question.type === 'table' ? 'Pernyataan' : ''),
+      title: question.title !== undefined ? question.title : (question.type === 'table' ? 'Pernyataan' : ''),
       question: question.question,
       discussion: question.discussion,
       options: opts,
@@ -902,8 +956,10 @@ const AdminPackageSettings: React.FC = () => {
       subQuestions: (question.sub_questions || []).map((sub: any) => ({
         ...sub,
         type: sub.type || 'single',
-        title: sub.title || (sub.type === 'table' ? 'Pernyataan' : ''),
-        options: sub.options || (sub.type === 'table' ? ['Benar', 'Salah'] : ['', '', '', '', '']),
+        title: sub.title !== undefined ? sub.title : (sub.type === 'table' ? 'Pernyataan' : ''),
+        options: (sub.type === 'table' && sub.options && sub.options.length > 0 && !sub.options.every((o: string) => !o))
+          ? sub.options
+          : (sub.type === 'table' ? ['Benar', 'Salah'] : (sub.options || ['', '', '', '', ''])),
         correct: normalizeCorrectForType(sub.type || 'single', sub.correct),
         rows: sub.rows || [],
         scoringMethod: sub.scoring_method || 'all_or_nothing',
