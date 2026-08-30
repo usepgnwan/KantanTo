@@ -18,6 +18,14 @@ import { renderQuillHtml as renderLatex } from '../utils/renderContent';
 
 const { Title, Text, Paragraph } = Typography;
 
+interface TableRowDetail {
+  id: string;
+  question: string;
+  discussion?: string;
+  correct: number;
+  points: number;
+}
+
 interface AnswerDetail {
   id: number;
   question_id: number;
@@ -29,6 +37,7 @@ interface AnswerDetail {
   question_text: string;
   question_title: string;
   question_type: string;
+  scoring_method?: string;
   options: string[];
   correct_answers: number[];
   discussion: string;
@@ -36,12 +45,15 @@ interface AnswerDetail {
   parent_title?: string;
   parent_type?: string;
   parent_options?: string[];
+  rows?: TableRowDetail[];
+  row_answers?: Record<string, number[]>;
 }
 
 interface GroupedQuestion {
   question_id: number;
   sub_question_id?: number | null;
   type: string;
+  sub_type?: string;
   title: string;
   question_text: string;
   parent_question?: string;
@@ -49,6 +61,9 @@ interface GroupedQuestion {
   linkedSubIndex?: number;
   linkedGroupSize?: number;
   options?: string[];
+  rows?: TableRowDetail[];
+  row_answers?: Record<string, number[]>;
+  scoring_method?: string;
   answers: AnswerDetail[];
 }
 
@@ -112,6 +127,7 @@ const Review: React.FC = () => {
               question_id: a.question_id,
               sub_question_id: a.sub_question_id,
               type: 'linked',
+              sub_type: a.question_type || 'single',
               title: a.question_title || a.parent_title || 'Soal Berhubungan',
               question_text: a.question_text,
               parent_question: a.parent_question || '',
@@ -119,6 +135,9 @@ const Review: React.FC = () => {
               linkedSubIndex: curSubIdx,
               linkedGroupSize: groupSize,
               options: a.options,
+              rows: a.rows,
+              row_answers: a.row_answers,
+              scoring_method: a.scoring_method,
               answers: [a]
             });
           } else if (isSub) {
@@ -392,92 +411,225 @@ const Review: React.FC = () => {
                               </Paragraph>
                             </div>
 
-                            {/* Kamu Memilih */}
-                            <div className="flex items-start gap-2 mb-5 px-1">
-                              <Text className="text-xs font-bold text-on-surface/40 uppercase tracking-wider shrink-0 mt-1">Kamu memilih:</Text>
-                              {current.selected_options.length > 0 ? (
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  {current.selected_options.sort((a, b) => a - b).map(optIdx => {
-                                    const optLabel = String.fromCharCode(65 + optIdx);
-                                    const isThisCorrect = (current.correct_answers || []).includes(optIdx);
-                                    return (
-                                      <span
-                                        key={optIdx}
-                                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-black ${
-                                          isThisCorrect ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-                                        }`}
-                                      >
-                                        {optLabel} {isThisCorrect ? '✓' : '✗'}
-                                      </span>
-                                    );
-                                  })}
-                                  <Text className={`text-sm font-bold ${current.is_correct ? 'text-green-600' : 'text-red-500'}`}>
-                                    {current.is_correct ? '— Benar!' : '— Salah'}
-                                  </Text>
+                            {current.question_type === 'table' && current.rows && current.rows.length > 0 ? (
+                              /* Table Sub-Question Review */
+                              <div className="space-y-6">
+                                <div className="bg-white rounded-3xl shadow-sm border border-surface-container overflow-hidden">
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                      <thead>
+                                        <tr className="bg-surface-low/80 border-b border-surface-container">
+                                          <th className="p-3 sm:p-4 font-black text-xs text-on-surface">
+                                            {current.question_title || 'Pernyataan'}
+                                          </th>
+                                          {(current.options && current.options.length > 0 ? current.options : ['Benar', 'Salah']).map((col, cIdx) => (
+                                            <th key={cIdx} className="p-3 sm:p-4 font-black text-xs text-center text-on-surface w-20 sm:w-24 border-l border-surface-container/60">
+                                              {col}
+                                            </th>
+                                          ))}
+                                          <th className="p-3 sm:p-4 font-black text-xs text-center text-on-surface w-28 border-l border-surface-container/60">
+                                            Jawaban Kamu
+                                          </th>
+                                          <th className="p-3 sm:p-4 font-black text-xs text-center text-on-surface w-28 border-l border-surface-container/60">
+                                            Kunci
+                                          </th>
+                                          <th className="p-3 sm:p-4 font-black text-xs text-center text-on-surface w-20 border-l border-surface-container/60">
+                                            Poin
+                                          </th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-surface-container/60">
+                                        {current.rows.map((row, rIdx) => {
+                                          const rowAnswers = current.row_answers || {};
+                                          const userRowPick = (rowAnswers[row.id] && rowAnswers[row.id].length > 0) ? rowAnswers[row.id][0] : null;
+                                          const correctKey = row.correct;
+                                          const isRowCorrect = userRowPick !== null && userRowPick === correctKey;
+                                          const colList = current.options && current.options.length > 0 ? current.options : ['Benar', 'Salah'];
+                                          const rowBg = userRowPick === null ? '' : isRowCorrect ? 'bg-green-50/30' : 'bg-red-50/30';
+
+                                          return (
+                                            <tr key={row.id || rIdx} className={`transition-colors ${rowBg}`}>
+                                              <td className="p-3 sm:p-4 align-middle">
+                                                <div className="flex items-start gap-2">
+                                                  <span className="font-black text-on-surface/30 text-xs mt-0.5 shrink-0">{rIdx + 1}.</span>
+                                                  <div
+                                                    className="font-normal font-sans text-on-surface text-xs leading-relaxed"
+                                                    dangerouslySetInnerHTML={{ __html: renderLatex(row.question) }}
+                                                  />
+                                                </div>
+                                              </td>
+                                              {colList.map((_, cIdx) => {
+                                                const isUserChoice = userRowPick === cIdx;
+                                                const isCorrect = correctKey === cIdx;
+                                                return (
+                                                  <td key={cIdx} className="p-3 text-center align-middle border-l border-surface-container/60">
+                                                    <div className="flex justify-center items-center">
+                                                      {isUserChoice && isCorrect ? (
+                                                        <div className="w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center text-xs font-black shadow" title="Benar">✓</div>
+                                                      ) : isUserChoice && !isCorrect ? (
+                                                        <div className="w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center text-xs font-black shadow" title="Salah">✗</div>
+                                                      ) : isCorrect ? (
+                                                        <div className="w-6 h-6 rounded-full border-2 border-green-500 bg-green-50 text-green-700 flex items-center justify-center text-[8px] font-black leading-tight" title="Kunci">KEY</div>
+                                                      ) : (
+                                                        <div className="w-2.5 h-2.5 rounded-full border border-on-surface/15 bg-surface-low/50" />
+                                                      )}
+                                                    </div>
+                                                  </td>
+                                                );
+                                              })}
+                                              <td className="p-3 text-center align-middle border-l border-surface-container/60">
+                                                {userRowPick === null ? (
+                                                  <Tag className="rounded-full border-none px-2 font-bold text-[11px] text-gray-400 bg-gray-100 m-0">Kosong</Tag>
+                                                ) : isRowCorrect ? (
+                                                  <Tag color="success" className="rounded-full border-none font-bold text-[11px] px-2 m-0">
+                                                    ✓ {colList[userRowPick] ?? String.fromCharCode(65 + userRowPick)}
+                                                  </Tag>
+                                                ) : (
+                                                  <Tag color="error" className="rounded-full border-none font-bold text-[11px] px-2 m-0">
+                                                    ✗ {colList[userRowPick] ?? String.fromCharCode(65 + userRowPick)}
+                                                  </Tag>
+                                                )}
+                                              </td>
+                                              <td className="p-3 text-center align-middle border-l border-surface-container/60">
+                                                <Tag className="rounded-full font-bold text-[11px] px-2 bg-green-50 text-green-700 border border-green-300 m-0">
+                                                  {colList[correctKey] ?? String.fromCharCode(65 + correctKey)}
+                                                </Tag>
+                                              </td>
+                                              <td className="p-3 text-center align-middle border-l border-surface-container/60">
+                                                <span className={`text-xs font-black block ${isRowCorrect ? 'text-green-600' : userRowPick === null ? 'text-gray-400' : 'text-red-500'}`}>
+                                                  {isRowCorrect ? row.points || 1 : 0} / {row.points || 1}
+                                                </span>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
                                 </div>
-                              ) : (
-                                <Text className="text-sm font-bold text-gray-400 italic">— Tidak dijawab</Text>
-                              )}
-                            </div>
 
-                            {/* Options */}
-                            <div className="space-y-3">
-                              <Text className="text-xs font-bold uppercase tracking-widest text-on-surface/40 pl-2">Pilihan Jawaban</Text>
-                              {current.options
-                                .map((opt, idx) => ({ opt, idx }))
-                                .filter(({ opt, idx }) => {
-                                  const isCorrect = (current.correct_answers || []).includes(idx);
-                                  return isCorrect || (opt && opt.trim() !== '');
-                                })
-                                .map(({ opt, idx }) => {
-                                  const isCorrect = (current.correct_answers || []).includes(idx);
-                                  const isUserPick = (current.selected_options || []).includes(idx);
-                                  const label = String.fromCharCode(65 + idx);
-
-                                  let wrapCls = 'border border-surface-container bg-white';
-                                  let labelCls = 'bg-surface-low text-on-surface/60';
-                                  let textCls = 'text-on-surface/80';
-                                  let icon = null;
-
-                                  if (isCorrect && isUserPick) {
-                                    wrapCls = 'border-green-500 bg-green-50 ring-1 ring-green-500 shadow-sm';
-                                    labelCls = 'bg-green-500 text-white';
-                                    textCls = 'text-green-800 font-semibold';
-                                    icon = <CheckCircleFilled className="text-green-500 text-xl shrink-0" />;
-                                  } else if (isCorrect) {
-                                    wrapCls = 'border-green-400 bg-green-50/60 ring-1 ring-green-400';
-                                    labelCls = 'bg-green-400 text-white';
-                                    textCls = 'text-green-800 font-semibold';
-                                    icon = <CheckCircleFilled className="text-green-400 text-xl shrink-0" />;
-                                  } else if (isUserPick && !isCorrect) {
-                                    wrapCls = 'border-red-500 bg-red-50/60 ring-1 ring-red-500 shadow-sm';
-                                    labelCls = 'bg-red-500 text-white';
-                                    textCls = 'text-red-800';
-                                    icon = <CloseCircleFilled className="text-red-500 text-xl shrink-0" />;
-                                  }
-
-                                  return (
-                                    <div key={idx} className={`p-4 lg:p-5 rounded-2xl flex items-center justify-between transition-all ${wrapCls}`}>
-                                      <div className="flex items-center gap-4">
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-base shrink-0 transition-colors ${labelCls}`}>
-                                          {label}
-                                        </div>
-                                        {opt && opt.trim() !== '' ? (
-                                          <span
-                                            className={`text-base font-medium leading-relaxed ${textCls}`}
-                                            dangerouslySetInnerHTML={{ __html: renderLatex(opt) }}
-                                          />
-                                        ) : (
-                                          <span className={`text-base font-medium italic opacity-60 ${textCls}`}>
-                                            (Data opsi tidak tersedia)
-                                          </span>
-                                        )}
+                                {/* Row discussions */}
+                                {current.rows.some(r => r.discussion && r.discussion.trim() !== '') && (
+                                  <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-5 space-y-4">
+                                    <div className="flex gap-2.5 items-center mb-1">
+                                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-500 text-sm shrink-0">
+                                        <BulbOutlined />
                                       </div>
-                                      {icon}
+                                      <Title level={5} className="!m-0 !font-manrope !font-black !text-sm !text-blue-900">Pembahasan Baris</Title>
                                     </div>
-                                  );
-                                })}
-                            </div>
+                                    {current.rows.map((row, rIdx) => {
+                                      if (!row.discussion || row.discussion.trim() === '') return null;
+                                      return (
+                                        <div key={`disc-${rIdx}`} className="border-t border-blue-100 pt-3 first:border-0 first:pt-0">
+                                          <div className="flex items-start gap-2.5">
+                                            <Tag className="rounded-lg bg-blue-500 text-white border-none font-bold text-[11px] shrink-0 mt-0.5">
+                                              Baris {rIdx + 1}
+                                            </Tag>
+                                            <div className="flex-1 space-y-1">
+                                              <div className="text-xs font-bold text-blue-900/50 leading-snug" dangerouslySetInnerHTML={{ __html: renderLatex(row.question) }} />
+                                              <div
+                                                className="text-xs text-blue-950/90 font-normal font-sans leading-relaxed"
+                                                dangerouslySetInnerHTML={{ __html: renderLatex(row.discussion) }}
+                                              />
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              /* Standard Options Review for Single / Multiple Choice */
+                              <>
+                                {/* Kamu Memilih */}
+                                <div className="flex items-start gap-2 mb-5 px-1">
+                                  <Text className="text-xs font-bold text-on-surface/40 uppercase tracking-wider shrink-0 mt-1">Kamu memilih:</Text>
+                                  {current.selected_options.length > 0 ? (
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      {current.selected_options.sort((a, b) => a - b).map(optIdx => {
+                                        const optLabel = String.fromCharCode(65 + optIdx);
+                                        const isThisCorrect = (current.correct_answers || []).includes(optIdx);
+                                        return (
+                                          <span
+                                            key={optIdx}
+                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-black ${
+                                              isThisCorrect ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                                            }`}
+                                          >
+                                            {optLabel} {isThisCorrect ? '✓' : '✗'}
+                                          </span>
+                                        );
+                                      })}
+                                      <Text className={`text-sm font-bold ${current.is_correct ? 'text-green-600' : 'text-red-500'}`}>
+                                        {current.is_correct ? '— Benar!' : '— Salah'}
+                                      </Text>
+                                    </div>
+                                  ) : (
+                                    <Text className="text-sm font-bold text-gray-400 italic">— Tidak dijawab</Text>
+                                  )}
+                                </div>
+
+                                {/* Options */}
+                                <div className="space-y-3">
+                                  <Text className="text-xs font-bold uppercase tracking-widest text-on-surface/40 pl-2">Pilihan Jawaban</Text>
+                                  {current.options
+                                    .map((opt, idx) => ({ opt, idx }))
+                                    .filter(({ opt, idx }) => {
+                                      const isCorrect = (current.correct_answers || []).includes(idx);
+                                      return isCorrect || (opt && opt.trim() !== '');
+                                    })
+                                    .map(({ opt, idx }) => {
+                                      const isCorrect = (current.correct_answers || []).includes(idx);
+                                      const isUserPick = (current.selected_options || []).includes(idx);
+                                      const label = String.fromCharCode(65 + idx);
+
+                                      let wrapCls = 'border border-surface-container bg-white';
+                                      let labelCls = 'bg-surface-low text-on-surface/60';
+                                      let textCls = 'text-on-surface/80';
+                                      let icon = null;
+
+                                      if (isCorrect && isUserPick) {
+                                        wrapCls = 'border-green-500 bg-green-50 ring-1 ring-green-500 shadow-sm';
+                                        labelCls = 'bg-green-500 text-white';
+                                        textCls = 'text-green-800 font-semibold';
+                                        icon = <CheckCircleFilled className="text-green-500 text-xl shrink-0" />;
+                                      } else if (isCorrect) {
+                                        wrapCls = 'border-green-400 bg-green-50/60 ring-1 ring-green-400';
+                                        labelCls = 'bg-green-400 text-white';
+                                        textCls = 'text-green-800 font-semibold';
+                                        icon = <CheckCircleFilled className="text-green-400 text-xl shrink-0" />;
+                                      } else if (isUserPick && !isCorrect) {
+                                        wrapCls = 'border-red-500 bg-red-50/60 ring-1 ring-red-500 shadow-sm';
+                                        labelCls = 'bg-red-500 text-white';
+                                        textCls = 'text-red-800';
+                                        icon = <CloseCircleFilled className="text-red-500 text-xl shrink-0" />;
+                                      }
+
+                                      return (
+                                        <div key={idx} className={`p-4 lg:p-5 rounded-2xl flex items-center justify-between transition-all ${wrapCls}`}>
+                                          <div className="flex items-center gap-4">
+                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-base shrink-0 transition-colors ${labelCls}`}>
+                                              {label}
+                                            </div>
+                                            {opt && opt.trim() !== '' ? (
+                                              <span
+                                                className={`text-base font-medium leading-relaxed ${textCls}`}
+                                                dangerouslySetInnerHTML={{ __html: renderLatex(opt) }}
+                                              />
+                                            ) : (
+                                              <span className={`text-base font-medium italic opacity-60 ${textCls}`}>
+                                                (Data opsi tidak tersedia)
+                                              </span>
+                                            )}
+                                          </div>
+                                          {icon}
+                                        </div>
+                                      );
+                                    })}
+                                </div>
+                              </>
+                            )}
 
                             {/* Discussion */}
                             {current.discussion && (

@@ -106,39 +106,93 @@ func SubmitExam(c echo.Context) error {
 		}
 
 		if q.Type == "nested" || q.Type == "scenario" || q.Type == "table" || q.Type == "linked" {
-			// Scenario / Table Based: Independent Scoring for each sub-question
+			// Scenario / Table / Linked Based: Independent Scoring for each sub-question
 			for _, sub := range q.SubQuestions {
-				subSelected, hasSubAns := req.Answers[sub.ClientID] // Frontend sends ClientID keys
-				if !hasSubAns {
-					subSelected = []int{}
+				if sub.Type == "table" && sub.RowsJSON != "" && sub.RowsJSON != "[]" {
+					var rows []tableRowPayload
+					json.Unmarshal([]byte(sub.RowsJSON), &rows)
+
+					var subCols []string
+					json.Unmarshal([]byte(sub.OptionsJSON), &subCols)
+					if len(subCols) == 0 {
+						subCols = []string{"Benar", "Salah"}
+					}
+
+					var subPts float64 = 0
+					var allCorrect = true
+					rowAnswersMap := make(map[string][]int)
+
+					for _, r := range rows {
+						rowKey := fmt.Sprintf("%s_%s", sub.ClientID, r.ID)
+						rowSelected, hasRowAns := req.Answers[rowKey]
+						if !hasRowAns {
+							rowSelected, hasRowAns = req.Answers[r.ID]
+						}
+						if !hasRowAns {
+							rowSelected = []int{}
+						}
+						rowAnswersMap[r.ID] = rowSelected
+
+						rowCorrect := []int{r.Correct}
+						totalIncorrect := len(subCols) - len(rowCorrect)
+						if totalIncorrect < 0 {
+							totalIncorrect = 0
+						}
+						pts, isCorrect := calculateScoreMulti("single", rowSelected, rowCorrect, r.Points, "all_or_nothing", totalIncorrect)
+						subPts += pts
+						if !isCorrect {
+							allCorrect = false
+						}
+					}
+					totalScore += subPts
+
+					b, _ := json.Marshal(rowAnswersMap)
+					subID := sub.ID
+					examAnswers = append(examAnswers, model.ExamAnswer{
+						SessionID:           session.ID,
+						QuestionID:          q.ID,
+						SubQuestionID:       &subID,
+						SelectedOptionsJSON: string(b),
+						IsCorrect:           allCorrect,
+						PointsEarned:        subPts,
+					})
+				} else {
+					subSelected, hasSubAns := req.Answers[sub.ClientID] // Frontend sends ClientID keys
+					if !hasSubAns {
+						subSelected = []int{}
+					}
+
+					subCorrect := parseCorrectJSON(sub.CorrectJSON)
+
+					// Calculate totalIncorrect from sub-question options or parent options (for table)
+					var subOpts []string
+					json.Unmarshal([]byte(sub.OptionsJSON), &subOpts)
+					if len(subOpts) == 0 && q.Type == "table" {
+						json.Unmarshal([]byte(q.OptionsJSON), &subOpts)
+					}
+					totalIncorrect := len(subOpts) - len(subCorrect)
+					if totalIncorrect < 0 {
+						totalIncorrect = 0
+					}
+
+					method := sub.ScoringMethod
+					if method == "" {
+						method = "all_or_nothing"
+					}
+					pts, isCorrect := calculateScoreMulti(sub.Type, subSelected, subCorrect, sub.Points, method, totalIncorrect)
+					totalScore += pts
+
+					b, _ := json.Marshal(subSelected)
+					subID := sub.ID
+					examAnswers = append(examAnswers, model.ExamAnswer{
+						SessionID:           session.ID,
+						QuestionID:          q.ID,
+						SubQuestionID:       &subID,
+						SelectedOptionsJSON: string(b),
+						IsCorrect:           isCorrect,
+						PointsEarned:        pts,
+					})
 				}
-
-				subCorrect := parseCorrectJSON(sub.CorrectJSON)
-
-				// Calculate totalIncorrect from sub-question options or parent options (for table)
-				var subOpts []string
-				json.Unmarshal([]byte(sub.OptionsJSON), &subOpts)
-				if len(subOpts) == 0 && q.Type == "table" {
-					json.Unmarshal([]byte(q.OptionsJSON), &subOpts)
-				}
-				totalIncorrect := len(subOpts) - len(subCorrect)
-				if totalIncorrect < 0 {
-					totalIncorrect = 0
-				}
-
-				pts, isCorrect := calculateScoreMulti(sub.Type, subSelected, subCorrect, sub.Points, "all_or_nothing", totalIncorrect)
-				totalScore += pts
-
-				b, _ := json.Marshal(subSelected)
-				subID := sub.ID
-				examAnswers = append(examAnswers, model.ExamAnswer{
-					SessionID:           session.ID,
-					QuestionID:          q.ID,
-					SubQuestionID:       &subID,
-					SelectedOptionsJSON: string(b),
-					IsCorrect:           isCorrect,
-					PointsEarned:        pts,
-				})
 			}
 		} else {
 			// Single or Multiple
@@ -297,13 +351,15 @@ func GetExamSession(c echo.Context) error {
 		PointsEarned    float64 `json:"points_earned"`
 		MaxPoints       float64 `json:"max_points"`
 		// Question details
-		QuestionText   string   `json:"question_text"`
-		QuestionTitle  string   `json:"question_title"`
-		QuestionType   string   `json:"question_type"`
-		ScoringMethod  string   `json:"scoring_method"`
-		Options        []string `json:"options"`
-		CorrectAnswers []int    `json:"correct_answers"`
-		Discussion     string   `json:"discussion"`
+		QuestionText   string      `json:"question_text"`
+		QuestionTitle  string      `json:"question_title"`
+		QuestionType   string      `json:"question_type"`
+		ScoringMethod  string      `json:"scoring_method"`
+		Options        []string    `json:"options"`
+		CorrectAnswers []int       `json:"correct_answers"`
+		Discussion     string      `json:"discussion"`
+		Rows           interface{} `json:"rows,omitempty"`
+		RowAnswers     interface{} `json:"row_answers,omitempty"`
 		// Scenario context
 		ParentQuestion string   `json:"parent_question,omitempty"`
 		ParentTitle    string   `json:"parent_title,omitempty"`
@@ -442,8 +498,12 @@ func GetExamSession(c echo.Context) error {
 				if err := connection.DB.Where("id = ?", *ans.SubQuestionID).First(&sub).Error; err == nil {
 					detail.QuestionText = sub.Question
 					detail.QuestionType = sub.Type
+					if sub.Title != "" {
+						detail.QuestionTitle = sub.Title
+					}
 					detail.Discussion = sub.Discussion
 					detail.MaxPoints = sub.Points
+					detail.ScoringMethod = sub.ScoringMethod
 
 					var opts []string
 					json.Unmarshal([]byte(sub.OptionsJSON), &opts)
@@ -452,6 +512,17 @@ func GetExamSession(c echo.Context) error {
 					}
 					detail.Options = opts
 					detail.CorrectAnswers = parseCorrectJSON(sub.CorrectJSON)
+
+					if sub.RowsJSON != "" && sub.RowsJSON != "[]" {
+						var subRows []tableRowPayload
+						json.Unmarshal([]byte(sub.RowsJSON), &subRows)
+						detail.Rows = subRows
+
+						var rowAnsMap map[string][]int
+						if err := json.Unmarshal([]byte(ans.SelectedOptionsJSON), &rowAnsMap); err == nil {
+							detail.RowAnswers = rowAnsMap
+						}
+					}
 				}
 			}
 		} else {

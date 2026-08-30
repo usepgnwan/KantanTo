@@ -45,17 +45,20 @@ type PackageQuestion struct {
 }
 
 type PackageSubQuestion struct {
-	ID          uint      `gorm:"primaryKey" json:"id"`
-	QuestionID  uint      `gorm:"index;not null" json:"question_id"`
-	ClientID    string    `gorm:"index;not null" json:"client_id"`
-	Type        string    `json:"type"`
-	Question    string    `json:"question"`
-	Discussion  string    `json:"discussion"`
-	OptionsJSON string    `gorm:"type:jsonb" json:"-"`
-	CorrectJSON string    `gorm:"type:jsonb" json:"-"`
-	Points      float64   `json:"points"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID            uint      `gorm:"primaryKey" json:"id"`
+	QuestionID    uint      `gorm:"index;not null" json:"question_id"`
+	ClientID      string    `gorm:"index;not null" json:"client_id"`
+	Type          string    `json:"type"`
+	Title         string    `json:"title"`
+	Question      string    `json:"question"`
+	Discussion    string    `json:"discussion"`
+	OptionsJSON   string    `gorm:"type:jsonb" json:"-"`
+	CorrectJSON   string    `gorm:"type:jsonb" json:"-"`
+	RowsJSON      string    `gorm:"type:jsonb" json:"-"`
+	ScoringMethod string    `json:"scoring_method"`
+	Points        float64   `json:"points"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
 
 type PackageMaterial struct {
