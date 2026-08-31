@@ -11,6 +11,12 @@ const api = axios.create({
   },
 });
 
+export interface ApplicablePackageSummary {
+  id: number;
+  title: string;
+  slug: string;
+}
+
 export interface Voucher {
   key?: string; // mapping to frontend
   id?: number;
@@ -21,6 +27,8 @@ export interface Voucher {
   used: number;
   expiryDate: string;
   status?: 'active' | 'expired' | 'finished';
+  applicable_package_ids?: number[];
+  applicable_packages?: ApplicablePackageSummary[];
 }
 
 export interface VoucherUsage {
@@ -53,6 +61,16 @@ const normalizeVoucher = (v: any): Voucher => ({
   used: Number(v.used) || 0,
   expiryDate: v.expiryDate || '',
   status: v.status || 'active',
+  applicable_package_ids: Array.isArray(v.applicable_package_ids)
+    ? v.applicable_package_ids.map(Number)
+    : [],
+  applicable_packages: Array.isArray(v.applicable_packages)
+    ? v.applicable_packages.map((pkg: any) => ({
+        id: Number(pkg.id),
+        title: pkg.title || '',
+        slug: pkg.slug || '',
+      }))
+    : undefined,
 });
 
 export const getVouchers = async (): Promise<Voucher[]> => {
@@ -74,8 +92,20 @@ export const deleteVoucher = async (id: number | string): Promise<void> => {
   await api.delete(`/vouchers/${id}`);
 };
 
-export const applyVoucherAPI = async (code: string, userId: number): Promise<Voucher> => {
-  const response = await api.post('/vouchers/apply', { code, user_id: userId });
+export const applyVoucherAPI = async (
+  code: string,
+  userId: number,
+  packageSlugs?: string[],
+  packageSlug?: string,
+  packageId?: number
+): Promise<Voucher> => {
+  const response = await api.post('/vouchers/apply', {
+    code,
+    user_id: userId,
+    package_slugs: packageSlugs,
+    package_slug: packageSlug,
+    package_id: packageId,
+  });
   return normalizeVoucher(unwrapItem(response.data));
 };
 

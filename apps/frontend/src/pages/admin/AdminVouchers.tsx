@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getVouchers, createVoucher, updateVoucher, deleteVoucher, Voucher, VoucherUsage, getVoucherUsageHistoryAPI } from '../../services/voucherService';
+import { getPackages, PackageListItem } from '../../services/packageService';
 import AdminLayout from '../../layouts/AdminLayout';
 import {
   Card, Table, Button, Tag, Typography, Space, Modal,
   Form, Input, InputNumber, DatePicker, Select, message,
-  Row, Col, Progress
+  Row, Col, Progress, Radio, Tooltip
 } from 'antd';
 import type { TableColumnsType } from 'antd';
 import {
@@ -17,6 +18,7 @@ import {
   SafetyOutlined,
   SearchOutlined,
   HistoryOutlined,
+  AppstoreOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
@@ -26,6 +28,7 @@ const { Title, Text } = Typography;
 
 const AdminVouchers: React.FC = () => {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
+  const [packages, setPackages] = useState<PackageListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -33,6 +36,7 @@ const AdminVouchers: React.FC = () => {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [editTarget, setEditTarget] = useState<Voucher | null>(null);
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
+  const [packageScope, setPackageScope] = useState<'all' | 'specific'>('all');
   const [form] = Form.useForm();
 
   const getVoucherStatus = (v: Voucher): 'active' | 'expired' | 'finished' => {
@@ -53,13 +57,28 @@ const AdminVouchers: React.FC = () => {
     }
   };
 
+  const fetchPackages = async () => {
+    try {
+      const pkgs = await getPackages();
+      setPackages(pkgs);
+    } catch (error) {
+      console.error('Gagal memuat daftar paket', error);
+    }
+  };
+
   React.useEffect(() => {
     fetchVouchers();
+    fetchPackages();
   }, []);
 
   const openCreate = () => {
     setEditTarget(null);
+    setPackageScope('all');
     form.resetFields();
+    form.setFieldsValue({
+      packageScope: 'all',
+      applicable_package_ids: [],
+    });
     setModalOpen(true);
   };
 
@@ -81,9 +100,14 @@ const AdminVouchers: React.FC = () => {
 
   const openEdit = (v: Voucher) => {
     setEditTarget(v);
+    const hasSpecificPackages = Array.isArray(v.applicable_package_ids) && v.applicable_package_ids.length > 0;
+    const scope = hasSpecificPackages ? 'specific' : 'all';
+    setPackageScope(scope);
     form.setFieldsValue({
       ...v,
       expiryDate: dayjs(v.expiryDate),
+      packageScope: scope,
+      applicable_package_ids: hasSpecificPackages ? v.applicable_package_ids : [],
     });
     setModalOpen(true);
   };
@@ -91,9 +115,20 @@ const AdminVouchers: React.FC = () => {
   const handleSubmit = async () => {
     try {
       const vals = await form.validateFields();
+      const targetPackageIDs = vals.packageScope === 'specific' ? (vals.applicable_package_ids || []) : [];
+      
+      if (vals.packageScope === 'specific' && targetPackageIDs.length === 0) {
+        message.warning('Pilih minimal satu paket yang berlaku');
+        return;
+      }
+
       const formattedVals = {
-        ...vals,
+        code: vals.code,
+        type: vals.type,
+        value: vals.value,
+        limit: vals.limit,
         expiryDate: vals.expiryDate.format('YYYY-MM-DD'),
+        applicable_package_ids: targetPackageIDs,
       };
 
       if (editTarget && editTarget.id) {
@@ -144,6 +179,46 @@ const AdminVouchers: React.FC = () => {
           {r.type === 'percentage' ? `${r.value}%` : `Rp ${r.value.toLocaleString('id-ID')}`}
         </span>
       )
+    },
+    {
+      title: 'Paket Berlaku',
+      key: 'applicable_packages',
+      render: (_, r) => {
+        const pkgIds = r.applicable_package_ids || [];
+        if (pkgIds.length === 0) {
+          return (
+            <Tag color="blue" className="rounded-full font-bold px-3">
+              Semua Paket
+            </Tag>
+          );
+        }
+
+        const matchedPkgs = packages.filter((p) => pkgIds.includes(p.id));
+        if (matchedPkgs.length === 0) {
+          return (
+            <Tag color="orange" className="rounded-full font-bold px-3">
+              {pkgIds.length} Paket Spesifik
+            </Tag>
+          );
+        }
+
+        return (
+          <Tooltip title={matchedPkgs.map((p) => p.title).join(', ')}>
+            <Space wrap size={[0, 4]}>
+              {matchedPkgs.slice(0, 2).map((p) => (
+                <Tag key={p.id} color="purple" className="rounded-lg font-medium text-xs">
+                  {p.title.length > 18 ? `${p.title.substring(0, 18)}...` : p.title}
+                </Tag>
+              ))}
+              {matchedPkgs.length > 2 && (
+                <Tag color="default" className="rounded-lg font-bold text-xs">
+                  +{matchedPkgs.length - 2} lagi
+                </Tag>
+              )}
+            </Space>
+          </Tooltip>
+        );
+      },
     },
     {
       title: 'Penggunaan',
@@ -330,6 +405,66 @@ const AdminVouchers: React.FC = () => {
               </Form.Item>
             </Col>
           </Row>
+
+          <Form.Item
+            name="packageScope"
+            label={<span className="font-bold text-sm">Cakupan Paket</span>}
+            initialValue="all"
+          >
+            <Radio.Group
+              onChange={(e) => setPackageScope(e.target.value)}
+              className="w-full grid grid-cols-2 gap-3"
+            >
+              <Radio.Button
+                value="all"
+                className="h-12 flex items-center justify-center rounded-xl font-bold text-center border"
+              >
+                Semua Paket
+              </Radio.Button>
+              <Radio.Button
+                value="specific"
+                className="h-12 flex items-center justify-center rounded-xl font-bold text-center border"
+              >
+                Paket Tertentu (1 - N)
+              </Radio.Button>
+            </Radio.Group>
+          </Form.Item>
+
+          {packageScope === 'specific' && (
+            <Form.Item
+              name="applicable_package_ids"
+              label={
+                <span className="font-bold text-sm">
+                  Pilih Paket yang Berlaku{' '}
+                  <span className="text-primary text-xs font-normal">
+                    (bisa pilih 1 atau lebih paket)
+                  </span>
+                </span>
+              }
+              rules={[
+                {
+                  required: true,
+                  message: 'Pilih minimal satu paket yang berlaku',
+                },
+              ]}
+            >
+              <Select
+                mode="multiple"
+                allowClear
+                placeholder="Pilih paket yang mendapatkan potongan..."
+                className="w-full min-h-[48px] rounded-xl"
+                options={packages.map((pkg) => ({
+                  value: pkg.id,
+                  label: `${pkg.title} (${pkg.category || 'Paket'})`,
+                }))}
+                filterOption={(input, option) =>
+                  (option?.label ?? '')
+                    .toLowerCase()
+                    .includes(input.toLowerCase())
+                }
+              />
+            </Form.Item>
+          )}
         </Form>
       </Modal>
 

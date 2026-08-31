@@ -1,8 +1,12 @@
 package controller
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
+
 	"gorm.io/gorm"
 	. "server/app/helpers"
 	"server/app/model"
@@ -33,6 +37,13 @@ func GetVouchers(c echo.Context) error {
 	}
 
 	result := data.Paginate(query, c)
+	if vouchers, ok := result.Rows.([]model.Voucher); ok {
+		for i := range vouchers {
+			vouchers[i].PopulateApplicablePackages()
+		}
+		result.Rows = vouchers
+	}
+
 	return c.JSON(http.StatusOK, Response{Status: true, Message: "Success get data", Data: result})
 }
 
@@ -52,6 +63,7 @@ func GetVoucherByID(c echo.Context) error {
 	if err := connection.DB.First(&voucher, id).Error; err != nil {
 		return c.JSON(http.StatusNotFound, Response{Status: false, Message: "Data tidak ditemukan"})
 	}
+	voucher.PopulateApplicablePackages()
 	return c.JSON(http.StatusOK, Response{Status: true, Message: "Success", Data: voucher})
 }
 
@@ -81,9 +93,19 @@ func CreateVoucher(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Kode voucher sudah digunakan"})
 	}
 	
+	if voucher.ApplicablePackageIDs != nil {
+		bytes, err := json.Marshal(voucher.ApplicablePackageIDs)
+		if err == nil {
+			voucher.ApplicablePackagesJSON = string(bytes)
+		}
+	} else if voucher.ApplicablePackagesJSON == "" {
+		voucher.ApplicablePackagesJSON = "[]"
+	}
+
 	if err := connection.DB.Create(&voucher).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, Response{Status: false, Message: "Gagal menyimpan data"})
 	}
+	voucher.PopulateApplicablePackages()
 	return c.JSON(http.StatusCreated, Response{Status: true, Message: "Created successfully", Data: voucher})
 }
 
@@ -114,7 +136,15 @@ func UpdateVoucher(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Kode voucher sudah digunakan oleh voucher lain"})
 	}
 
+	if voucher.ApplicablePackageIDs != nil {
+		bytes, err := json.Marshal(voucher.ApplicablePackageIDs)
+		if err == nil {
+			voucher.ApplicablePackagesJSON = string(bytes)
+		}
+	}
+
 	connection.DB.Save(&voucher)
+	voucher.PopulateApplicablePackages()
 	return c.JSON(http.StatusOK, Response{Status: true, Message: "Updated successfully", Data: voucher})
 }
 
@@ -138,7 +168,7 @@ func DeleteVoucher(c echo.Context) error {
 
 // ApplyVoucher godoc
 // @Summary      Apply Voucher
-// @Description  Validate and apply a voucher code for a specific user
+// @Description  Validate and apply a voucher code for a specific user and optional package
 // @Tags         Voucher
 // @Accept       json
 // @Produce      json
@@ -147,8 +177,12 @@ func DeleteVoucher(c echo.Context) error {
 // @Router       /api/vouchers/apply [post]
 func ApplyVoucher(c echo.Context) error {
 	type ApplyRequest struct {
-		Code   string `json:"code"`
-		UserID uint   `json:"user_id"`
+		Code         string   `json:"code"`
+		UserID       uint     `json:"user_id"`
+		PackageSlug  string   `json:"package_slug"`
+		PackageSlugs []string `json:"package_slugs"`
+		PackageID    uint     `json:"package_id"`
+		PackageIDs   []uint   `json:"package_ids"`
 	}
 	req := new(ApplyRequest)
 	if err := c.Bind(req); err != nil {
@@ -159,6 +193,7 @@ func ApplyVoucher(c echo.Context) error {
 	if err := connection.DB.Where("code = ?", req.Code).First(&voucher).Error; err != nil {
 		return c.JSON(http.StatusNotFound, Response{Status: false, Message: "Voucher tidak ditemukan"})
 	}
+	voucher.PopulateApplicablePackages()
 
 	if voucher.Status != "active" {
 		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Voucher tidak aktif atau sudah kadaluarsa"})
@@ -168,9 +203,80 @@ func ApplyVoucher(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Kuota penggunaan voucher telah habis"})
 	}
 
+	// Validate applicable package if restricted
+	if len(voucher.ApplicablePackageIDs) > 0 {
+		var allSlugs []string
+		if req.PackageSlug != "" {
+			allSlugs = append(allSlugs, req.PackageSlug)
+		}
+		if len(req.PackageSlugs) > 0 {
+			allSlugs = append(allSlugs, req.PackageSlugs...)
+		}
+
+		var allIDs []uint
+		if req.PackageID > 0 {
+			allIDs = append(allIDs, req.PackageID)
+		}
+		if len(req.PackageIDs) > 0 {
+			allIDs = append(allIDs, req.PackageIDs...)
+		}
+
+		// Parse any numeric ID string in slugs
+		for _, s := range allSlugs {
+			if s != "" {
+				if idNum, err := strconv.Atoi(s); err == nil && idNum > 0 {
+					allIDs = append(allIDs, uint(idNum))
+				}
+			}
+		}
+
+		// Resolve slugs to package IDs from database
+		if len(allSlugs) > 0 {
+			var pkgIDs []uint
+			connection.DB.Model(&model.Package{}).Where("slug IN ?", allSlugs).Pluck("id", &pkgIDs)
+			allIDs = append(allIDs, pkgIDs...)
+		}
+
+		if len(allIDs) == 0 {
+			return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Voucher ini hanya berlaku untuk paket tertentu"})
+		}
+
+		matched := false
+		for _, targetID := range allIDs {
+			if voucher.IsApplicableToPackage(targetID) {
+				matched = true
+				break
+			}
+		}
+
+		if !matched {
+			var pkgs []model.Package
+			connection.DB.Select("id, title").Where("id IN ?", voucher.ApplicablePackageIDs).Find(&pkgs)
+			var titles []string
+			for _, p := range pkgs {
+				titles = append(titles, p.Title)
+			}
+			if len(titles) > 0 {
+				return c.JSON(http.StatusBadRequest, Response{
+					Status:  false,
+					Message: fmt.Sprintf("Voucher ini hanya berlaku untuk: %s", strings.Join(titles, ", ")),
+				})
+			}
+			return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Voucher tidak berlaku untuk paket ini"})
+		}
+	}
+
 	var usage model.VoucherUsage
 	if err := connection.DB.Where("voucher_id = ? AND user_id = ?", voucher.ID, req.UserID).First(&usage).Error; err == nil {
 		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Voucher sudah pernah digunakan oleh akun ini"})
+	}
+
+	// Populate package details in voucher response
+	if len(voucher.ApplicablePackageIDs) > 0 {
+		connection.DB.Model(&model.Package{}).
+			Where("id IN ?", voucher.ApplicablePackageIDs).
+			Select("id, title, slug").
+			Scan(&voucher.ApplicablePackages)
 	}
 
 	return c.JSON(http.StatusOK, Response{Status: true, Message: "Voucher berhasil diterapkan", Data: voucher})

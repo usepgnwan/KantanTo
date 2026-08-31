@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { message } from 'antd';
 import { Voucher } from '../services/voucherService';
 
 export interface CartItem {
@@ -67,7 +68,29 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const removeFromCart = (id: string) => {
-    setItems((prev) => prev.filter((item) => item.id !== id));
+    setItems((prev) => {
+      const updated = prev.filter((item) => item.id !== id);
+      if (appliedVoucher) {
+        if (updated.length === 0) {
+          setAppliedVoucher(null);
+        } else if (appliedVoucher.applicable_package_ids && appliedVoucher.applicable_package_ids.length > 0) {
+          const stillEligible = updated.some((item) => {
+            const itemSlug = item.slug || item.id;
+            const itemIdNum = Number(item.id);
+            const matchesId = !isNaN(itemIdNum) && appliedVoucher.applicable_package_ids?.includes(itemIdNum);
+            const matchesSummary = appliedVoucher.applicable_packages?.some(
+              (ap) => ap.slug === itemSlug || ap.id === itemIdNum
+            );
+            return matchesId || matchesSummary;
+          });
+          if (!stillEligible) {
+            setAppliedVoucher(null);
+            message.warning('Voucher dilepas karena paket yang memenuhi syarat telah dihapus dari keranjang');
+          }
+        }
+      }
+      return updated;
+    });
   };
 
   const updateQuantity = (id: string, delta: number) => {

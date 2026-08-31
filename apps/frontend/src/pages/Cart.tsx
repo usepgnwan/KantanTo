@@ -62,6 +62,8 @@ const CartPage: React.FC = () => {
                   total={total}
                   ppnRate={ppn}
                   appliedVoucher={appliedVoucher}
+                  packageSlug={items[0]?.slug || items[0]?.id}
+                  packageSlugs={items.map((i) => i.slug || i.id).filter(Boolean)}
                   onApplyVoucher={applyVoucher}
                   onRemoveVoucher={removeVoucher}
                   onCheckout={() => navigate('/checkout')} 
