@@ -86,7 +86,7 @@ const CheckoutPage: React.FC = () => {
     try {
       const res = await checkoutAPI({
         user_id: user.id,
-        package_slug: currentCart[0].id,
+        package_slug: currentCart[0].slug || currentCart[0].id,
         voucher_code: appliedVoucher?.code,
       });
       setOrderNumber(res.invoice_code || res.order_id);

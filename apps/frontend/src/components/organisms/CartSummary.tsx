@@ -13,12 +13,25 @@ interface CartSummaryProps {
   total: number;
   ppnRate: number;
   appliedVoucher: Voucher | null;
+  packageSlug?: string;
+  packageSlugs?: string[];
   onApplyVoucher: (voucher: Voucher) => void;
   onRemoveVoucher: () => void;
   onCheckout: () => void;
 }
 
-const CartSummary: React.FC<CartSummaryProps> = ({ subtotal, tax, total, ppnRate, appliedVoucher, onApplyVoucher, onRemoveVoucher, onCheckout }) => {
+const CartSummary: React.FC<CartSummaryProps> = ({
+  subtotal,
+  tax,
+  total,
+  ppnRate,
+  appliedVoucher,
+  packageSlug,
+  packageSlugs,
+  onApplyVoucher,
+  onRemoveVoucher,
+  onCheckout,
+}) => {
   const [code, setCode] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const { user } = useAuth();
@@ -32,8 +45,8 @@ const CartSummary: React.FC<CartSummaryProps> = ({ subtotal, tax, total, ppnRate
     
     setLoading(true);
     try {
-      // payload expects user_id
-      const v = await applyVoucherAPI(code.trim(), user.id);
+      // payload expects user_id, package_slugs and optional package_slug
+      const v = await applyVoucherAPI(code.trim(), user.id, packageSlugs, packageSlug);
       onApplyVoucher(v);
       message.success('Voucher berhasil digunakan!');
       setCode('');

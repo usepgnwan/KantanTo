@@ -73,7 +73,8 @@ func Checkout(c echo.Context) error {
 	if req.VoucherCode != "" {
 		var v model.Voucher
 		if err := connection.DB.Where("code = ?", req.VoucherCode).First(&v).Error; err == nil {
-			if v.Status == "active" && v.Used < v.Limit {
+			v.PopulateApplicablePackages()
+			if v.Status == "active" && v.Used < v.Limit && v.IsApplicableToPackage(pkg.ID) {
 				// Check usage
 				var usage model.VoucherUsage
 				if err := connection.DB.Where("voucher_id = ? AND user_id = ?", v.ID, req.UserID).First(&usage).Error; err != nil { 
