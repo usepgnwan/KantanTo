@@ -721,7 +721,7 @@ const PackageDetailPage: React.FC = () => {
                       <Space direction="vertical" size="large" className="w-full">
                         <div>
                           <Text className="text-xs text-primary font-bold uppercase tracking-widest block mb-1">Daftar Sekarang</Text>
-                          <Title level={3} className="!m-0 !font-black !font-manrope">Akses Penuh Materi &amp; Tryout</Title>
+                          <Title level={3} className="!m-0 !font-black !font-manrope">Akses Penuh Pembahasan &amp; Tryout</Title>
                           <Text className="text-xs text-surface-on/50 block mt-1">
                             {packageData?.is_bundle ? 'Dapatkan akses ke seluruh paket kombo sekaligus dengan harga hemat.' : 'Dapatkan simulasi CBT standar nasional dan materi lengkap.'}
                           </Text>
