@@ -124,3 +124,47 @@ export const getVoucherUsageHistoryAPI = async (id: number | string): Promise<Vo
     date: new Date(u.created_at).toLocaleString('id-ID'),
   }));
 };
+
+export const isItemEligibleForVoucher = (
+  item: { id?: string | number; slug?: string },
+  voucher: Voucher | null
+): boolean => {
+  if (!voucher) return false;
+  if (!voucher.applicable_package_ids || voucher.applicable_package_ids.length === 0) {
+    return true; // berlaku untuk semua paket
+  }
+  const itemIdNum = Number(item.id);
+  const itemSlug = item.slug || (item.id !== undefined ? String(item.id) : '');
+  const matchesId = !isNaN(itemIdNum) && voucher.applicable_package_ids.includes(itemIdNum);
+  const matchesSummary = voucher.applicable_packages?.some(
+    (ap) => ap.slug === itemSlug || ap.id === itemIdNum
+  );
+  return Boolean(matchesId || matchesSummary);
+};
+
+export const calculateVoucherDiscount = (
+  voucher: Voucher | null,
+  items: Array<{ id?: string | number; slug?: string; price: number; quantity?: number }>
+): number => {
+  if (!voucher || !items || items.length === 0) return 0;
+
+  const isSpecific = Array.isArray(voucher.applicable_package_ids) && voucher.applicable_package_ids.length > 0;
+
+  const eligibleItems = isSpecific
+    ? items.filter((item) => isItemEligibleForVoucher(item, voucher))
+    : items;
+
+  const baseAmount = eligibleItems.reduce(
+    (sum, item) => sum + (Number(item.price) || 0) * (Number(item.quantity) || 1),
+    0
+  );
+
+  if (baseAmount <= 0) return 0;
+
+  if (voucher.type === 'percentage') {
+    return (baseAmount * (Number(voucher.value) || 0)) / 100;
+  } else {
+    return Math.min(baseAmount, Number(voucher.value) || 0);
+  }
+};
+

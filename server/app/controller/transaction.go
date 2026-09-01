@@ -42,7 +42,8 @@ func UpdateTransactionStatus(c echo.Context) error {
 	id := c.Param("id")
 
 	type StatusRequest struct {
-		Status string `json:"status"` // 'active', 'pending payment', 'expired'
+		Status   string `json:"status"` // 'active', 'pending payment', 'cancelled', 'expired'
+		AllGroup *bool  `json:"all_group"` // optional, default true if in same invoice_group
 	}
 
 	req := new(StatusRequest)
@@ -55,25 +56,40 @@ func UpdateTransactionStatus(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, Response{Status: false, Message: "Transaksi tidak ditemukan"})
 	}
 
-	transaction.Status = req.Status
-	if req.Status == "active" {
-		if transaction.IsLifetime {
-			transaction.ActiveUntil = nil
-		} else {
-			// Jika paket terbatas waktu, set ActiveUntil
-			durationDays := 30 // Default fallback
-			if transaction.Package.ValidityDays > 0 {
-				durationDays = transaction.Package.ValidityDays
-			}
-			t := time.Now().AddDate(0, 0, durationDays)
-			transaction.ActiveUntil = &t
-		}
-	} else if req.Status == "pending payment" {
-		transaction.ActiveUntil = nil
+	updateAll := true
+	if req.AllGroup != nil {
+		updateAll = *req.AllGroup
 	}
 
-	if err := connection.DB.Save(&transaction).Error; err != nil {
-		return c.JSON(http.StatusInternalServerError, Response{Status: false, Message: "Gagal me-update status transaksi"})
+	var transactionsToUpdate []model.Transaction
+	if updateAll {
+		if transaction.InvoiceGroup != "" {
+			connection.DB.Preload("Package").Where("invoice_group = ?", transaction.InvoiceGroup).Find(&transactionsToUpdate)
+		} else if transaction.OrderID != "" {
+			connection.DB.Preload("Package").Where("order_id = ?", transaction.OrderID).Find(&transactionsToUpdate)
+		}
+	}
+	if len(transactionsToUpdate) == 0 {
+		transactionsToUpdate = append(transactionsToUpdate, transaction)
+	}
+
+	for _, tx := range transactionsToUpdate {
+		tx.Status = req.Status
+		if req.Status == "active" {
+			if tx.IsLifetime {
+				tx.ActiveUntil = nil
+			} else {
+				durationDays := 30
+				if tx.Package.ValidityDays > 0 {
+					durationDays = tx.Package.ValidityDays
+				}
+				t := time.Now().AddDate(0, 0, durationDays)
+				tx.ActiveUntil = &t
+			}
+		} else {
+			tx.ActiveUntil = nil
+		}
+		_ = connection.DB.Save(&tx)
 	}
 
 	return c.JSON(http.StatusOK, Response{Status: true, Message: "Status transaksi berhasil diperbarui", Data: transaction})

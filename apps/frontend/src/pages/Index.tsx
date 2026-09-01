@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import dayjs from 'dayjs';
 import { Typography, Row, Col, Card, Tag, Space, Button, Empty, Spin } from 'antd';
-import { UserOutlined, CheckCircleFilled, ArrowRightOutlined, StarFilled } from '@ant-design/icons';
+import { ArrowRightOutlined, StarFilled, AppstoreOutlined } from '@ant-design/icons';
 import { useNavigate, Link } from 'react-router-dom';
 
 import AppLayout from '../layouts/AppLayout';
@@ -11,42 +12,102 @@ import InteractiveWidgets from '../components/organisms/InteractiveWidgets';
 import CustomerReviews from '../components/organisms/CustomerReviews';
 import ContactForm from '../components/organisms/ContactForm';
 import FloatingWhatsApp from '../components/atoms/FloatingWhatsApp';
+import PackageCard, { PackageProps } from '../components/molecules/PackageCard';
 
 import { getPackages, PackageListItem } from '../services/packageService';
 import { getArtikel, Artikel } from '../services/artikelService';
-import { recordMenuLogAPI } from '../services/logService';
+import { getMyPackagesAPI } from '../services/myPackageService';
 import { useAuth } from '../context/AuthContext';
 
 const backendUrl = process.env.REACT_APP_LINK_BACKEND?.replace(/\/api\/?$/, '') || 'http://127.0.0.1:3026';
+const fallbackImage = 'https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?auto=format&fit=crop&q=80&w=800';
 const { Title, Paragraph, Text } = Typography;
+
+const toPackageCard = (pkg: PackageListItem): PackageProps => {
+  let finalPrice = pkg.price;
+  let originalPrice = 0;
+
+  if (pkg.is_bundle && pkg.original_price && pkg.original_price > pkg.price) {
+    originalPrice = pkg.original_price;
+    finalPrice = pkg.price;
+  } else if (pkg.discount_type === 'percent') {
+    finalPrice = pkg.price - (pkg.price * (pkg.discount_value || 0)) / 100;
+    originalPrice = pkg.price;
+  } else if (pkg.discount_type === 'harga') {
+    finalPrice = pkg.price - (pkg.discount_value || 0);
+    originalPrice = pkg.price;
+  }
+
+  return {
+    id: pkg.slug,
+    slug: pkg.slug,
+    title: pkg.title,
+    image: pkg.thumbnail || fallbackImage,
+    price: finalPrice,
+    originalPrice: originalPrice,
+    rating: 5,
+    studentCount: 0,
+    duration: pkg.is_bundle ? 'Sesuai Sub-Paket' : (pkg.duration > 0 ? `${pkg.duration} Menit` : 'Tryout'),
+    category: pkg.category || (pkg.is_bundle ? 'Bundle Hemat' : 'Tryout'),
+    classes: pkg.classes,
+    subjects: pkg.subjects,
+    isPopular: pkg.questions_count > 0 || Boolean(pkg.is_bundle),
+    is_lifetime: pkg.is_lifetime,
+    validity_days: pkg.validity_days,
+    max_exam_attempts: pkg.max_exam_attempts,
+    questions_count: pkg.questions_count,
+    materials_count: pkg.materials_count,
+    videos_count: pkg.videos_count,
+    is_bundle: pkg.is_bundle,
+    bundled_package_ids: pkg.bundled_package_ids,
+    bundled_packages: pkg.bundled_packages,
+  };
+};
 
 const IndexPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [packages, setPackages] = useState<PackageListItem[]>([]);
+  const [packages, setPackages] = useState<PackageProps[]>([]);
+  const [ownedSlugs, setOwnedSlugs] = useState<Set<string>>(new Set());
   const [loadingPackages, setLoadingPackages] = useState(true);
+  const [activeTab, setActiveTab] = useState<'all' | 'bundle' | 'single'>('all');
 
   const [blogs, setBlogs] = useState<Artikel[]>([]);
   const [loadingBlogs, setLoadingBlogs] = useState(true);
 
-  const handlePackageClick = (pkg: PackageListItem) => {
-    const device = window.innerWidth < 768 ? 'mobile' : 'web';
-    recordMenuLogAPI({
-      path: `/paket/${pkg.slug}`,
-      label: pkg.title,
-      device,
-      user_id: user?.id,
-    });
-    navigate(`/paket/${pkg.slug}`);
-  };
+  // Fetch owned packages
+  useEffect(() => {
+    if (user?.id) {
+      getMyPackagesAPI(user.id, 'active')
+        .then((myTransactions) => {
+          const slugs = new Set(
+            (myTransactions || [])
+              .filter((tx) => {
+                if (!tx.is_lifetime && tx.active_until && dayjs(tx.active_until).isBefore(dayjs())) {
+                  return false;
+                }
+                if (tx.max_exam_attempts > 0 && tx.used_exam_attempts >= tx.max_exam_attempts) {
+                  return false;
+                }
+                return true;
+              })
+              .map((tx) => tx.package?.slug)
+              .filter(Boolean) as string[]
+          );
+          setOwnedSlugs(slugs);
+        })
+        .catch(console.error);
+    }
+  }, [user]);
 
+  // Fetch published packages
   useEffect(() => {
     let mounted = true;
 
     getPackages()
       .then((data) => {
         if (mounted) {
-          setPackages(data.filter((pkg) => pkg.status === 'published'));
+          setPackages(data.filter((pkg) => pkg.status === 'published').map(toPackageCard));
         }
       })
       .catch(() => {
@@ -78,6 +139,19 @@ const IndexPage: React.FC = () => {
     };
   }, []);
 
+  const bundleCount = useMemo(() => packages.filter(p => p.is_bundle).length, [packages]);
+  const singleCount = useMemo(() => packages.filter(p => !p.is_bundle).length, [packages]);
+
+  const displayedPackages = useMemo(() => {
+    let list = packages;
+    if (activeTab === 'bundle') {
+      list = packages.filter(p => p.is_bundle);
+    } else if (activeTab === 'single') {
+      list = packages.filter(p => !p.is_bundle);
+    }
+    return list.slice(0, 8);
+  }, [packages, activeTab]);
+
   return (
     <AppLayout>
       <HeroSection />
@@ -85,91 +159,99 @@ const IndexPage: React.FC = () => {
       <FeaturesGrid />
       <InteractiveWidgets />
 
-      {/* Package Catalog - 4 Grid */}
+      {/* Package Catalog - Katalog Tryout Unggulan */}
       <section id="paket" className="py-24 bg-background dark:bg-zinc-800/10 transition-colors duration-500">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center mb-16">
-          <Title level={2} className="!text-4xl !font-manrope mb-4">Katalog Tryout Unggulan</Title>
-          <Paragraph className="text-lg text-surface-on/60 max-w-2xl mx-auto">
-            Pilihlah paket yang sesuai dengan minat dan target PTN impian Anda.
-          </Paragraph>
-        </div>
-
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-10">
+            <div className="flex items-center justify-center gap-2 text-primary font-bold mb-2">
+              <AppstoreOutlined />
+              <span className="uppercase tracking-widest text-xs">Pilihan Terbaik</span>
+            </div>
+            <Title level={2} className="!text-3xl md:!text-5xl !font-black !font-manrope mb-4">
+              Katalog Tryout Unggulan
+            </Title>
+            <Paragraph className="text-base md:text-lg text-surface-on/60 max-w-2xl mx-auto m-0">
+              Pilihlah paket yang sesuai dengan minat dan target PTN impian Anda.
+            </Paragraph>
+          </div>
+
+          {/* Tab Filter */}
+          <div className="flex justify-center items-center gap-2 mb-12 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setActiveTab('all')}
+              className={`px-5 py-2.5 rounded-2xl text-xs md:text-sm font-bold transition-all cursor-pointer border ${
+                activeTab === 'all'
+                  ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20'
+                  : 'bg-white dark:bg-zinc-900 text-on-surface/70 border-surface-container hover:border-primary/40'
+              }`}
+            >
+              Semua Paket ({packages.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('bundle')}
+              className={`px-5 py-2.5 rounded-2xl text-xs md:text-sm font-bold transition-all cursor-pointer border flex items-center gap-2 ${
+                activeTab === 'bundle'
+                  ? 'bg-purple-600 text-white border-purple-600 shadow-lg shadow-purple-600/20'
+                  : 'bg-white dark:bg-zinc-900 text-purple-700 dark:text-purple-300 border-purple-200 hover:border-purple-400'
+              }`}
+            >
+              <span>🎁 Paket Bundle</span>
+              <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-black ${activeTab === 'bundle' ? 'bg-white/20 text-white' : 'bg-purple-100 text-purple-800'}`}>
+                {bundleCount}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('single')}
+              className={`px-5 py-2.5 rounded-2xl text-xs md:text-sm font-bold transition-all cursor-pointer border ${
+                activeTab === 'single'
+                  ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20'
+                  : 'bg-white dark:bg-zinc-900 text-on-surface/70 border-surface-container hover:border-primary/40'
+              }`}
+            >
+              Paket Satuan ({singleCount})
+            </button>
+          </div>
+
           <Spin spinning={loadingPackages}>
-            {packages.length > 0 ? (
-              <Row gutter={[24, 24]}>
-                {packages.slice(0, 4).map((pkg) => (
-                  <Col xs={24} sm={12} lg={6} key={pkg.slug}>
-                    <Card
-                      className="h-full weightless-card border-none hover:shadow-2xl transition-all"
-                      cover={
-                        <div className="h-24 bg-primary/5 flex items-center justify-center relative overflow-hidden">
-                          <Tag color="blue" className="m-0 absolute top-4 left-4 font-bold border-none">
-                            PUBLISHED
-                          </Tag>
-                          <div className="absolute top-0 right-0 w-16 h-16 bg-primary opacity-5 rounded-bl-full" />
-                        </div>
-                      }
-                    >
-                      <Space direction="vertical" className="w-full" size="small">
-                        <Title level={4} className="m-0">{pkg.title}</Title>
-                        <div className="flex items-center space-x-2 text-surface-on/60 text-xs">
-                          <UserOutlined />
-                          <span>{pkg.category || 'Tryout'} Berlangganan</span>
-                        </div>
+            {displayedPackages.length > 0 ? (
+              <>
+                <Row gutter={[24, 24]}>
+                  {displayedPackages.map((pkg) => (
+                    <Col xs={24} sm={12} lg={6} key={pkg.id}>
+                      <PackageCard {...pkg} isOwned={ownedSlugs.has(pkg.slug)} />
+                    </Col>
+                  ))}
+                </Row>
 
-                        <div className="py-4">
-                          {pkg.discount_type && (
-                            <Text className="text-xs text-surface-on/40 line-through">
-                              Rp {Number(pkg.price).toLocaleString('id-ID')}
-                            </Text>
-                          )}
-                          <div className="flex items-end space-x-1">
-                            <Text className="text-xl font-bold text-primary">
-                              {(() => {
-                                const finalPrice = pkg.discount_type === 'percent'
-                                  ? pkg.price - (pkg.price * (pkg.discount_value || 0)) / 100
-                                  : pkg.discount_type === 'harga'
-                                  ? pkg.price - (pkg.discount_value || 0)
-                                  : pkg.price;
-                                return finalPrice === 0 ? 'Gratis' : `Rp ${Number(finalPrice).toLocaleString('id-ID')}`;
-                              })()}
-                            </Text>
-                            <Text className="text-xs text-surface-on/60 mb-1">/Paket</Text>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2 mb-6">
-                          {[
-                            pkg.is_lifetime ? 'Akses Selamanya (Lifetime)' : `Akses ${pkg.validity_days} Hari`,
-                            pkg.max_exam_attempts === 0 ? 'Bebas Ujian Berkali-kali' : `Maksimal ${pkg.max_exam_attempts}x Ujian`,
-                            `${pkg.questions_count} Soal`,
-                            pkg.materials_count > 0 ? `${pkg.materials_count} Materi Pembahasan` : 'Pembahasan dalam soal',
-                            pkg.videos_count > 0 ? `${pkg.videos_count} Video Pembahasan` : null,
-                          ].filter(Boolean).map((feature) => (
-                            <div key={feature as string} className="flex items-start space-x-2">
-                              <CheckCircleFilled className="text-primary/40 text-xs mt-0.5 shrink-0" />
-                              <Text className="text-xs text-surface-on/70">{feature}</Text>
-                            </div>
-                          ))}
-                        </div>
-
-                        <Button
-                          type="primary"
-                          block
-                          className="h-10 rounded-xl font-bold"
-                          onClick={() => handlePackageClick(pkg)}
-                        >
-                          Pilih Paket
-                        </Button>
-                      </Space>
-                    </Card>
-                  </Col>
-                ))}
-              </Row>
+                <div className="mt-14 text-center">
+                  <Button
+                    type="primary"
+                    size="large"
+                    onClick={() => navigate('/paket')}
+                    className="h-14 px-8 rounded-2xl font-bold shadow-xl shadow-primary/20 text-base inline-flex items-center gap-2"
+                  >
+                    <span>Lihat Seluruh Katalog Paket</span>
+                    <ArrowRightOutlined />
+                  </Button>
+                </div>
+              </>
             ) : (
-              <Card className="border-none glass rounded-3xl py-12">
-                <Empty description="Belum ada paket published" />
+              <Card className="border-none glass rounded-3xl py-16 text-center max-w-lg mx-auto">
+                <Empty
+                  description={
+                    <div className="space-y-1">
+                      <Text className="font-bold text-base block text-on-surface">
+                        {loadingPackages ? 'Memuat paket...' : 'Belum ada paket yang dipublikasikan'}
+                      </Text>
+                      <Text className="text-xs text-on-surface/50 block">
+                        Silakan cek kembali beberapa saat lagi.
+                      </Text>
+                    </div>
+                  }
+                />
               </Card>
             )}
           </Spin>
@@ -248,35 +330,12 @@ const IndexPage: React.FC = () => {
             ) : (
               <Empty description="Belum ada artikel" />
             )}
-
-            {/* Mobile View All Button */}
-            <div className="mt-8 text-center sm:hidden">
-              <Button type="primary" block className="h-12 rounded-xl font-bold shadow-md shadow-primary/20" onClick={() => navigate('/blog')}>
-                Lihat Semua Artikel
-              </Button>
-            </div>
           </Spin>
         </div>
       </section>
 
       <CustomerReviews />
-
       <ContactForm />
-
-      {/* CTA Final */}
-      <section className="py-24 bg-gradient-to-br from-primary to-primary-container text-white relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl translate-x-1/2 -translate-y-1/2" />
-        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center z-10 py-20">
-          <Title level={2} className="!text-white !text-3xl md:!text-5xl mb-8">Mulai Tryout Saat Ini</Title>
-          <Paragraph className="text-white/80 text-lg mb-10 max-w-2xl mx-auto">
-            Asah pemahaman materi dan raih nilai impianmu. Mulai latihan tryout intensif sekarang untuk persiapan ujian yang lebih matang!
-          </Paragraph>
-          <button className="bg-white text-primary px-12 py-4 rounded-full font-bold text-lg hover:scale-105 transition-all shadow-xl">
-            Ikuti Tryout Sekarang
-          </button>
-        </div>
-      </section>
-
       <FloatingWhatsApp />
     </AppLayout>
   );

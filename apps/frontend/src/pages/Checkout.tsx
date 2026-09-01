@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { checkoutAPI } from '../services/checkoutService';
 import { getSetting } from '../services/settingService';
+import { calculateVoucherDiscount } from '../services/voucherService';
 import { message } from 'antd';
 
 const { Title, Text, Paragraph } = Typography;
@@ -29,6 +30,8 @@ const CheckoutPage: React.FC = () => {
   const [customerData, setCustomerData] = useState({ name: '', whatsapp: '', email: '' });
   const [purchasedItems, setPurchasedItems] = useState<any[]>([]);
   const [purchasedTotal, setPurchasedTotal] = useState<number>(0);
+  const [purchasedDiscount, setPurchasedDiscount] = useState<number>(0);
+  const [purchasedVoucherCode, setPurchasedVoucherCode] = useState<string | undefined>(undefined);
   const [ppn, setPpn] = useState<number>(11);
 
   useEffect(() => {
@@ -54,15 +57,7 @@ const CheckoutPage: React.FC = () => {
   }, [isLoggedIn, cartItems.length, step, navigate]);
 
   const subtotal = cartItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-  
-  let discount = 0;
-  if (appliedVoucher) {
-    if (appliedVoucher.type === 'percentage') {
-      discount = subtotal * (appliedVoucher.value / 100);
-    } else {
-      discount = appliedVoucher.value;
-    }
-  }
+  const discount = calculateVoucherDiscount(appliedVoucher, cartItems);
 
   const newSubtotal = Math.max(0, subtotal - discount);
   const tax = Math.round(newSubtotal * (ppn / 100));
@@ -73,6 +68,8 @@ const CheckoutPage: React.FC = () => {
 
     const currentCart = [...cartItems];
     const currentTotal = total;
+    const currentDiscount = discount;
+    const currentVoucherCode = appliedVoucher?.code;
 
     setCustomerData({
       name: values.name || user.name || '',
@@ -81,12 +78,15 @@ const CheckoutPage: React.FC = () => {
     });
     setPurchasedItems(currentCart);
     setPurchasedTotal(currentTotal);
+    setPurchasedDiscount(currentDiscount);
+    setPurchasedVoucherCode(currentVoucherCode);
     
     setLoading(true);
     try {
       const res = await checkoutAPI({
         user_id: user.id,
-        package_slug: currentCart[0].slug || currentCart[0].id,
+        package_slug: currentCart[0]?.slug || currentCart[0]?.id,
+        package_slugs: currentCart.map((c) => c.slug || c.id).filter(Boolean),
         voucher_code: appliedVoucher?.code,
       });
       setOrderNumber(res.invoice_code || res.order_id);
@@ -225,8 +225,8 @@ const CheckoutPage: React.FC = () => {
                 <OrderSummarySimple 
                   items={step === 'payment' ? purchasedItems : cartItems} 
                   total={step === 'payment' ? purchasedTotal : total} 
-                  discount={discount} 
-                  voucherCode={appliedVoucher?.code} 
+                  discount={step === 'payment' ? purchasedDiscount : discount} 
+                  voucherCode={step === 'payment' ? purchasedVoucherCode : appliedVoucher?.code} 
                 />
                 <div className="p-6 bg-primary/5 rounded-3xl border border-primary/10 flex gap-4 items-start">
                     <div className="p-2 bg-primary/10 rounded-xl">

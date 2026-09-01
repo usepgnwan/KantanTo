@@ -5,6 +5,7 @@ import "time"
 type Transaction struct {
 	ID            uint      `gorm:"primaryKey" json:"id"`
 	InvoiceCode   string    `gorm:"uniqueIndex;not null" json:"invoice_code"`
+	InvoiceGroup  string    `gorm:"index" json:"invoice_group"`
 	OrderID       string    `gorm:"not null" json:"order_id"` // random external order ID reference
 	UserID        uint      `gorm:"not null" json:"user_id"`
 	User          User      `gorm:"foreignKey:UserID" json:"user"`

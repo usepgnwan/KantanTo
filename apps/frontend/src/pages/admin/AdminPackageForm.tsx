@@ -8,7 +8,7 @@ import {
 import type { TableColumnsType, MenuProps } from 'antd';
 import {
   PlusOutlined, SettingOutlined, DeleteOutlined, MoreOutlined,
-  TagsOutlined, EditOutlined, EyeOutlined, ClockCircleOutlined,
+  TagsOutlined, EditOutlined, ClockCircleOutlined,
   PictureOutlined, ReloadOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -76,7 +76,21 @@ const AdminPackageForm: React.FC = () => {
   const openCreate = () => {
     setEditTarget(null);
     form.resetFields();
-    form.setFieldsValue({ status: 'draft', classes: [], subjects: [], duration: 120, price: 0, is_lifetime: true, validity_days: 30, max_exam_attempts: 0 });
+    form.setFieldsValue({
+      status: 'published',
+      classes: [],
+      subjects: [],
+      duration: 120,
+      price: 0,
+      is_lifetime: true,
+      validity_days: 30,
+      max_exam_attempts: 0,
+      is_bundle: false,
+      bundled_package_ids: [],
+      original_price: 0,
+      bundle_discount_type: 'fixed',
+      bundle_discount_value: 0,
+    });
     setModalOpen(true);
   };
 
@@ -96,8 +110,34 @@ const AdminPackageForm: React.FC = () => {
       is_lifetime: pkg.is_lifetime,
       validity_days: pkg.validity_days || 30,
       max_exam_attempts: pkg.max_exam_attempts || 0,
+      is_bundle: Boolean(pkg.is_bundle),
+      bundled_package_ids: pkg.bundled_package_ids || [],
+      original_price: pkg.original_price || 0,
+      bundle_discount_type: (pkg.bundle_discount_type as any) || 'fixed',
+      bundle_discount_value: pkg.bundle_discount_value || 0,
     });
     setModalOpen(true);
+  };
+
+  // Helper calculate bundle price
+  const recalculateBundlePrice = () => {
+    const isBundle = form.getFieldValue('is_bundle');
+    if (!isBundle) return;
+    const selectedIds: number[] = form.getFieldValue('bundled_package_ids') || [];
+    const selectedPkgs = packages.filter(p => selectedIds.includes(p.id));
+    const origPrice = selectedPkgs.reduce((acc, p) => acc + (p.price || 0), 0);
+    form.setFieldValue('original_price', origPrice);
+
+    const discType = form.getFieldValue('bundle_discount_type') || 'fixed';
+    const discVal = Number(form.getFieldValue('bundle_discount_value') || 0);
+
+    let finalPrice = origPrice;
+    if (discType === 'percent' || discType === 'percentage') {
+      finalPrice = origPrice - (origPrice * discVal) / 100;
+    } else {
+      finalPrice = Math.max(0, origPrice - discVal);
+    }
+    form.setFieldValue('price', finalPrice);
   };
 
   // ── Submit ────────────────────────────────────────────────────────────────
@@ -105,31 +145,39 @@ const AdminPackageForm: React.FC = () => {
     const vals = await form.validateFields();
     setSubmitting(true);
     try {
+      const isBundle = Boolean(vals.is_bundle);
+      const payload = {
+        title: vals.title,
+        description: vals.description,
+        price: vals.price ?? 0,
+        category: vals.category ?? '',
+        classes: vals.classes ?? [],
+        subjects: vals.subjects ?? [],
+        duration: isBundle ? 0 : (vals.duration ?? 0),
+        status: vals.status ?? 'draft',
+        thumbnail: editTarget?.thumbnail || '',
+        discount_type: isBundle ? '' : (vals.discount_type ?? ''),
+        discount_value: isBundle ? 0 : (vals.discount_value ?? 0),
+        is_lifetime: isBundle ? true : (vals.is_lifetime ?? true),
+        validity_days: isBundle ? 0 : (vals.validity_days ?? 0),
+        max_exam_attempts: isBundle ? 0 : (vals.max_exam_attempts ?? 0),
+        is_bundle: isBundle,
+        bundled_package_ids: isBundle ? (vals.bundled_package_ids ?? []) : [],
+        original_price: isBundle ? (vals.original_price ?? 0) : 0,
+        bundle_discount_type: isBundle ? (vals.bundle_discount_type ?? '') : '',
+        bundle_discount_value: isBundle ? (vals.bundle_discount_value ?? 0) : 0,
+      };
+
       if (editTarget) {
-        // Update existing
         const updated = await updatePackage(editTarget.slug, {
           slug: editTarget.slug,
-          title: vals.title,
-          description: vals.description,
-          price: vals.price ?? 0,
-          category: vals.category ?? '',
-          classes: vals.classes ?? [],
-          subjects: vals.subjects ?? [],
-          duration: vals.duration ?? 0,
-          status: vals.status ?? 'draft',
-          thumbnail: editTarget.thumbnail,
-          discount_type: vals.discount_type ?? '',
-          discount_value: vals.discount_value ?? 0,
-          is_lifetime: vals.is_lifetime ?? true,
-          validity_days: vals.validity_days ?? 0,
-          max_exam_attempts: vals.max_exam_attempts ?? 0,
+          ...payload,
         });
         setPackages(prev =>
           prev.map(p => p.slug === editTarget.slug ? toRow(updated) : p)
         );
         message.success('Paket berhasil diperbarui');
       } else {
-        // Create new — auto-generate slug from title
         const slugBase = vals.title
           .toLowerCase()
           .trim()
@@ -143,20 +191,7 @@ const AdminPackageForm: React.FC = () => {
           : candidateSlug;
         const created = await createPackage({
           slug,
-          title: vals.title,
-          description: vals.description,
-          price: vals.price ?? 0,
-          category: vals.category ?? '',
-          classes: vals.classes ?? [],
-          subjects: vals.subjects ?? [],
-          duration: vals.duration ?? 0,
-          status: vals.status ?? 'draft',
-          thumbnail: '',
-          discount_type: vals.discount_type ?? '',
-          discount_value: vals.discount_value ?? 0,
-          is_lifetime: vals.is_lifetime ?? true,
-          validity_days: vals.validity_days ?? 0,
-          max_exam_attempts: vals.max_exam_attempts ?? 0,
+          ...payload,
         });
         setPackages(prev => [...prev, toRow(created)]);
         message.success('Paket baru berhasil dibuat');
@@ -185,6 +220,14 @@ const AdminPackageForm: React.FC = () => {
         thumbnail: pkg.thumbnail,
         discount_type: pkg.discount_type,
         discount_value: pkg.discount_value,
+        is_lifetime: pkg.is_lifetime,
+        validity_days: pkg.validity_days,
+        max_exam_attempts: pkg.max_exam_attempts,
+        is_bundle: pkg.is_bundle,
+        bundled_package_ids: pkg.bundled_package_ids,
+        original_price: pkg.original_price,
+        bundle_discount_type: pkg.bundle_discount_type,
+        bundle_discount_value: pkg.bundle_discount_value,
       });
       setPackages(prev => prev.map(p => p.slug === pkg.slug ? toRow(updated) : p));
     } catch {
@@ -205,43 +248,49 @@ const AdminPackageForm: React.FC = () => {
   const rowActions = (pkg: PackageRow): MenuProps['items'] => [
     {
       key: 'edit',
-      label: 'Edit Info Paket',
+      label: <span className="font-bold">Edit Informasi</span>,
       icon: <EditOutlined />,
       onClick: () => openEdit(pkg),
     },
     {
-      key: 'settings',
-      label: 'Kelola Soal & Materi',
+      key: 'manage',
+      label: <span className="font-bold">Kelola Soal & Materi</span>,
       icon: <SettingOutlined />,
       onClick: () => navigate(`/admin/packages/${pkg.slug}`),
     },
+    { type: 'divider' },
     {
-      key: 'preview',
-      label: 'Lihat di Halaman Siswa',
-      icon: <EyeOutlined />,
-      onClick: () => window.open(`/paket/${pkg.slug}`, '_blank'),
+      key: 'publish',
+      label: 'Set Published',
+      disabled: pkg.status === 'published',
+      onClick: () => handleStatusChange(pkg, 'published'),
+    },
+    {
+      key: 'draft',
+      label: 'Set Draft',
+      disabled: pkg.status === 'draft',
+      onClick: () => handleStatusChange(pkg, 'draft'),
+    },
+    {
+      key: 'delete-soft',
+      label: 'Set Deleted',
+      disabled: pkg.status === 'deleted',
+      onClick: () => handleStatusChange(pkg, 'deleted'),
     },
     { type: 'divider' },
-    pkg.status === 'deleted'
-      ? {
-          key: 'restore',
-          label: 'Pulihkan Paket',
-          icon: <PlusOutlined />,
-          onClick: () => { handleStatusChange(pkg, 'draft'); message.success('Paket dipulihkan ke Draft'); },
-        }
-      : {
-          key: 'delete',
-          label: 'Hapus (Pindah ke Trash)',
-          icon: <DeleteOutlined />,
-          danger: true,
-          onClick: () => { handleStatusChange(pkg, 'deleted'); message.warning('Paket dipindah ke status Deleted'); },
-        },
     {
-      key: 'perm-delete',
-      label: 'Hapus Permanen',
-      icon: <DeleteOutlined />,
-      danger: true,
-      onClick: () => handlePermanentDelete(pkg),
+      key: 'delete-permanent',
+      label: <span className="text-red-500 font-bold">Hapus Selamanya</span>,
+      icon: <DeleteOutlined className="text-red-500" />,
+      onClick: () => {
+        Modal.confirm({
+          title: 'Hapus Paket Selamanya?',
+          content: `Paket "${pkg.title}" dan seluruh soal/materinya akan dihapus permanen.`,
+          okText: 'Hapus',
+          okButtonProps: { danger: true },
+          onOk: () => handlePermanentDelete(pkg),
+        });
+      },
     },
   ];
 
@@ -252,17 +301,34 @@ const AdminPackageForm: React.FC = () => {
       dataIndex: 'title',
       key: 'title',
       render: (title, record) => (
-        <div className="flex items-center gap-3">
+        <div className="flex items-start gap-3">
           <Avatar
             size={40}
-            className="bg-primary/10 text-primary shrink-0 text-lg font-black rounded-xl"
+            className={`${record.is_bundle ? 'bg-purple-100 text-purple-700' : 'bg-primary/10 text-primary'} shrink-0 text-lg font-black rounded-xl`}
             shape="square"
           >
-            {title?.[0] ?? '?'}
+            {record.is_bundle ? '🎁' : (title?.[0] ?? '?')}
           </Avatar>
           <div>
-            <span className="font-bold block text-on-surface dark:text-zinc-100">{title}</span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="font-bold text-on-surface dark:text-zinc-100">{title}</span>
+              {record.is_bundle && (
+                <Tag color="purple" className="!text-[10px] !m-0 font-bold rounded-md px-1.5 py-0">
+                  🎁 Bundle ({record.bundled_package_ids?.length || 0} Paket)
+                </Tag>
+              )}
+            </div>
             <Text className="text-xs text-on-surface/40 dark:text-zinc-500 line-clamp-1">{record.description}</Text>
+            {record.is_bundle && record.bundled_packages && record.bundled_packages.length > 0 && (
+              <div className="flex items-center gap-1 flex-wrap mt-1">
+                <span className="text-[10px] text-purple-600 font-bold">Termasuk:</span>
+                {record.bundled_packages.map(sp => (
+                  <Tag key={sp.id} className="!text-[9px] !m-0 bg-purple-50 text-purple-700 border-purple-200 rounded-md px-1.5">
+                    {sp.title}
+                  </Tag>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       ),
@@ -294,11 +360,17 @@ const AdminPackageForm: React.FC = () => {
       title: 'Durasi',
       dataIndex: 'duration',
       key: 'duration',
-      render: (dur) => (
-        <Space className="text-on-surface/60 dark:text-zinc-400">
-          <ClockCircleOutlined />
-          <span className="text-xs font-bold">{dur} Menit</span>
-        </Space>
+      render: (dur, record) => (
+        record.is_bundle ? (
+          <Tag color="purple" className="m-0 border-none font-bold text-[9px] px-2 rounded-md">
+            Ikut Sub-Paket
+          </Tag>
+        ) : (
+          <Space className="text-on-surface/60 dark:text-zinc-400">
+            <ClockCircleOutlined />
+            <span className="text-xs font-bold">{dur} Menit</span>
+          </Space>
+        )
       ),
     },
     {
@@ -306,31 +378,51 @@ const AdminPackageForm: React.FC = () => {
       dataIndex: 'price',
       key: 'price',
       align: 'right',
-      render: (price, record) => (
-        <div className="flex flex-col items-end gap-1">
-          {record.discount_type ? (
-            <>
+      render: (price, record) => {
+        if (record.is_bundle && record.original_price && record.original_price > record.price) {
+          const discountVal = record.original_price - record.price;
+          const discountPct = Math.round((discountVal / record.original_price) * 100);
+          return (
+            <div className="flex flex-col items-end gap-0.5">
               <span className="text-xs text-on-surface/40 line-through">
+                Rp {Number(record.original_price).toLocaleString('id-ID')}
+              </span>
+              <span className="font-black text-purple-600 text-sm">
                 Rp {Number(price).toLocaleString('id-ID')}
               </span>
-              <span className="font-black text-primary">
-                Rp {Number(
-                  record.discount_type === 'percent'
-                    ? price - (price * (record.discount_value || 0)) / 100
-                    : price - (record.discount_value || 0)
-                ).toLocaleString('id-ID')}
-              </span>
-              <Tag color="red" className="m-0 mt-1 border-none font-bold text-[9px] px-1.5 py-0.5 rounded-md">
-                {record.discount_type === 'percent' ? `${record.discount_value}% OFF` : `Hemat Rp ${Number(record.discount_value).toLocaleString('id-ID')}`}
+              <Tag color="purple" className="m-0 border-none font-bold text-[9px] px-1.5 py-0.5 rounded-md">
+                Hemat Rp {discountVal.toLocaleString('id-ID')} ({discountPct}%)
               </Tag>
-            </>
-          ) : (
-            <span className="font-black text-primary">
-              {price === 0 ? 'Gratis' : `Rp ${Number(price).toLocaleString('id-ID')}`}
-            </span>
-          )}
-        </div>
-      ),
+            </div>
+          );
+        }
+
+        return (
+          <div className="flex flex-col items-end gap-1">
+            {record.discount_type ? (
+              <>
+                <span className="text-xs text-on-surface/40 line-through">
+                  Rp {Number(price).toLocaleString('id-ID')}
+                </span>
+                <span className="font-black text-primary">
+                  Rp {Number(
+                    record.discount_type === 'percent'
+                      ? price - (price * (record.discount_value || 0)) / 100
+                      : price - (record.discount_value || 0)
+                  ).toLocaleString('id-ID')}
+                </span>
+                <Tag color="red" className="m-0 mt-1 border-none font-bold text-[9px] px-1.5 py-0.5 rounded-md">
+                  {record.discount_type === 'percent' ? `${record.discount_value}% OFF` : `Hemat Rp ${Number(record.discount_value).toLocaleString('id-ID')}`}
+                </Tag>
+              </>
+            ) : (
+              <span className="font-black text-primary">
+                {price === 0 ? 'Gratis' : `Rp ${Number(price).toLocaleString('id-ID')}`}
+              </span>
+            )}
+          </div>
+        );
+      },
       sorter: (a, b) => a.price - b.price,
     },
     {
@@ -354,18 +446,24 @@ const AdminPackageForm: React.FC = () => {
       title: 'Akses & Limit',
       key: 'access_limit',
       render: (_, r) => (
-        <Space direction="vertical" size={2}>
-          {r.is_lifetime ? (
-            <Tag color="green" className="m-0 rounded-lg border-none font-bold text-[9px] px-2">Lifetime</Tag>
-          ) : (
-            <Tag color="blue" className="m-0 rounded-lg border-none font-bold text-[9px] px-2">{r.validity_days} Hari</Tag>
-          )}
-          {r.max_exam_attempts === 0 ? (
-            <Tag color="orange" className="m-0 rounded-lg border-none font-bold text-[9px] px-2">Ujian Unlimited</Tag>
-          ) : (
-            <Tag color="magenta" className="m-0 rounded-lg border-none font-bold text-[9px] px-2">Max {r.max_exam_attempts}x Ujian</Tag>
-          )}
-        </Space>
+        r.is_bundle ? (
+          <Tag color="purple" className="m-0 border-none font-bold text-[9px] px-2 rounded-md">
+            Sesuai Sub-Paket
+          </Tag>
+        ) : (
+          <Space direction="vertical" size={2}>
+            {r.is_lifetime ? (
+              <Tag color="green" className="m-0 rounded-lg border-none font-bold text-[9px] px-2">Lifetime</Tag>
+            ) : (
+              <Tag color="blue" className="m-0 rounded-lg border-none font-bold text-[9px] px-2">{r.validity_days} Hari</Tag>
+            )}
+            {r.max_exam_attempts === 0 ? (
+              <Tag color="orange" className="m-0 rounded-lg border-none font-bold text-[9px] px-2">Ujian Unlimited</Tag>
+            ) : (
+              <Tag color="magenta" className="m-0 rounded-lg border-none font-bold text-[9px] px-2">Max {r.max_exam_attempts}x Ujian</Tag>
+            )}
+          </Space>
+        )
       ),
     },
     {
@@ -414,7 +512,7 @@ const AdminPackageForm: React.FC = () => {
             <div>
               <Text className="text-[10px] uppercase font-black tracking-widest text-primary/60 block mb-1">Manajemen Konten</Text>
               <Title level={1} className="!text-3xl !font-manrope !font-black !m-0 dark:text-zinc-100">Daftar Paket</Title>
-              <Text className="text-on-surface/50 dark:text-zinc-400 text-sm">Kelola katalog paket, durasi, dan akses pengerjaan siswa</Text>
+              <Text className="text-on-surface/50 dark:text-zinc-400 text-sm">Kelola katalog paket satuan, paket bundle kombo, durasi, dan akses siswa</Text>
             </div>
             <Space className="mt-4 sm:mt-0">
               <Button
@@ -441,9 +539,9 @@ const AdminPackageForm: React.FC = () => {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
             {[
               { label: 'Total Paket', value: packages.length, color: 'text-primary' },
+              { label: 'Paket Bundle', value: packages.filter(p => p.is_bundle).length, color: 'text-purple-600' },
               { label: 'Published', value: packages.filter(p => p.status === 'published').length, color: 'text-green-500' },
               { label: 'Draft / Inactive', value: packages.filter(p => p.status === 'draft').length, color: 'text-orange-500' },
-              { label: 'Deleted', value: packages.filter(p => p.status === 'deleted').length, color: 'text-red-500' },
             ].map((s) => (
               <Card key={s.label} className="weightless-card border-none bg-white dark:bg-zinc-900 shadow-sm text-center py-2">
                 <div className={`text-2xl font-black font-manrope ${s.color}`}>{s.value}</div>
@@ -484,19 +582,158 @@ const AdminPackageForm: React.FC = () => {
         cancelText="Batal"
         okButtonProps={{ className: 'rounded-xl h-11 px-6 font-bold shadow-lg shadow-primary/20' }}
         cancelButtonProps={{ className: 'rounded-xl h-11 px-6 font-bold' }}
-        width={560}
+        width={620}
         centered
       >
-        <Form form={form} layout="vertical" requiredMark={false} className="mt-4">
+        <Form form={form} layout="vertical" requiredMark={false} className="mt-4" onValuesChange={() => recalculateBundlePrice()}>
           <Row gutter={16}>
+            {/* Toggle Bundle */}
             <Col span={24}>
-              <Form.Item name="title" label={<span className="font-bold text-sm">Nama Paket</span>} rules={[{ required: true, message: 'Harap isi nama paket' }]}>
-                <Input placeholder="Cth: Saintek Pro Batch 1" className="rounded-xl h-12 text-base" />
+              <Form.Item name="is_bundle" label={<span className="font-bold text-sm">Tipe Paket</span>} initialValue={false}>
+                <Select
+                  className="rounded-xl w-full"
+                  style={{ height: 44 }}
+                  onChange={() => recalculateBundlePrice()}
+                  options={[
+                    { value: false, label: '📦 Paket Satuan (Single Package)' },
+                    { value: true, label: '🎁 Paket Bundle (Kombo Beberapa Paket)' },
+                  ]}
+                />
+              </Form.Item>
+            </Col>
+
+            {/* Bundle Configuration Section */}
+            <Col span={24}>
+              <Form.Item noStyle shouldUpdate={(prev, curr) => prev.is_bundle !== curr.is_bundle || prev.bundled_package_ids !== curr.bundled_package_ids || prev.bundle_discount_type !== curr.bundle_discount_type || prev.bundle_discount_value !== curr.bundle_discount_value}>
+                {({ getFieldValue }) => {
+                  const isBundle = getFieldValue('is_bundle');
+                  if (!isBundle) return null;
+
+                  const selectedIds: number[] = getFieldValue('bundled_package_ids') || [];
+                  const selectedPkgs = packages.filter(p => selectedIds.includes(p.id));
+                  const origPrice = selectedPkgs.reduce((acc, p) => acc + (p.price || 0), 0);
+                  const discType = getFieldValue('bundle_discount_type') || 'fixed';
+                  const discVal = Number(getFieldValue('bundle_discount_value') || 0);
+
+                  let finalPrice = origPrice;
+                  if (discType === 'percent' || discType === 'percentage') {
+                    finalPrice = origPrice - (origPrice * discVal) / 100;
+                  } else {
+                    finalPrice = Math.max(0, origPrice - discVal);
+                  }
+                  const hemat = origPrice - finalPrice;
+
+                  return (
+                    <div className="bg-purple-50/70 border border-purple-200 rounded-2xl p-4 mb-4 space-y-4">
+                      <div className="flex items-center gap-2 text-purple-900 font-bold text-sm">
+                        <span>🎁 Pengaturan Paket Bundle</span>
+                      </div>
+
+                      <Form.Item
+                        name="bundled_package_ids"
+                        label={<span className="font-bold text-xs text-purple-950">Pilih Paket yang Digabungkan dalam Bundle</span>}
+                        rules={[{ required: isBundle, message: 'Pilih minimal 1 paket untuk bundle' }]}
+                      >
+                        <Select
+                          mode="multiple"
+                          placeholder="Pilih paket-paket..."
+                          className="rounded-xl w-full"
+                          style={{ height: 'auto', minHeight: 44 }}
+                          onChange={() => recalculateBundlePrice()}
+                          options={packages
+                            .filter(p => !p.is_bundle && (!editTarget || p.slug !== editTarget.slug))
+                            .map(p => ({
+                              value: p.id,
+                              label: `${p.title} (Rp ${Number(p.price).toLocaleString('id-ID')})`,
+                            }))}
+                        />
+                      </Form.Item>
+
+                      {/* Selected packages preview */}
+                      {selectedPkgs.length > 0 && (
+                        <div className="bg-white rounded-xl p-3 border border-purple-100 text-xs space-y-2">
+                          <div className="font-bold text-on-surface">Paket Terpilih ({selectedPkgs.length} item):</div>
+                          <div className="space-y-1">
+                            {selectedPkgs.map(sp => (
+                              <div key={sp.id} className="flex items-center justify-between text-on-surface/70">
+                                <span>• {sp.title}</span>
+                                <span className="font-bold">Rp {Number(sp.price).toLocaleString('id-ID')}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="border-t border-purple-100 pt-2 flex items-center justify-between font-bold text-purple-900">
+                            <span>Total Harga Asli Sub-Paket:</span>
+                            <span>Rp {origPrice.toLocaleString('id-ID')}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <Row gutter={12}>
+                        <Col xs={24} sm={12}>
+                          <Form.Item
+                            name="bundle_discount_type"
+                            label={<span className="font-bold text-xs text-purple-950">Jenis Diskon Bundle</span>}
+                            initialValue="fixed"
+                          >
+                            <Select
+                              className="rounded-xl w-full"
+                              style={{ height: 42 }}
+                              onChange={() => recalculateBundlePrice()}
+                              options={[
+                                { value: 'fixed', label: 'Potongan Langsung (Rp)' },
+                                { value: 'percentage', label: 'Persentase Diskon (%)' },
+                              ]}
+                            />
+                          </Form.Item>
+                        </Col>
+                        <Col xs={24} sm={12}>
+                          <Form.Item
+                            name="bundle_discount_value"
+                            label={<span className="font-bold text-xs text-purple-950">Nilai Diskon</span>}
+                            initialValue={0}
+                          >
+                            <InputNumber
+                              min={0}
+                              className="w-full rounded-xl"
+                              style={{ height: 42, display: 'flex', alignItems: 'center' }}
+                              onChange={() => recalculateBundlePrice()}
+                              formatter={discType === 'fixed' ? (v) => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : undefined}
+                              parser={discType === 'fixed' ? (v) => Number(v?.replace(/\./g, '') ?? 0) as any : undefined}
+                            />
+                          </Form.Item>
+                        </Col>
+                      </Row>
+
+                      {/* Live Calculation Summary */}
+                      <div className="bg-purple-600 text-white rounded-xl p-3 flex items-center justify-between">
+                        <div>
+                          <div className="text-[10px] text-purple-200 uppercase font-bold tracking-wider">Harga Jual Akhir Bundle</div>
+                          <div className="text-xl font-black font-manrope">Rp {finalPrice.toLocaleString('id-ID')}</div>
+                        </div>
+                        {hemat > 0 && (
+                          <Tag color="gold" className="font-black text-xs px-2.5 py-1 rounded-lg m-0 border-none">
+                            Hemat Rp {hemat.toLocaleString('id-ID')}
+                          </Tag>
+                        )}
+                      </div>
+
+                      <Form.Item name="original_price" hidden>
+                        <InputNumber />
+                      </Form.Item>
+                    </div>
+                  );
+                }}
+              </Form.Item>
+            </Col>
+
+            <Col span={24}>
+              <Form.Item name="title" label={<span className="font-bold text-sm">Nama Paket / Bundle</span>} rules={[{ required: true, message: 'Harap isi nama paket' }]}>
+                <Input placeholder="Cth: Bundle Spesial Saintek + Soshum 2026" className="rounded-xl h-12 text-base" />
               </Form.Item>
             </Col>
             <Col span={24}>
               <Form.Item name="description" label={<span className="font-bold text-sm">Deskripsi Singkat</span>} rules={[{ required: true, message: 'Harap isi deskripsi' }]}>
-                <TextArea rows={3} placeholder="Gambarkan keunggulan paket ini..." className="rounded-xl p-3" />
+                <TextArea rows={3} placeholder="Gambarkan keunggulan paket / bundle kombo ini..." className="rounded-xl p-3" />
               </Form.Item>
             </Col>
             <Col span={24}>
@@ -506,6 +743,7 @@ const AdminPackageForm: React.FC = () => {
                   className="rounded-xl w-full"
                   style={{ height: 44 }}
                   options={[
+                    { value: 'Bundle Hemat', label: '🎁 Bundle Hemat' },
                     { value: 'Intensive Bootcamp', label: 'Intensive Bootcamp' },
                     { value: 'Saintek', label: 'Saintek' },
                     { value: 'Soshum', label: 'Soshum' },
@@ -545,7 +783,7 @@ const AdminPackageForm: React.FC = () => {
               </Form.Item>
             </Col>
             <Col xs={24} sm={12}>
-              <Form.Item name="classes" label={<span className="font-bold text-sm">Kelas</span>} rules={[{ required: true }]}>
+              <Form.Item name="classes" label={<span className="font-bold text-sm">Kelas</span>}>
                 <Select
                   mode="multiple"
                   placeholder="Pilih kelas..."
@@ -556,7 +794,7 @@ const AdminPackageForm: React.FC = () => {
               </Form.Item>
             </Col>
             <Col xs={24} sm={12}>
-              <Form.Item name="subjects" label={<span className="font-bold text-sm">Mata Pelajaran</span>} rules={[{ required: true }]}>
+              <Form.Item name="subjects" label={<span className="font-bold text-sm">Mata Pelajaran</span>}>
                 <Select
                   mode="multiple"
                   placeholder="Pilih mapel..."
@@ -566,41 +804,56 @@ const AdminPackageForm: React.FC = () => {
                 />
               </Form.Item>
             </Col>
-            <Col xs={24} sm={12}>
-              <Form.Item name="duration" label={<span className="font-bold text-sm">Durasi Ujian (Menit)</span>} rules={[{ required: true, message: 'Durasi wajib diisi' }]}>
-                <InputNumber min={1} placeholder="120" className="w-full rounded-xl" style={{ height: 44, display: 'flex', alignItems: 'center' }} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12}>
-              <Form.Item name="is_lifetime" label={<span className="font-bold text-sm">Masa Aktif Paket</span>} initialValue={true}>
-                <Select
-                  className="rounded-xl w-full"
-                  style={{ height: 44 }}
-                  options={[
-                    { value: true, label: 'Lifetime (Selamanya)' },
-                    { value: false, label: 'Terbatas (Hari)' },
-                  ]}
-                />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12}>
-              <Form.Item noStyle shouldUpdate={(prev, curr) => prev.is_lifetime !== curr.is_lifetime}>
+
+            {/* Hanya untuk Paket Satuan (Single Package) - Paket Bundle disesuaikan dengan sub paketnya */}
+            <Col span={24}>
+              <Form.Item noStyle shouldUpdate={(prev, curr) => prev.is_bundle !== curr.is_bundle}>
                 {({ getFieldValue }) => {
-                  const isLifetime = getFieldValue('is_lifetime');
-                  if (isLifetime) return null;
+                  const isBundle = getFieldValue('is_bundle');
+                  if (isBundle) return null;
                   return (
-                    <Form.Item name="validity_days" label={<span className="font-bold text-sm">Jumlah Hari Aktif</span>} rules={[{ required: true, message: 'Wajib diisi' }]}>
-                      <InputNumber min={1} placeholder="30" className="w-full rounded-xl" style={{ height: 44, display: 'flex', alignItems: 'center' }} />
-                    </Form.Item>
+                    <Row gutter={16}>
+                      <Col xs={24} sm={12}>
+                        <Form.Item name="duration" label={<span className="font-bold text-sm">Durasi Ujian (Menit)</span>} rules={[{ required: true, message: 'Durasi wajib diisi' }]}>
+                          <InputNumber min={1} placeholder="120" className="w-full rounded-xl" style={{ height: 44, display: 'flex', alignItems: 'center' }} />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <Form.Item name="is_lifetime" label={<span className="font-bold text-sm">Masa Aktif Paket</span>} initialValue={true}>
+                          <Select
+                            className="rounded-xl w-full"
+                            style={{ height: 44 }}
+                            options={[
+                              { value: true, label: 'Lifetime (Selamanya)' },
+                              { value: false, label: 'Terbatas (Hari)' },
+                            ]}
+                          />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <Form.Item noStyle shouldUpdate={(prev, curr) => prev.is_lifetime !== curr.is_lifetime}>
+                          {({ getFieldValue: getFieldVal }) => {
+                            const isLifetime = getFieldVal('is_lifetime');
+                            if (isLifetime) return null;
+                            return (
+                              <Form.Item name="validity_days" label={<span className="font-bold text-sm">Jumlah Hari Aktif</span>} rules={[{ required: true, message: 'Wajib diisi' }]}>
+                                <InputNumber min={1} placeholder="30" className="w-full rounded-xl" style={{ height: 44, display: 'flex', alignItems: 'center' }} />
+                              </Form.Item>
+                            );
+                          }}
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} sm={12}>
+                        <Form.Item name="max_exam_attempts" label={<span className="font-bold text-sm">Limit Kesempatan Ujian</span>} initialValue={0} tooltip="Isi 0 untuk unlimited">
+                          <InputNumber min={0} placeholder="0 (Unlimited)" className="w-full rounded-xl" style={{ height: 44, display: 'flex', alignItems: 'center' }} />
+                        </Form.Item>
+                      </Col>
+                    </Row>
                   );
                 }}
               </Form.Item>
             </Col>
-            <Col xs={24} sm={12}>
-              <Form.Item name="max_exam_attempts" label={<span className="font-bold text-sm">Limit Kesempatan Ujian</span>} initialValue={0} tooltip="Isi 0 untuk unlimited">
-                <InputNumber min={0} placeholder="0 (Unlimited)" className="w-full rounded-xl" style={{ height: 44, display: 'flex', alignItems: 'center' }} />
-              </Form.Item>
-            </Col>
+
             <Col span={24}>
               <Form.Item name="price" label={<span className="font-bold text-sm">Harga Jual (Rp)</span>} rules={[{ required: true, message: 'Harga wajib diisi' }]}>
                 <InputNumber
@@ -614,21 +867,29 @@ const AdminPackageForm: React.FC = () => {
               </Form.Item>
             </Col>
             <Col xs={24} sm={12}>
-              <Form.Item name="discount_type" label={<span className="font-bold text-sm">Tipe Diskon</span>} initialValue="">
-                <Select
-                  className="rounded-xl w-full"
-                  style={{ height: 48 }}
-                  options={[
-                    { value: '', label: 'Tidak Ada Diskon' },
-                    { value: 'percent', label: 'Persen (%)' },
-                    { value: 'harga', label: 'Nominal (Rp)' },
-                  ]}
-                />
+              <Form.Item noStyle shouldUpdate={(prev, curr) => prev.is_bundle !== curr.is_bundle}>
+                {({ getFieldValue }) => {
+                  if (getFieldValue('is_bundle')) return null;
+                  return (
+                    <Form.Item name="discount_type" label={<span className="font-bold text-sm">Tipe Diskon Satuan</span>} initialValue="">
+                      <Select
+                        className="rounded-xl w-full"
+                        style={{ height: 48 }}
+                        options={[
+                          { value: '', label: 'Tidak Ada Diskon' },
+                          { value: 'percent', label: 'Persen (%)' },
+                          { value: 'harga', label: 'Nominal (Rp)' },
+                        ]}
+                      />
+                    </Form.Item>
+                  );
+                }}
               </Form.Item>
             </Col>
             <Col xs={24} sm={12}>
-              <Form.Item noStyle shouldUpdate={(prev, curr) => prev.discount_type !== curr.discount_type}>
+              <Form.Item noStyle shouldUpdate={(prev, curr) => prev.discount_type !== curr.discount_type || prev.is_bundle !== curr.is_bundle}>
                 {({ getFieldValue }) => {
+                  if (getFieldValue('is_bundle')) return null;
                   const type = getFieldValue('discount_type');
                   if (!type) return null;
                   return (

@@ -2,12 +2,13 @@ import React from 'react';
 import { Typography, Button, Input, Divider, message, Tag } from 'antd';
 import { SafetyCertificateOutlined, ArrowRightOutlined } from '@ant-design/icons';
 
-import { Voucher, applyVoucherAPI } from '../../services/voucherService';
+import { Voucher, applyVoucherAPI, calculateVoucherDiscount } from '../../services/voucherService';
 import { useAuth } from '../../context/AuthContext';
 
 const { Title, Text } = Typography;
 
 interface CartSummaryProps {
+  items?: Array<{ id?: string | number; slug?: string; price: number; quantity?: number }>;
   subtotal: number;
   tax: number;
   total: number;
@@ -21,6 +22,7 @@ interface CartSummaryProps {
 }
 
 const CartSummary: React.FC<CartSummaryProps> = ({
+  items,
   subtotal,
   tax,
   total,
@@ -58,14 +60,7 @@ const CartSummary: React.FC<CartSummaryProps> = ({
     }
   };
 
-  let discount = 0;
-  if (appliedVoucher) {
-    if (appliedVoucher.type === 'percentage') {
-      discount = subtotal * (appliedVoucher.value / 100);
-    } else {
-      discount = appliedVoucher.value;
-    }
-  }
+  const discount = calculateVoucherDiscount(appliedVoucher, items || []);
   
   // Recalculate tax and total with discount
   const newSubtotal = Math.max(0, subtotal - discount);
@@ -78,6 +73,10 @@ const CartSummary: React.FC<CartSummaryProps> = ({
       currency: 'IDR',
       minimumFractionDigits: 0,
     }).format(value);
+
+  const hasSpecificPackages = Boolean(
+    appliedVoucher?.applicable_package_ids && appliedVoucher.applicable_package_ids.length > 0
+  );
 
   return (
     <div className="weightless-card p-6 sticky top-24">
@@ -100,11 +99,17 @@ const CartSummary: React.FC<CartSummaryProps> = ({
           <Text className="text-xs text-on-surface/40 block mb-2 uppercase tracking-wider font-bold">Kupon / Promo</Text>
           {appliedVoucher ? (
             <div className="flex justify-between items-center bg-green-50 p-3 rounded-xl border border-green-200">
-              <div>
+              <div className="max-w-[70%]">
                 <Text className="font-bold text-green-700 block text-sm">{appliedVoucher.code}</Text>
-                <Text className="text-xs text-green-600">
+                <Text className="text-xs text-green-600 block">
                   Potongan {appliedVoucher.type === 'percentage' ? `${appliedVoucher.value}%` : formatCurrency(appliedVoucher.value)}
+                  {hasSpecificPackages ? ' (Khusus paket terdaftar)' : ''}
                 </Text>
+                {hasSpecificPackages && appliedVoucher.applicable_packages && appliedVoucher.applicable_packages.length > 0 && (
+                  <Text className="text-[11px] text-green-700/80 block mt-0.5 line-clamp-1">
+                    Untuk: {appliedVoucher.applicable_packages.map(p => p.title).join(', ')}
+                  </Text>
+                )}
               </div>
               <Button type="text" danger size="small" onClick={onRemoveVoucher} className="font-bold">Hapus</Button>
             </div>

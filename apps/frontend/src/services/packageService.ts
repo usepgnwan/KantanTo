@@ -33,6 +33,12 @@ export interface PackageListItem {
   questions_count: number;
   materials_count: number;
   videos_count: number;
+  is_bundle?: boolean;
+  bundled_package_ids?: number[];
+  bundled_packages?: PackageListItem[];
+  original_price?: number;
+  bundle_discount_type?: 'percent' | 'harga' | 'percentage' | 'fixed' | '';
+  bundle_discount_value?: number;
 }
 
 export interface PackagePayload {
@@ -51,6 +57,11 @@ export interface PackagePayload {
   is_lifetime: boolean;
   validity_days: number;
   max_exam_attempts: number;
+  is_bundle?: boolean;
+  bundled_package_ids?: number[];
+  original_price?: number;
+  bundle_discount_type?: 'percent' | 'harga' | 'percentage' | 'fixed' | '';
+  bundle_discount_value?: number;
 }
 
 const asStringArray = (value: unknown): string[] => {
@@ -102,6 +113,12 @@ const normalizePackage = (pkg: any): PackageListItem => ({
   questions_count: Number(pkg?.questions_count) || 0,
   materials_count: Number(pkg?.materials_count) || 0,
   videos_count: Number(pkg?.videos_count) || 0,
+  is_bundle: Boolean(pkg?.is_bundle),
+  bundled_package_ids: Array.isArray(pkg?.bundled_package_ids) ? pkg.bundled_package_ids.map(Number) : [],
+  bundled_packages: Array.isArray(pkg?.bundled_packages) ? pkg.bundled_packages.map(normalizePackage) : [],
+  original_price: Number(pkg?.original_price) || 0,
+  bundle_discount_type: pkg?.bundle_discount_type || '',
+  bundle_discount_value: Number(pkg?.bundle_discount_value) || 0,
 });
 
 const unwrapList = (data: any): any[] => {

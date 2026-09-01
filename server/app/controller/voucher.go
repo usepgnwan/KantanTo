@@ -40,6 +40,12 @@ func GetVouchers(c echo.Context) error {
 	if vouchers, ok := result.Rows.([]model.Voucher); ok {
 		for i := range vouchers {
 			vouchers[i].PopulateApplicablePackages()
+			if len(vouchers[i].ApplicablePackageIDs) > 0 {
+				connection.DB.Model(&model.Package{}).
+					Where("id IN ?", vouchers[i].ApplicablePackageIDs).
+					Select("id, title, slug").
+					Scan(&vouchers[i].ApplicablePackages)
+			}
 		}
 		result.Rows = vouchers
 	}
@@ -64,6 +70,12 @@ func GetVoucherByID(c echo.Context) error {
 		return c.JSON(http.StatusNotFound, Response{Status: false, Message: "Data tidak ditemukan"})
 	}
 	voucher.PopulateApplicablePackages()
+	if len(voucher.ApplicablePackageIDs) > 0 {
+		connection.DB.Model(&model.Package{}).
+			Where("id IN ?", voucher.ApplicablePackageIDs).
+			Select("id, title, slug").
+			Scan(&voucher.ApplicablePackages)
+	}
 	return c.JSON(http.StatusOK, Response{Status: true, Message: "Success", Data: voucher})
 }
 
