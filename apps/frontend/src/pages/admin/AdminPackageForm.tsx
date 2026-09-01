@@ -40,6 +40,19 @@ const toRow = (pkg: PackageListItem): PackageRow => ({
   videos_count: Number(pkg.videos_count) || 0,
 });
 
+export const getPackageEffectivePrice = (p: PackageListItem | PackageRow): number => {
+  if (p.is_bundle) {
+    return p.price || 0;
+  }
+  if (p.discount_type === 'percent') {
+    return Math.max(0, (p.price || 0) - ((p.price || 0) * (p.discount_value || 0)) / 100);
+  }
+  if (p.discount_type === 'harga') {
+    return Math.max(0, (p.price || 0) - (p.discount_value || 0));
+  }
+  return p.price || 0;
+};
+
 const AdminPackageForm: React.FC = () => {
   const [packages, setPackages] = useState<PackageRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -125,7 +138,7 @@ const AdminPackageForm: React.FC = () => {
     if (!isBundle) return;
     const selectedIds: number[] = form.getFieldValue('bundled_package_ids') || [];
     const selectedPkgs = packages.filter(p => selectedIds.includes(p.id));
-    const origPrice = selectedPkgs.reduce((acc, p) => acc + (p.price || 0), 0);
+    const origPrice = selectedPkgs.reduce((acc, p) => acc + getPackageEffectivePrice(p), 0);
     form.setFieldValue('original_price', origPrice);
 
     const discType = form.getFieldValue('bundle_discount_type') || 'fixed';
@@ -611,7 +624,7 @@ const AdminPackageForm: React.FC = () => {
 
                   const selectedIds: number[] = getFieldValue('bundled_package_ids') || [];
                   const selectedPkgs = packages.filter(p => selectedIds.includes(p.id));
-                  const origPrice = selectedPkgs.reduce((acc, p) => acc + (p.price || 0), 0);
+                  const origPrice = selectedPkgs.reduce((acc, p) => acc + getPackageEffectivePrice(p), 0);
                   const discType = getFieldValue('bundle_discount_type') || 'fixed';
                   const discVal = Number(getFieldValue('bundle_discount_value') || 0);
 
@@ -642,10 +655,16 @@ const AdminPackageForm: React.FC = () => {
                           onChange={() => recalculateBundlePrice()}
                           options={packages
                             .filter(p => !p.is_bundle && (!editTarget || p.slug !== editTarget.slug))
-                            .map(p => ({
-                              value: p.id,
-                              label: `${p.title} (Rp ${Number(p.price).toLocaleString('id-ID')})`,
-                            }))}
+                            .map(p => {
+                              const eff = getPackageEffectivePrice(p);
+                              const hasDisc = p.discount_type && eff < p.price;
+                              return {
+                                value: p.id,
+                                label: hasDisc
+                                  ? `${p.title} (Rp ${eff.toLocaleString('id-ID')} - Diskon dari Rp ${Number(p.price).toLocaleString('id-ID')})`
+                                  : `${p.title} (Rp ${Number(p.price).toLocaleString('id-ID')})`,
+                              };
+                            })}
                         />
                       </Form.Item>
 
@@ -654,15 +673,26 @@ const AdminPackageForm: React.FC = () => {
                         <div className="bg-white rounded-xl p-3 border border-purple-100 text-xs space-y-2">
                           <div className="font-bold text-on-surface">Paket Terpilih ({selectedPkgs.length} item):</div>
                           <div className="space-y-1">
-                            {selectedPkgs.map(sp => (
-                              <div key={sp.id} className="flex items-center justify-between text-on-surface/70">
-                                <span>• {sp.title}</span>
-                                <span className="font-bold">Rp {Number(sp.price).toLocaleString('id-ID')}</span>
-                              </div>
-                            ))}
+                            {selectedPkgs.map(sp => {
+                              const eff = getPackageEffectivePrice(sp);
+                              const hasDisc = sp.discount_type && eff < sp.price;
+                              return (
+                                <div key={sp.id} className="flex items-center justify-between text-on-surface/70">
+                                  <span>• {sp.title}</span>
+                                  <span className="font-bold flex items-center gap-1.5">
+                                    {hasDisc && (
+                                      <span className="text-[10px] text-on-surface/40 line-through">
+                                        Rp {Number(sp.price).toLocaleString('id-ID')}
+                                      </span>
+                                    )}
+                                    <span>Rp {eff.toLocaleString('id-ID')}</span>
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
                           <div className="border-t border-purple-100 pt-2 flex items-center justify-between font-bold text-purple-900">
-                            <span>Total Harga Asli Sub-Paket:</span>
+                            <span>Total Harga Jual Sub-Paket (Sebelum Diskon Bundle):</span>
                             <span>Rp {origPrice.toLocaleString('id-ID')}</span>
                           </div>
                         </div>

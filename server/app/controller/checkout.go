@@ -174,7 +174,20 @@ func Checkout(c echo.Context) error {
 
 	for i, pkg := range pkgs {
 		pkgTitles = append(pkgTitles, pkg.Title)
-		totalAmount += pkg.Price
+
+		pkgEffectivePrice := pkg.Price
+		if !pkg.IsBundle {
+			if pkg.DiscountType == "percent" {
+				pkgEffectivePrice = pkg.Price - (pkg.Price * (pkg.DiscountValue / 100.0))
+			} else if pkg.DiscountType == "harga" {
+				pkgEffectivePrice = pkg.Price - pkg.DiscountValue
+			}
+			if pkgEffectivePrice < 0 {
+				pkgEffectivePrice = 0
+			}
+		}
+
+		totalAmount += pkgEffectivePrice
 
 		var invoiceCode string
 		if len(pkgs) == 1 {
@@ -189,15 +202,15 @@ func Checkout(c echo.Context) error {
 		if voucher != nil && voucher.IsApplicableToPackage(pkg.ID) {
 			vId = &voucher.ID
 			if voucher.Type == "percentage" {
-				pkgDiscount = pkg.Price * (voucher.Value / 100.0)
+				pkgDiscount = pkgEffectivePrice * (voucher.Value / 100.0)
 			} else {
-				pkgDiscount = math.Min(pkg.Price, remainingFixedBudget)
+				pkgDiscount = math.Min(pkgEffectivePrice, remainingFixedBudget)
 				remainingFixedBudget -= pkgDiscount
 			}
 		}
 
 		totalDiscount += pkgDiscount
-		netAmount := pkg.Price - pkgDiscount
+		netAmount := pkgEffectivePrice - pkgDiscount
 		if netAmount < 0 {
 			netAmount = 0
 		}
