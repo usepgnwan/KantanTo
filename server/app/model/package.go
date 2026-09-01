@@ -1,27 +1,53 @@
 package model
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type Package struct {
-	ID           uint      `gorm:"primaryKey" json:"id"`
-	Slug         string    `gorm:"uniqueIndex;not null" json:"slug"`
-	Title        string    `json:"title"`
-	Description  string    `json:"description"`
-	Price        float64   `gorm:"default:0" json:"price"`
-	DiscountType string    `gorm:"default:''" json:"discount_type"`
-	DiscountValue float64  `gorm:"default:0" json:"discount_value"`
-	Category     string    `gorm:"default:''" json:"category"`
-	ClassesJSON  string    `gorm:"type:text;default:'[]'" json:"-"`
-	SubjectsJSON string    `gorm:"type:text;default:'[]'" json:"-"`
-	Duration     int       `gorm:"default:0" json:"duration"`
-	Status       string    `gorm:"default:'draft'" json:"status"`
-	Thumbnail    string    `gorm:"default:''" json:"thumbnail"`
-	IsLifetime   bool      `gorm:"default:true" json:"is_lifetime"` // Default to true based on user request
-	ValidityDays int       `gorm:"default:0" json:"validity_days"` // Hari expired
-	MaxExamAttempts int    `gorm:"default:0" json:"max_exam_attempts"` // 0 = unlimited
-	Materials    []PackageMaterial `gorm:"foreignKey:PackageID;constraint:OnDelete:CASCADE" json:"materials"`
-	CreatedAt    time.Time         `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID                    uint              `gorm:"primaryKey" json:"id"`
+	Slug                  string            `gorm:"uniqueIndex;not null" json:"slug"`
+	Title                 string            `json:"title"`
+	Description           string            `json:"description"`
+	Price                 float64           `gorm:"default:0" json:"price"`
+	DiscountType          string            `gorm:"default:''" json:"discount_type"`
+	DiscountValue         float64           `gorm:"default:0" json:"discount_value"`
+	Category              string            `gorm:"default:''" json:"category"`
+	ClassesJSON           string            `gorm:"type:text;default:'[]'" json:"-"`
+	SubjectsJSON          string            `gorm:"type:text;default:'[]'" json:"-"`
+	Duration              int               `gorm:"default:0" json:"duration"`
+	Status                string            `gorm:"default:'draft'" json:"status"`
+	Thumbnail             string            `gorm:"default:''" json:"thumbnail"`
+	IsLifetime            bool              `gorm:"default:true" json:"is_lifetime"` // Default to true based on user request
+	ValidityDays          int               `gorm:"default:0" json:"validity_days"`  // Hari expired
+	MaxExamAttempts       int               `gorm:"default:0" json:"max_exam_attempts"` // 0 = unlimited
+	IsBundle              bool              `gorm:"default:false" json:"is_bundle"`
+	BundledPackageIDsJSON string            `gorm:"type:text;default:'[]'" json:"-"`
+	OriginalPrice         float64           `gorm:"default:0" json:"original_price"`
+	BundleDiscountType    string            `gorm:"default:''" json:"bundle_discount_type"` // 'percentage' | 'fixed'
+	BundleDiscountValue   float64           `gorm:"default:0" json:"bundle_discount_value"`
+	Materials             []PackageMaterial `gorm:"foreignKey:PackageID;constraint:OnDelete:CASCADE" json:"materials"`
+	CreatedAt             time.Time         `json:"created_at"`
+	UpdatedAt             time.Time         `json:"updated_at"`
+}
+
+func (p *Package) GetBundledPackageIDs() []uint {
+	if p.BundledPackageIDsJSON == "" || p.BundledPackageIDsJSON == "[]" {
+		return []uint{}
+	}
+	var ids []uint
+	_ = json.Unmarshal([]byte(p.BundledPackageIDsJSON), &ids)
+	return ids
+}
+
+func (p *Package) SetBundledPackageIDs(ids []uint) {
+	if len(ids) == 0 {
+		p.BundledPackageIDsJSON = "[]"
+		return
+	}
+	b, _ := json.Marshal(ids)
+	p.BundledPackageIDsJSON = string(b)
 }
 
 type PackageQuestion struct {

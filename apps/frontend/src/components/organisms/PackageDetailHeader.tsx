@@ -19,6 +19,8 @@ interface PackageDetailHeaderProps {
   category: string;
   classes: string[];
   subjects: string[];
+  is_bundle?: boolean;
+  bundledPackageCount?: number;
 }
 
 const PackageDetailHeader: React.FC<PackageDetailHeaderProps> = ({
@@ -29,7 +31,9 @@ const PackageDetailHeader: React.FC<PackageDetailHeaderProps> = ({
   questionCount,
   category,
   classes,
-  subjects
+  subjects,
+  is_bundle,
+  bundledPackageCount
 }) => {
   return (
     <div className="relative pt-32 pb-16 overflow-hidden">
@@ -48,7 +52,12 @@ const PackageDetailHeader: React.FC<PackageDetailHeaderProps> = ({
         <Row gutter={[48, 48]} align="middle">
           <Col span={24}>
             <Space direction="vertical" size="large" className="w-full">
-              <Space size="middle">
+              <Space size="middle" wrap>
+                {is_bundle && (
+                  <Tag color="purple" className="rounded-full px-4 py-0.5 border-none font-black bg-purple-600 text-white shadow-md">
+                    🎁 PAKET BUNDLE ({bundledPackageCount || 0} PAKET)
+                  </Tag>
+                )}
                 <Tag color="blue" className="rounded-full px-4 border-none font-bold bg-primary text-white">
                   {category}
                 </Tag>

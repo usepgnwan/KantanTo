@@ -13,18 +13,27 @@ const api = axios.create({
 
 export interface CheckoutRequest {
   user_id: number;
-  package_slug: string;
+  package_slug?: string;
+  package_slugs?: string[];
   voucher_code?: string;
 }
 
 export interface TransactionResponse {
   id: number;
   invoice_code: string;
+  invoice_group?: string;
   order_id: string;
   user_id: number;
   package_id: number;
   voucher_id: number | null;
-  voucher?: { code: string; discount_percentage: number; title: string };
+  voucher?: {
+    id?: number;
+    code: string;
+    type?: 'fixed' | 'percentage';
+    value?: number;
+    discount_percentage?: number;
+    title?: string;
+  };
   amount: number;
   payment_method: string;
   status: string;

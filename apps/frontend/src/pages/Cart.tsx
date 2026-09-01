@@ -57,6 +57,7 @@ const CartPage: React.FC = () => {
               
               <Col xs={24} lg={8}>
                 <CartSummary 
+                  items={items}
                   subtotal={subtotal} 
                   tax={tax} 
                   total={total}

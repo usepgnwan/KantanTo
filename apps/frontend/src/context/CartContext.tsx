@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { message } from 'antd';
-import { Voucher } from '../services/voucherService';
+import { Voucher, isItemEligibleForVoucher } from '../services/voucherService';
 
 export interface CartItem {
   id: string;
@@ -46,7 +46,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   useEffect(() => {
-    localStorage.setItem('cart_items', JSON.stringify(items));
+    try {
+      localStorage.setItem('cart_items', JSON.stringify(items));
+    } catch (e) {
+      console.error('Failed to save cart items', e);
+    }
   }, [items]);
 
   useEffect(() => {
@@ -74,15 +78,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (updated.length === 0) {
           setAppliedVoucher(null);
         } else if (appliedVoucher.applicable_package_ids && appliedVoucher.applicable_package_ids.length > 0) {
-          const stillEligible = updated.some((item) => {
-            const itemSlug = item.slug || item.id;
-            const itemIdNum = Number(item.id);
-            const matchesId = !isNaN(itemIdNum) && appliedVoucher.applicable_package_ids?.includes(itemIdNum);
-            const matchesSummary = appliedVoucher.applicable_packages?.some(
-              (ap) => ap.slug === itemSlug || ap.id === itemIdNum
-            );
-            return matchesId || matchesSummary;
-          });
+          const stillEligible = updated.some((item) => isItemEligibleForVoucher(item, appliedVoucher));
           if (!stillEligible) {
             setAppliedVoucher(null);
             message.warning('Voucher dilepas karena paket yang memenuhi syarat telah dihapus dari keranjang');
