@@ -105,6 +105,123 @@
     text-align: justify !important;
   }
 
+  /* ── Quill Size Classes ───────────────────────────── */
+  .ql-size-small,
+  .kantan-quill-preview .ql-size-small,
+  .blog-content .ql-size-small {
+    font-size: 0.75em !important;
+  }
+
+  .ql-size-large,
+  .kantan-quill-preview .ql-size-large,
+  .blog-content .ql-size-large {
+    font-size: 1.5em !important;
+  }
+
+  .ql-size-huge,
+  .kantan-quill-preview .ql-size-huge,
+  .blog-content .ql-size-huge {
+    font-size: 2.5em !important;
+  }
+
+  /* ── Quill Size Picker Dropdown Styles ─────────────── */
+  .ql-snow .ql-picker.ql-size {
+    width: 125px !important;
+  }
+
+  .ql-snow .ql-picker.ql-size .ql-picker-label::before {
+    content: 'Ukuran Font';
+  }
+
+  .ql-snow .ql-picker.ql-size .ql-picker-label[data-value]::before,
+  .ql-snow .ql-picker.ql-size .ql-picker-item[data-value]::before {
+    content: attr(data-value) !important;
+  }
+
+  .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="10px"]::before,
+  .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="10px"]::before {
+    content: '10px (Kecil)' !important;
+    font-size: 11px !important;
+  }
+
+  .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="12px"]::before,
+  .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="12px"]::before {
+    content: '12px' !important;
+    font-size: 12px !important;
+  }
+
+  .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="14px"]::before,
+  .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="14px"]::before {
+    content: '14px (Standar)' !important;
+    font-size: 13px !important;
+  }
+
+  .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="16px"]::before,
+  .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="16px"]::before {
+    content: '16px (Sedang)' !important;
+    font-size: 14px !important;
+  }
+
+  .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="18px"]::before,
+  .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="18px"]::before {
+    content: '18px (Besar)' !important;
+    font-size: 15px !important;
+  }
+
+  .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="20px"]::before,
+  .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="20px"]::before {
+    content: '20px' !important;
+    font-size: 16px !important;
+  }
+
+  .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="24px"]::before,
+  .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="24px"]::before {
+    content: '24px (Judul)' !important;
+    font-size: 18px !important;
+  }
+
+  .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="30px"]::before,
+  .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="30px"]::before {
+    content: '30px' !important;
+    font-size: 20px !important;
+  }
+
+  .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="36px"]::before,
+  .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="36px"]::before {
+    content: '36px (Sangat Besar)' !important;
+    font-size: 22px !important;
+  }
+
+  /* ── Dark Mode for Quill Snow Toolbar & Pickers ─────── */
+  .dark .ql-toolbar.ql-snow {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    background-color: rgba(24, 24, 27, 0.6) !important;
+  }
+  .dark .ql-toolbar.ql-snow .ql-stroke {
+    stroke: rgba(255, 255, 255, 0.7) !important;
+  }
+  .dark .ql-toolbar.ql-snow .ql-fill {
+    fill: rgba(255, 255, 255, 0.7) !important;
+  }
+  .dark .ql-toolbar.ql-snow .ql-picker {
+    color: rgba(255, 255, 255, 0.8) !important;
+  }
+  .dark .ql-toolbar.ql-snow .ql-picker-options {
+    background-color: #18181b !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
+  }
+  .dark .ql-toolbar.ql-snow .ql-picker-item {
+    color: rgba(255, 255, 255, 0.8) !important;
+  }
+  .dark .ql-toolbar.ql-snow .ql-picker-item:hover,
+  .dark .ql-toolbar.ql-snow .ql-picker-item.ql-selected {
+    color: #60a5fa !important;
+  }
+  .dark .ql-container.ql-snow {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+  }
+
   /* ── KaTeX Math Display Fixes & Blog Styles ────────── */
   .katex-display {
     margin: 0.85rem 0 !important;

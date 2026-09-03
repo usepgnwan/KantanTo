@@ -22,9 +22,17 @@ interface KantanEditorProps {
   theme?: 'snow' | 'bubble';
 }
 
+export const FONT_SIZES = ['10px', '12px', '14px', '16px', '18px', '20px', '24px', '30px', '36px'];
+
+const SizeStyle = Quill.import('attributors/style/size') as any;
+SizeStyle.whitelist = FONT_SIZES;
+Quill.register({ 'formats/size': SizeStyle }, true);
+
 const toolbarOptions = [
   [{ header: [2, 3, 4, false] }],
+  [{ size: FONT_SIZES }],
   ['bold', 'italic', 'underline', 'strike'],
+  [{ color: [] }, { background: [] }],
   [{ list: 'ordered' }, { list: 'bullet' }, { indent: '-1' }, { indent: '+1' }],
   [{ align: [] }],
   ['blockquote', 'code-block'],
