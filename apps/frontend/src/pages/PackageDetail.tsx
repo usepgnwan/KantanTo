@@ -82,7 +82,7 @@ const PackageDetailPage: React.FC = () => {
     };
   }, [ownedTx, ownsPackage]);
 
-  const hasAccess = isPreviewMode || isPackageValid;
+  const hasAccess = isPreviewMode || isPackageValid || isAdmin;
 
   const totalQuestionsCount = useMemo(() => {
     if (packageData?.is_bundle) {
@@ -708,9 +708,9 @@ const PackageDetailPage: React.FC = () => {
                           icon={<PlayCircleOutlined />}
                           onClick={() => {
                             if (packageData?.is_bundle && packageData.bundled_packages && packageData.bundled_packages.length > 0) {
-                              navigate(`/paket/${packageData.bundled_packages[0].slug}`);
+                              navigate(`/exam/${packageData.bundled_packages[0].slug}`);
                             } else {
-                              navigate(`/ujian/${slug}`);
+                              navigate(`/exam/${slug}`);
                             }
                           }}
                         >
