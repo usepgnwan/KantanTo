@@ -24,6 +24,18 @@ interface KantanEditorProps {
 
 export const FONT_SIZES = ['10px', '12px', '14px', '16px', '18px', '20px', '24px', '30px', '36px'];
 
+export const SIZE_LABELS: Record<string, string> = {
+  '10px': '10px',
+  '12px': '12px',
+  '14px': '14px',
+  '16px': '16px',
+  '18px': '18px',
+  '20px': '20px',
+  '24px': '24px',
+  '30px': '30px',
+  '36px': '36px',
+};
+
 const SizeStyle = Quill.import('attributors/style/size') as any;
 SizeStyle.whitelist = FONT_SIZES;
 Quill.register({ 'formats/size': SizeStyle }, true);
@@ -328,13 +340,13 @@ function setupImageResizer(quill: Quill, onChangeCallback: () => void) {
     // 8 Resize Handles
     const handles = [
       { id: 'nw', cursor: 'nw-resize', top: '-7px', left: '-7px' },
-      { id: 'n',  cursor: 'n-resize',  top: '-7px', left: 'calc(50% - 7px)' },
+      { id: 'n', cursor: 'n-resize', top: '-7px', left: 'calc(50% - 7px)' },
       { id: 'ne', cursor: 'ne-resize', top: '-7px', right: '-7px' },
-      { id: 'e',  cursor: 'e-resize',  top: 'calc(50% - 7px)', right: '-7px' },
+      { id: 'e', cursor: 'e-resize', top: 'calc(50% - 7px)', right: '-7px' },
       { id: 'se', cursor: 'se-resize', bottom: '-7px', right: '-7px' },
-      { id: 's',  cursor: 's-resize',  bottom: '-7px', left: 'calc(50% - 7px)' },
+      { id: 's', cursor: 's-resize', bottom: '-7px', left: 'calc(50% - 7px)' },
       { id: 'sw', cursor: 'sw-resize', bottom: '-7px', left: '-7px' },
-      { id: 'w',  cursor: 'w-resize',  top: 'calc(50% - 7px)', left: '-7px' },
+      { id: 'w', cursor: 'w-resize', top: 'calc(50% - 7px)', left: '-7px' },
     ];
 
     handles.forEach(h => {
@@ -641,6 +653,34 @@ const KantanEditor: React.FC<KantanEditorProps> = ({ value, onChange, placeholde
         }
       }
 
+      // Setup labels for size picker items & current selected label
+      const updateSizePickerLabels = () => {
+        if (!editorRef.current) return;
+        const container = editorRef.current.parentElement;
+        const sizePicker = container?.querySelector('.ql-picker.ql-size');
+        if (!sizePicker) return;
+
+        const label = sizePicker.querySelector('.ql-picker-label');
+        if (label) {
+          const currentVal = label.getAttribute('data-value');
+          if (currentVal && SIZE_LABELS[currentVal]) {
+            label.setAttribute('data-label', SIZE_LABELS[currentVal]);
+          } else {
+            label.setAttribute('data-label', 'Ukuran Font');
+          }
+        }
+
+        sizePicker.querySelectorAll('.ql-picker-item').forEach(item => {
+          const val = item.getAttribute('data-value');
+          if (val && SIZE_LABELS[val]) {
+            item.setAttribute('data-label', SIZE_LABELS[val]);
+          }
+        });
+      };
+
+      setTimeout(updateSizePickerLabels, 0);
+      setTimeout(updateSizePickerLabels, 150);
+
       quill.on('text-change', () => {
         const html = quill!.root.innerHTML;
         const normalized = html === '<p><br></p>' ? '' : html;
@@ -648,6 +688,11 @@ const KantanEditor: React.FC<KantanEditorProps> = ({ value, onChange, placeholde
         if (onChangeRef.current) {
           onChangeRef.current(normalized);
         }
+        updateSizePickerLabels();
+      });
+
+      quill.on('selection-change', () => {
+        updateSizePickerLabels();
       });
     }
 
@@ -727,6 +772,67 @@ const KantanEditor: React.FC<KantanEditorProps> = ({ value, onChange, placeholde
         .kantan-quill .ql-editor img:hover {
           outline: 2px dashed #0053dd !important;
           outline-offset: 2px;
+        }
+
+        /* ── Quill Size Dropdown Styles ── */
+        .kantan-quill .ql-snow .ql-picker.ql-size {
+          width: 135px !important;
+        }
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-label::before {
+          content: 'Ukuran Font' !important;
+        }
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-label[data-label]::before {
+          content: attr(data-label) !important;
+        }
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-item::before {
+          content: attr(data-label) !important;
+        }
+
+        /* Specific value fallbacks */
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="10px"]::before,
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="10px"]::before {
+          content: '10px (Kecil)' !important;
+          font-size: 11px !important;
+        }
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="12px"]::before,
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="12px"]::before {
+          content: '12px' !important;
+          font-size: 12px !important;
+        }
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="14px"]::before,
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="14px"]::before {
+          content: '14px (Standar)' !important;
+          font-size: 13px !important;
+        }
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="16px"]::before,
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="16px"]::before {
+          content: '16px (Sedang)' !important;
+          font-size: 14px !important;
+        }
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="18px"]::before,
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="18px"]::before {
+          content: '18px (Besar)' !important;
+          font-size: 15px !important;
+        }
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="20px"]::before,
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="20px"]::before {
+          content: '20px' !important;
+          font-size: 16px !important;
+        }
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="24px"]::before,
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="24px"]::before {
+          content: '24px (Judul)' !important;
+          font-size: 18px !important;
+        }
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="30px"]::before,
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="30px"]::before {
+          content: '30px' !important;
+          font-size: 20px !important;
+        }
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-item[data-value="36px"]::before,
+        .kantan-quill .ql-snow .ql-picker.ql-size .ql-picker-label[data-value="36px"]::before {
+          content: '36px (Sangat Besar)' !important;
+          font-size: 22px !important;
         }
       `}</style>
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={insertImage} />

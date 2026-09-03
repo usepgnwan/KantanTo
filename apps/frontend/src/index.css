@@ -79,18 +79,19 @@
   .weightless-pagination .ant-pagination-item-active a {
     @apply !text-white;
   }
+}
 
-  /* ── Quill Bubble Toolbar Fix ─────────────────────── */
-  .ql-bubble .ql-tooltip {
-    z-index: 9999 !important;
-    position: fixed !important;
-  }
+/* ── Quill Bubble Toolbar Fix ─────────────────────── */
+.ql-bubble .ql-tooltip {
+  z-index: 9999 !important;
+  position: fixed !important;
+}
 
-  /* Default min-height bubble editor = 20px (single line) */
-  .kantan-bubble .ql-editor {
-    min-height: 20px !important;
-    padding: 6px 12px !important;
-  }
+/* Default min-height bubble editor = 20px (single line) */
+.kantan-bubble .ql-editor {
+  min-height: 20px !important;
+  padding: 6px 12px !important;
+}
 
   /* ── Quill Alignment Classes ──────────────────────── */
   .ql-align-center {
@@ -126,11 +127,16 @@
 
   /* ── Quill Size Picker Dropdown Styles ─────────────── */
   .ql-snow .ql-picker.ql-size {
-    width: 125px !important;
+    width: 140px !important;
   }
 
   .ql-snow .ql-picker.ql-size .ql-picker-label::before {
-    content: 'Ukuran Font';
+    content: 'Ukuran Font' !important;
+  }
+
+  .ql-snow .ql-picker.ql-size .ql-picker-label[data-label]::before,
+  .ql-snow .ql-picker.ql-size .ql-picker-item[data-label]::before {
+    content: attr(data-label) !important;
   }
 
   .ql-snow .ql-picker.ql-size .ql-picker-label[data-value]::before,
@@ -322,4 +328,3 @@
     margin-top: 0 !important;
     margin-bottom: 0 !important;
   }
-}
