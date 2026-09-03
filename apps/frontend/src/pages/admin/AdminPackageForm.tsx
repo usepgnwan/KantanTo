@@ -9,7 +9,7 @@ import type { TableColumnsType, MenuProps } from 'antd';
 import {
   PlusOutlined, SettingOutlined, DeleteOutlined, MoreOutlined,
   TagsOutlined, EditOutlined, ClockCircleOutlined,
-  PictureOutlined, ReloadOutlined,
+  PictureOutlined, ReloadOutlined, EyeOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -271,6 +271,12 @@ const AdminPackageForm: React.FC = () => {
       icon: <SettingOutlined />,
       onClick: () => navigate(`/admin/packages/${pkg.slug}`),
     },
+    {
+      key: 'preview-exam',
+      label: <span className="font-bold">Preview Ujian (Siswa)</span>,
+      icon: <EyeOutlined />,
+      onClick: () => window.open(`/exam/${pkg.slug}`, '_blank'),
+    },
     { type: 'divider' },
     {
       key: 'publish',
@@ -494,9 +500,17 @@ const AdminPackageForm: React.FC = () => {
     {
       title: '',
       key: 'actions',
-      width: 100,
+      width: 160,
       render: (_, record) => (
         <Space>
+          <Button
+            icon={<EyeOutlined />}
+            size="small"
+            className="rounded-xl font-bold h-8 px-3"
+            onClick={() => window.open(`/exam/${record.slug}`, '_blank')}
+          >
+            Lihat
+          </Button>
           <Button
             type="primary"
             icon={<SettingOutlined />}
