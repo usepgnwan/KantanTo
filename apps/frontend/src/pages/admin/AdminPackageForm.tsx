@@ -275,7 +275,7 @@ const AdminPackageForm: React.FC = () => {
       key: 'preview-exam',
       label: <span className="font-bold">Preview Ujian (Siswa)</span>,
       icon: <EyeOutlined />,
-      onClick: () => window.open(`/exam/${pkg.slug}`, '_blank'),
+      onClick: () => window.open(`/paket/${pkg.slug}`, '_blank'),
     },
     { type: 'divider' },
     {
@@ -507,7 +507,7 @@ const AdminPackageForm: React.FC = () => {
             icon={<EyeOutlined />}
             size="small"
             className="rounded-xl font-bold h-8 px-3"
-            onClick={() => window.open(`/exam/${record.slug}`, '_blank')}
+            onClick={() => window.open(`/paket/${record.slug}`, '_blank')}
           >
             Lihat
           </Button>

@@ -361,10 +361,10 @@ const Review: React.FC = () => {
                   </div>
 
                   {currentGroup.type === 'linked' ? (
-                    /* ── SOAL BERHUBUNGAN (PASSAGE): SPLIT TWO-PANEL REVIEW ── */
-                    <div className="flex flex-col xl:flex-row gap-8 items-start mb-8">
-                      {/* Left: Sticky Passage */}
-                      <div className="w-full xl:w-1/2 bg-surface-lowest rounded-[2rem] p-6 lg:p-8 shadow-sm border border-surface-container xl:sticky xl:top-24 xl:max-h-[75vh] xl:overflow-y-auto">
+                    /* ── SOAL BERHUBUNGAN (PASSAGE): SINGLE COLUMN REVIEW ── */
+                    <div className="flex flex-col gap-8 mb-8">
+                      {/* Top: Passage */}
+                      <div className="w-full bg-surface-lowest rounded-[2rem] p-6 lg:p-8 shadow-sm border border-surface-container">
                         <div className="flex items-center gap-2 mb-4 flex-wrap">
                           <Tag color="green" className="rounded-full border-none font-bold px-3">
                             📖 {currentGroup.parent_title || 'Teks Bacaan'}
@@ -382,8 +382,8 @@ const Review: React.FC = () => {
                         />
                       </div>
 
-                      {/* Right: Specific Sub-question review */}
-                      <div className="w-full xl:w-1/2 space-y-6">
+                      {/* Bottom: Specific Sub-question review */}
+                      <div className="w-full space-y-6">
                         {currentGroup.answers.map((current) => (
                           <div key={current.id} className="relative">
                             {/* Sub-question Status & Points */}
