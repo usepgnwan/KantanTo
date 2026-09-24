@@ -1,5 +1,5 @@
 import React from 'react';
-import { Typography, Space, Tag, Breadcrumb, Row, Col } from 'antd';
+import { Typography, Space, Tag, Breadcrumb, Row, Col, Button } from 'antd';
 import {
   UserOutlined,
   ClockCircleOutlined,
@@ -21,6 +21,8 @@ interface PackageDetailHeaderProps {
   subjects: string[];
   is_bundle?: boolean;
   bundledPackageCount?: number;
+  onLoadDescription?: () => void;
+  descriptionLoading?: boolean;
 }
 
 const PackageDetailHeader: React.FC<PackageDetailHeaderProps> = ({
@@ -33,7 +35,9 @@ const PackageDetailHeader: React.FC<PackageDetailHeaderProps> = ({
   classes,
   subjects,
   is_bundle,
-  bundledPackageCount
+  bundledPackageCount,
+  onLoadDescription,
+  descriptionLoading
 }) => {
   return (
     <div className="relative pt-32 pb-16 overflow-hidden">
@@ -71,9 +75,15 @@ const PackageDetailHeader: React.FC<PackageDetailHeaderProps> = ({
                 <Title level={1} className="!text-4xl md:!text-6xl !font-manrope !m-0 !leading-[1.1]">
                   {title}
                 </Title>
-                <Paragraph className="text-md text-justify  text-surface-on/60 mt-6 leading-relaxed">
-                  {description}
-                </Paragraph>
+                {description ? (
+                  <Paragraph className="text-md text-justify text-surface-on/60 mt-6 leading-relaxed line-clamp-5">
+                    {description}
+                  </Paragraph>
+                ) : (
+                  <Button type="link" className="mt-4 px-0" onClick={onLoadDescription} loading={descriptionLoading}>
+                    Lihat deskripsi paket
+                  </Button>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-8 items-center pt-4">

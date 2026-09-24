@@ -19,7 +19,8 @@ import PackageDetailHeader from '../components/organisms/PackageDetailHeader';
 import QuestionGrid from '../components/molecules/QuestionGrid';
 import ResourceCard from '../components/molecules/ResourceCard';
 import {
-  getPackages,
+  getPackageBySlug,
+  getPackageDescription,
   getPackageMaterials,
   getPackageQuestions,
   getPackageVideos,
@@ -52,8 +53,10 @@ const PackageDetailPage: React.FC = () => {
   const [videos, setVideos] = useState<PackageVideoPayload[]>([]);
   const [bundledContents, setBundledContents] = useState<SubPackageContent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [description, setDescription] = useState('');
+  const [descriptionLoading, setDescriptionLoading] = useState(false);
 
-  const { isAdmin, isLoggedIn, user } = useAuth();
+  const { isAdmin, user } = useAuth();
   const { addToCart, isInCart } = useCart();
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [ownsPackage, setOwnsPackage] = useState(false);
@@ -82,7 +85,7 @@ const PackageDetailPage: React.FC = () => {
     };
   }, [ownedTx, ownsPackage]);
 
-  const hasAccess = isPreviewMode || isPackageValid || isAdmin;
+  const hasAccess = isPreviewMode || isPackageValid || isAdmin();
 
   const totalQuestionsCount = useMemo(() => {
     if (packageData?.is_bundle) {
@@ -101,7 +104,7 @@ const PackageDetailPage: React.FC = () => {
 
   const headerData = useMemo(() => ({
     title: packageData?.title || 'Paket tidak ditemukan',
-    description: packageData?.description || '',
+    description,
     joinedCount: 0,
     duration: packageData?.is_bundle ? 'Sesuai Sub-Paket' : (packageData?.duration ? `${packageData.duration} Menit` : 'Tryout'),
     questionCount: totalQuestionsCount,
@@ -110,16 +113,27 @@ const PackageDetailPage: React.FC = () => {
     subjects: packageData?.subjects || [],
     is_bundle: packageData?.is_bundle,
     bundledPackageCount: packageData?.bundled_packages?.length || packageData?.bundled_package_ids?.length || 0,
-  }), [packageData, totalQuestionsCount]);
+  }), [packageData, totalQuestionsCount, description]);
+
+  const loadDescription = async () => {
+    if (!slug || description || descriptionLoading) return;
+    setDescriptionLoading(true);
+    try {
+      setDescription(await getPackageDescription(slug));
+    } finally {
+      setDescriptionLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!slug) return;
     let mounted = true;
 
+    setDescription('');
     setLoading(true);
-    getPackages()
-      .then(async (packages) => {
-        const found = packages.find((pkg) => pkg.slug === slug && pkg.status === 'published') || null;
+    getPackageBySlug(slug)
+      .then(async (foundData) => {
+        const found = foundData?.status === 'published' ? foundData : null;
         if (!found) {
           if (mounted) {
             setPackageData(null);
@@ -262,11 +276,6 @@ const PackageDetailPage: React.FC = () => {
   }, [slug, user]);
 
   const handleAddToCart = () => {
-    if (!isLoggedIn) {
-      navigate('/login');
-      return;
-    }
-
     if (!packageData) return;
 
     if (!isInCart(packageData.slug)) {
@@ -617,7 +626,7 @@ const PackageDetailPage: React.FC = () => {
   return (
     <AppLayout>
       <Spin spinning={loading}>
-        <PackageDetailHeader {...headerData} />
+        <PackageDetailHeader {...headerData} onLoadDescription={loadDescription} descriptionLoading={descriptionLoading} />
 
         {!loading && !packageData ? (
           <section className="pb-24 bg-white dark:bg-zinc-900 transition-colors duration-500">

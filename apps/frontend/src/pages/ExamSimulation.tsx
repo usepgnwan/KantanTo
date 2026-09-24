@@ -13,7 +13,7 @@ import {
   ExclamationCircleOutlined,
   FileTextOutlined
 } from '@ant-design/icons';
-import { getPackageQuestions, submitExam, PackageQuestionPayload, getPackageBySlug } from '../services/packageService';
+import { getPackageQuestions, submitExam, PackageQuestionPayload, getPackageExamMeta } from '../services/packageService';
 import { useAuth } from '../context/AuthContext';
 import { renderQuillHtml as renderLatex } from '../utils/renderContent';
 
@@ -22,7 +22,7 @@ const { Title, Paragraph, Text } = Typography;
 const ExamSimulation: React.FC = () => {
   const { id: slug } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { payload, isAdmin } = useAuth();
+  const { payload } = useAuth();
 
   const [questions, setQuestions] = useState<PackageQuestionPayload[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,6 +30,10 @@ const ExamSimulation: React.FC = () => {
   const [isMapVisible, setIsMapVisible] = useState(false);
   const [isExitModalVisible, setIsExitModalVisible] = useState(false);
   const [textSize, setTextSize] = useState<number>(16);
+
+  useEffect(() => {
+    if (!payload) navigate('/login', { replace: true, state: { from: `/exam/${slug}` } });
+  }, [payload, navigate, slug]);
 
   // localStorage keys scoped per exam slug
   const lsKey = (suffix: string) => `exam_${slug}_${suffix}`;
@@ -100,7 +104,7 @@ const ExamSimulation: React.FC = () => {
 
     Promise.all([
       getPackageQuestions(slug),
-      getPackageBySlug(slug)
+      getPackageExamMeta(slug)
     ])
       .then(([questionsData, packageData]) => {
         setQuestions(questionsData);
@@ -217,8 +221,6 @@ const ExamSimulation: React.FC = () => {
     try {
       const res = await submitExam(slug, {
         client_id: 'client', // Placeholder if needed
-        user_id: payload?.user_id ?? 0,
-        is_testing: isAdmin(),
         answers: formattedAnswers
       });
       clearPersistedState(); // clear saved state after successful submit

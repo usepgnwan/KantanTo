@@ -208,6 +208,37 @@ func GetPackages(c echo.Context) error {
 	return c.JSON(http.StatusOK, helpers.Response{Status: true, Message: "Success", Data: result})
 }
 
+// GetPackageBySlug returns a single package so detail and exam pages do not download every package description.
+func GetPackageBySlug(c echo.Context) error {
+	var pkg model.Package
+	if err := connection.DB.Select("id", "slug", "title", "price", "discount_type", "discount_value", "category", "classes_json", "subjects_json", "duration", "status", "thumbnail", "is_lifetime", "validity_days", "max_exam_attempts", "is_bundle", "bundled_package_ids_json", "original_price", "bundle_discount_type", "bundle_discount_value").Where("slug = ?", c.Param("slug")).First(&pkg).Error; err != nil {
+		return c.JSON(http.StatusNotFound, helpers.Response{Status: false, Message: "Paket tidak ditemukan"})
+	}
+	return c.JSON(http.StatusOK, helpers.Response{Status: true, Message: "Success", Data: mapPackageResponse(pkg, 0, 0, 0)})
+}
+
+func GetPackageDescription(c echo.Context) error {
+	var pkg model.Package
+	if err := connection.DB.Select("description").Where("slug = ?", c.Param("slug")).First(&pkg).Error; err != nil {
+		return c.JSON(http.StatusNotFound, helpers.Response{Status: false, Message: "Paket tidak ditemukan"})
+	}
+	return c.JSON(http.StatusOK, helpers.Response{Status: true, Message: "Success", Data: map[string]string{"description": pkg.Description}})
+}
+
+// GetPackageExamMeta returns only fields required to initialize an exam.
+func GetPackageExamMeta(c echo.Context) error {
+	var pkg struct {
+		ID       uint   `json:"id"`
+		Slug     string `json:"slug"`
+		Duration int    `json:"duration"`
+		Status   string `json:"status"`
+	}
+	if err := connection.DB.Model(&model.Package{}).Select("id", "slug", "duration", "status").Where("slug = ?", c.Param("slug")).First(&pkg).Error; err != nil {
+		return c.JSON(http.StatusNotFound, helpers.Response{Status: false, Message: "Paket tidak ditemukan"})
+	}
+	return c.JSON(http.StatusOK, helpers.Response{Status: true, Message: "Success", Data: pkg})
+}
+
 func CreatePackage(c echo.Context) error {
 	payload := new(packageCreatePayload)
 	if err := c.Bind(payload); err != nil {
@@ -563,7 +594,6 @@ func SavePackageQuestions(c echo.Context) error {
 
 	return c.JSON(http.StatusOK, helpers.Response{Status: true, Message: "Daftar soal berhasil disimpan", Data: response})
 }
-
 
 func ScoreQuestion(c echo.Context) error {
 	payload := new(scoreRequest)
