@@ -11,6 +11,12 @@ const api = axios.create({
   },
 });
 
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('kantan_token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
 // ─── Package List CRUD ───────────────────────────────────────────────────────
 
 export interface PackageListItem {
@@ -137,8 +143,18 @@ export const getPackages = async (): Promise<PackageListItem[]> => {
 };
 
 export const getPackageBySlug = async (slug: string): Promise<PackageListItem | undefined> => {
-  const packages = await getPackages();
-  return packages.find(pkg => pkg.slug === slug);
+  const response = await api.get(`/packages/${slug}`);
+  return normalizePackage(unwrapItem(response.data));
+};
+
+export const getPackageExamMeta = async (slug: string): Promise<{ id: number; slug: string; duration: number; status: string }> => {
+  const response = await api.get(`/packages/${slug}/meta`);
+  return unwrapItem(response.data);
+};
+
+export const getPackageDescription = async (slug: string): Promise<string> => {
+  const response = await api.get(`/packages/${slug}/description`);
+  return unwrapItem(response.data)?.description || '';
 };
 
 export const createPackage = async (payload: PackagePayload): Promise<PackageListItem> => {
@@ -322,8 +338,6 @@ export const deletePackageVideo = async (slug: string, videoId: string): Promise
 
 export interface ExamSubmitPayload {
   client_id: string;
-  user_id: number;
-  is_testing: boolean;
   answers: Record<string, number[]>; // QuestionID / subQuestionID / rowID -> array of selected options
 }
 

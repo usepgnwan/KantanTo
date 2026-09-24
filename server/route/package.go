@@ -12,6 +12,9 @@ func RoutePackage(api *echo.Group) {
 	packages.POST("", controller.CreatePackage)
 	packages.PUT("/:slug", controller.UpdatePackage)
 	packages.DELETE("/:slug", controller.DeletePackage)
+	packages.GET("/:slug/meta", controller.GetPackageExamMeta)
+	packages.GET("/:slug/description", controller.GetPackageDescription)
+	packages.GET("/:slug", controller.GetPackageBySlug)
 	packages.GET("/:slug/questions", controller.GetPackageQuestions)
 	packages.POST("/:slug/questions", controller.SavePackageQuestion)
 	packages.PUT("/:slug/questions", controller.SavePackageQuestions)
@@ -24,8 +27,7 @@ func RoutePackage(api *echo.Group) {
 	packages.PUT("/:slug/videos", controller.SavePackageVideos)
 	packages.DELETE("/:slug/videos/:id", controller.DeletePackageVideo)
 	packages.POST("/score", controller.ScoreQuestion)
-	
+
 	// Exam Submit
 	packages.POST("/:slug/submit", controller.SubmitExam)
 }
-

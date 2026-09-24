@@ -5,19 +5,48 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"os"
 	"server/app/model"
 	"server/connection"
+	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 	"gorm.io/gorm"
 )
 
 type examSubmitPayload struct {
-	ClientID  string           `json:"client_id"`
-	UserID    uint             `json:"user_id"`
-	IsTesting bool             `json:"is_testing"`
-	Answers   map[string][]int `json:"answers"` // ClientID -> array of selected option indexes
+	ClientID string           `json:"client_id"`
+	Answers  map[string][]int `json:"answers"` // ClientID -> array of selected option indexes
+}
+
+type examAuthClaims struct {
+	UserID uint `json:"user_id"`
+	RoleID uint `json:"roleid"`
+	jwt.RegisteredClaims
+}
+
+func examClaims(c echo.Context) (*examAuthClaims, error) {
+	parts := strings.Fields(c.Request().Header.Get("Authorization"))
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		return nil, fmt.Errorf("unauthorized")
+	}
+	secret := os.Getenv("SIGNATURETOAPPS")
+	if secret == "" {
+		secret = "default_secret"
+	}
+	claims := new(examAuthClaims)
+	token, err := jwt.ParseWithClaims(parts[1], claims, func(token *jwt.Token) (interface{}, error) {
+		if token.Method != jwt.SigningMethodHS256 {
+			return nil, fmt.Errorf("invalid signing method")
+		}
+		return []byte(secret), nil
+	})
+	if err != nil || !token.Valid || claims.UserID == 0 {
+		return nil, fmt.Errorf("unauthorized")
+	}
+	return claims, nil
 }
 
 func parseCorrectJSON(jsonStr string) []int {
@@ -34,6 +63,10 @@ func parseCorrectJSON(jsonStr string) []int {
 
 func SubmitExam(c echo.Context) error {
 	slug := c.Param("slug")
+	claims, authErr := examClaims(c)
+	if authErr != nil {
+		return c.JSON(http.StatusUnauthorized, map[string]interface{}{"status": false, "message": "Silakan login untuk mengikuti ujian."})
+	}
 
 	var req examSubmitPayload
 	if err := c.Bind(&req); err != nil {
@@ -52,13 +85,40 @@ func SubmitExam(c echo.Context) error {
 		})
 	}
 
-	// 1.5 Validate Access (Lifetime/Expiration & Exam Limits)
-	if !req.IsTesting {
-		var validTransaction model.Transaction
-		err := connection.DB.Where("user_id = ? AND package_id = ? AND status = 'active' AND (is_lifetime = ? OR active_until > ?) AND (max_exam_attempts = 0 OR used_exam_attempts < max_exam_attempts)", 
-			req.UserID, pkg.ID, true, time.Now()).
-			Order("created_at asc").
-			First(&validTransaction).Error
+	// Only a verified admin token can submit a testing session without a package.
+	isTesting := claims.RoleID == 1
+	if !isTesting {
+		err := connection.DB.Transaction(func(tx *gorm.DB) error {
+			var entitlements []model.Transaction
+			if err := tx.Where("user_id = ? AND package_id = ? AND status = 'active' AND (is_lifetime = ? OR active_until > ?)", claims.UserID, pkg.ID, true, time.Now()).Order("created_at asc").Find(&entitlements).Error; err != nil {
+				return err
+			}
+			totalLimit, totalUsed := 0, 0
+			unlimited := false
+			for _, entitlement := range entitlements {
+				if entitlement.MaxExamAttempts == 0 {
+					unlimited = true
+				}
+				totalLimit += entitlement.MaxExamAttempts
+				totalUsed += entitlement.UsedExamAttempts
+			}
+			if len(entitlements) == 0 || (!unlimited && totalUsed >= totalLimit) {
+				return gorm.ErrRecordNotFound
+			}
+			for _, entitlement := range entitlements {
+				if entitlement.MaxExamAttempts > 0 && entitlement.UsedExamAttempts >= entitlement.MaxExamAttempts {
+					continue
+				}
+				result := tx.Model(&model.Transaction{}).Where("id = ? AND used_exam_attempts = ? AND (max_exam_attempts = 0 OR used_exam_attempts < max_exam_attempts)", entitlement.ID, entitlement.UsedExamAttempts).UpdateColumn("used_exam_attempts", gorm.Expr("used_exam_attempts + 1"))
+				if result.Error != nil {
+					return result.Error
+				}
+				if result.RowsAffected == 1 {
+					return nil
+				}
+			}
+			return gorm.ErrRecordNotFound
+		})
 
 		if err != nil {
 			return c.JSON(http.StatusForbidden, map[string]interface{}{
@@ -67,8 +127,6 @@ func SubmitExam(c echo.Context) error {
 			})
 		}
 
-		// Increment limit usage
-		connection.DB.Model(&validTransaction).UpdateColumn("used_exam_attempts", gorm.Expr("used_exam_attempts + ?", 1))
 	}
 
 	// 2. Fetch all questions for this package
@@ -86,8 +144,8 @@ func SubmitExam(c echo.Context) error {
 	session := model.ExamSession{
 		PackageID: pkg.ID,
 		ClientID:  req.ClientID,
-		UserID:    req.UserID,
-		IsTesting: req.IsTesting,
+		UserID:    claims.UserID,
+		IsTesting: isTesting,
 	}
 	if err := connection.DB.Create(&session).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
@@ -197,7 +255,7 @@ func SubmitExam(c echo.Context) error {
 		} else {
 			// Single or Multiple
 			correct := parseCorrectJSON(q.CorrectJSON)
-			
+
 			// For total correct and incorrect calculations on partial scoring
 			var totalOptions []string
 			json.Unmarshal([]byte(q.OptionsJSON), &totalOptions)
@@ -252,11 +310,13 @@ func calculateScore(qType string, selected []int, correct []int, maxPoints float
 // single: full points if selected[0] == correct[0], else 0
 //
 // multiple – all_or_nothing:
-//   Must select EXACTLY all correct answers and nothing else → maxPoints, else 0
+//
+//	Must select EXACTLY all correct answers and nothing else → maxPoints, else 0
 //
 // multiple – partial (prosedural):
-//   pts = (correctChosen/totalCorrect × maxPts) − (wrongChosen/totalWrong × maxPts)
-//   floor at 0. isCorrect = (pts == maxPoints)
+//
+//	pts = (correctChosen/totalCorrect × maxPts) − (wrongChosen/totalWrong × maxPts)
+//	floor at 0. isCorrect = (pts == maxPoints)
 func calculateScoreMulti(qType string, selected []int, correct []int, maxPoints float64, scoringMethod string, totalIncorrect int) (float64, bool) {
 	if len(selected) == 0 {
 		return 0, false
@@ -531,7 +591,7 @@ func GetExamSession(c echo.Context) error {
 			if err := connection.DB.Preload("SubQuestions", func(db *gorm.DB) *gorm.DB {
 				return db.Order("id asc")
 			}).Where("id = ?", ans.QuestionID).First(&q).Error; err == nil {
-			if (q.Type == "table" || q.Type == "nested" || q.Type == "scenario" || q.Type == "linked") && len(q.SubQuestions) > 0 {
+				if (q.Type == "table" || q.Type == "nested" || q.Type == "scenario" || q.Type == "linked") && len(q.SubQuestions) > 0 {
 					var parentOpts []string
 					json.Unmarshal([]byte(q.OptionsJSON), &parentOpts)
 					for _, sub := range q.SubQuestions {
@@ -627,7 +687,7 @@ func GetExamSession(c echo.Context) error {
 func GetAllExamSessions(c echo.Context) error {
 	page := 1
 	limit := 10
-	
+
 	if p := c.QueryParam("page"); p != "" {
 		// Just simple parse, assuming integer
 		fmt.Sscanf(p, "%d", &page)
@@ -635,7 +695,7 @@ func GetAllExamSessions(c echo.Context) error {
 	if l := c.QueryParam("limit"); l != "" {
 		fmt.Sscanf(l, "%d", &limit)
 	}
-	
+
 	isTesting := c.QueryParam("is_testing") == "true"
 	search := c.QueryParam("search")
 
