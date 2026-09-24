@@ -22,11 +22,9 @@ import {
   getPackageBySlug,
   getPackageDescription,
   getPackageMaterials,
-  getPackageQuestions,
   getPackageVideos,
   PackageListItem,
   PackageMaterialPayload,
-  PackageQuestionPayload,
   PackageVideoPayload,
 } from '../services/packageService';
 import { getMyPackagesAPI, MyTransaction } from '../services/myPackageService';
@@ -38,7 +36,6 @@ const fallbackVideoThumbnail = 'https://images.unsplash.com/photo-1516321318423-
 
 interface SubPackageContent {
   package: PackageListItem;
-  questions: PackageQuestionPayload[];
   materials: PackageMaterialPayload[];
   videos: PackageVideoPayload[];
   effectiveQuestionsCount: number;
@@ -48,13 +45,15 @@ const PackageDetailPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const [packageData, setPackageData] = useState<PackageListItem | null>(null);
-  const [questions, setQuestions] = useState<PackageQuestionPayload[]>([]);
   const [materials, setMaterials] = useState<PackageMaterialPayload[]>([]);
   const [videos, setVideos] = useState<PackageVideoPayload[]>([]);
   const [bundledContents, setBundledContents] = useState<SubPackageContent[]>([]);
   const [loading, setLoading] = useState(true);
   const [description, setDescription] = useState('');
   const [descriptionLoading, setDescriptionLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('bundle_items');
+  const [bundleContentLoading, setBundleContentLoading] = useState(false);
+  const [loadedBundleTabs, setLoadedBundleTabs] = useState<string[]>([]);
 
   const { isAdmin, user } = useAuth();
   const { addToCart, isInCart } = useCart();
@@ -91,16 +90,10 @@ const PackageDetailPage: React.FC = () => {
     if (packageData?.is_bundle) {
       return bundledContents.reduce((acc, curr) => acc + curr.effectiveQuestionsCount, 0);
     }
-    let total = 0;
-    for (const q of questions) {
-      if (q.type === 'linked' && q.sub_questions && q.sub_questions.length > 0) {
-        total += q.sub_questions.length;
-      } else {
-        total += 1;
-      }
-    }
-    return total;
-  }, [packageData?.is_bundle, bundledContents, questions]);
+    return packageData?.questions_count || 0;
+  }, [packageData?.is_bundle, bundledContents, packageData?.questions_count]);
+  const bundleMaterialsCount = packageData?.bundled_packages?.reduce((sum, item) => sum + item.materials_count, 0) || 0;
+  const bundleVideosCount = packageData?.bundled_packages?.reduce((sum, item) => sum + item.videos_count, 0) || 0;
 
   const headerData = useMemo(() => ({
     title: packageData?.title || 'Paket tidak ditemukan',
@@ -130,6 +123,7 @@ const PackageDetailPage: React.FC = () => {
     let mounted = true;
 
     setDescription('');
+    setLoadedBundleTabs([]);
     setLoading(true);
     getPackageBySlug(slug)
       .then(async (foundData) => {
@@ -137,7 +131,6 @@ const PackageDetailPage: React.FC = () => {
         if (!found) {
           if (mounted) {
             setPackageData(null);
-            setQuestions([]);
             setMaterials([]);
             setVideos([]);
             setBundledContents([]);
@@ -146,50 +139,27 @@ const PackageDetailPage: React.FC = () => {
         }
 
         if (found.is_bundle && found.bundled_packages && found.bundled_packages.length > 0) {
-          const subContents = await Promise.all(
-            found.bundled_packages.map(async (sub) => {
-              const [qData, mData, vData] = await Promise.all([
-                getPackageQuestions(sub.slug).catch(() => []),
-                getPackageMaterials(sub.slug).catch(() => []),
-                getPackageVideos(sub.slug).catch(() => []),
-              ]);
-
-              let effCount = 0;
-              for (const q of qData) {
-                if (q.type === 'linked' && q.sub_questions && q.sub_questions.length > 0) {
-                  effCount += q.sub_questions.length;
-                } else {
-                  effCount += 1;
-                }
-              }
-
-              return {
-                package: sub,
-                questions: qData,
-                materials: mData,
-                videos: vData,
-                effectiveQuestionsCount: effCount,
-              };
-            })
-          );
-
           if (mounted) {
             setPackageData(found);
-            setBundledContents(subContents);
-            setQuestions([]);
+            setActiveTab('bundle_items');
+            setBundledContents(found.bundled_packages.map((sub) => ({
+              package: sub,
+              materials: [],
+              videos: [],
+              effectiveQuestionsCount: sub.questions_count || 0,
+            })));
             setMaterials([]);
             setVideos([]);
           }
         } else {
-          const [questionData, materialData, videoData] = await Promise.all([
-            getPackageQuestions(slug).catch(() => []),
+          setActiveTab('soal');
+          const [materialData, videoData] = await Promise.all([
             getPackageMaterials(slug).catch(() => []),
             getPackageVideos(slug).catch(() => []),
           ]);
 
           if (mounted) {
             setPackageData(found);
-            setQuestions(questionData);
             setMaterials(materialData);
             setVideos(videoData);
             setBundledContents([]);
@@ -199,7 +169,6 @@ const PackageDetailPage: React.FC = () => {
       .catch(() => {
         if (mounted) {
           setPackageData(null);
-          setQuestions([]);
           setMaterials([]);
           setVideos([]);
           setBundledContents([]);
@@ -215,6 +184,26 @@ const PackageDetailPage: React.FC = () => {
       mounted = false;
     };
   }, [slug]);
+
+  useEffect(() => {
+    if (!packageData?.is_bundle || !['pembahasan', 'video'].includes(activeTab) || loadedBundleTabs.includes(activeTab)) return;
+    let mounted = true;
+    setBundleContentLoading(true);
+    const load = activeTab === 'pembahasan' ? getPackageMaterials : getPackageVideos;
+    Promise.all(bundledContents.map(async (item) => ({
+      id: item.package.id,
+      data: await load(item.package.slug).catch(() => []),
+    }))).then((loaded) => {
+      if (!mounted) return;
+      setBundledContents((current) => current.map((item) => {
+        const result = loaded.find((entry) => entry.id === item.package.id);
+        if (!result) return item;
+        return activeTab === 'pembahasan' ? { ...item, materials: result.data as PackageMaterialPayload[] } : { ...item, videos: result.data as PackageVideoPayload[] };
+      }));
+      setLoadedBundleTabs((current) => [...current, activeTab]);
+    }).finally(() => { if (mounted) setBundleContentLoading(false); });
+    return () => { mounted = false; };
+  }, [activeTab, packageData, bundledContents, loadedBundleTabs]);
 
   useEffect(() => {
     if (!slug || !user?.id) return;
@@ -366,14 +355,8 @@ const PackageDetailPage: React.FC = () => {
                           {sub.category}
                         </Tag>
                       )}
-                      {sub.is_lifetime ? (
-                        <Tag color="green" className="m-0 border-none font-bold text-[9px] px-2 rounded-md">Lifetime</Tag>
-                      ) : (
-                        <Tag color="blue" className="m-0 border-none font-bold text-[9px] px-2 rounded-md">{sub.validity_days} Hari</Tag>
-                      )}
                     </div>
-                    <h4 className="font-bold text-on-surface text-sm truncate mb-1">{sub.title}</h4>
-                    <p className="text-xs text-surface-on/50 line-clamp-2 mb-0">{sub.description}</p>
+                    <h4 className="font-bold text-on-surface text-sm truncate mb-1">Sub-Paket #{idx + 1}</h4>
                   </div>
                 </div>
 
@@ -444,18 +427,13 @@ const PackageDetailPage: React.FC = () => {
                     </div>
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-black text-on-surface text-base m-0">
-                          {subItem.package.title}
-                        </h3>
+                        <h3 className="font-black text-on-surface text-base m-0">Sub-Paket #{idx + 1}</h3>
                         {subItem.package.category && (
                           <Tag color="purple" className="m-0 border-none font-bold text-[9px] px-2 rounded-md">
                             {subItem.package.category}
                           </Tag>
                         )}
                       </div>
-                      <p className="text-xs text-on-surface/50 line-clamp-1 m-0">
-                        {subItem.package.description}
-                      </p>
                     </div>
                   </div>
 
@@ -480,7 +458,6 @@ const PackageDetailPage: React.FC = () => {
                     count={subItem.effectiveQuestionsCount}
                     duration={subItem.package.duration || 45}
                     answersLocked={!hasAccess}
-                    rawQuestions={subItem.questions}
                   />
                 ) : (
                   <div className="py-6 text-center text-xs text-on-surface/40">
@@ -496,7 +473,6 @@ const PackageDetailPage: React.FC = () => {
               count={totalQuestionsCount}
               duration={packageData?.duration || 45}
               answersLocked={!hasAccess}
-              rawQuestions={questions}
             />
           ) : (
             <Empty description="Belum ada soal di paket ini" className="py-12" />
@@ -506,21 +482,22 @@ const PackageDetailPage: React.FC = () => {
     },
 
     // 3. Tab Pembahasan
-    (packageData?.is_bundle ? bundleMaterials.length > 0 : materials.length > 0) ? {
+    (packageData?.is_bundle ? bundleMaterialsCount > 0 : materials.length > 0) ? {
       key: 'pembahasan',
       label: (
         <span className="flex items-center gap-2 px-2">
-          <FileSearchOutlined /> Pembahasan ({packageData?.is_bundle ? bundleMaterials.length : materials.length})
+          <FileSearchOutlined /> Pembahasan ({packageData?.is_bundle ? bundleMaterialsCount : materials.length})
         </span>
       ),
       children: (
         <div className="py-6 space-y-4">
+          {bundleContentLoading && <div className="text-center py-8"><Spin /></div>}
           {packageData?.is_bundle ? (
             bundledContents.map((subItem) => (
               subItem.materials.length > 0 && (
                 <div key={subItem.package.id} className="space-y-3 mb-6">
                   <div className="flex items-center gap-2 font-bold text-sm text-purple-900 dark:text-purple-200">
-                    <Tag color="purple" className="font-bold border-none">Paket {subItem.package.title}</Tag>
+                    <Tag color="purple" className="font-bold border-none">Sub-Paket #{bundledContents.indexOf(subItem) + 1}</Tag>
                     <span>({subItem.materials.length} Materi)</span>
                   </div>
                   {subItem.materials.map((item, index) => {
@@ -568,21 +545,22 @@ const PackageDetailPage: React.FC = () => {
     } : null,
 
     // 4. Tab Video
-    (packageData?.is_bundle ? bundleVideos.length > 0 : videos.length > 0) ? {
+    (packageData?.is_bundle ? bundleVideosCount > 0 : videos.length > 0) ? {
       key: 'video',
       label: (
         <span className="flex items-center gap-2 px-2">
-          <VideoCameraOutlined /> Video ({packageData?.is_bundle ? bundleVideos.length : videos.length})
+          <VideoCameraOutlined /> Video ({packageData?.is_bundle ? bundleVideosCount : videos.length})
         </span>
       ),
       children: (
         <div className="py-6">
+          {bundleContentLoading && <div className="text-center py-8"><Spin /></div>}
           {packageData?.is_bundle ? (
             bundledContents.map((subItem) => (
               subItem.videos.length > 0 && (
                 <div key={subItem.package.id} className="mb-6 space-y-3">
                   <div className="flex items-center gap-2 font-bold text-sm text-purple-900 dark:text-purple-200">
-                    <Tag color="purple" className="font-bold border-none">Paket {subItem.package.title}</Tag>
+                    <Tag color="purple" className="font-bold border-none">Sub-Paket #{bundledContents.indexOf(subItem) + 1}</Tag>
                     <span>({subItem.videos.length} Video)</span>
                   </div>
                   <Row gutter={[24, 24]}>
@@ -643,7 +621,8 @@ const PackageDetailPage: React.FC = () => {
                 <Col xs={24} lg={16}>
                   <div className="bg-surface-low/30 dark:bg-zinc-800/20 p-8 rounded-[2.5rem] border border-surface-container -mt-12 relative z-10 backdrop-blur-xl">
                     <Tabs
-                      defaultActiveKey={packageData?.is_bundle ? 'bundle_items' : 'soal'}
+                      activeKey={activeTab}
+                      onChange={setActiveTab}
                       items={tabItems}
                       className="weightless-tabs"
                       size="large"
@@ -678,7 +657,7 @@ const PackageDetailPage: React.FC = () => {
                               </div>
                               {packageData.bundled_packages?.map(sp => (
                                 <div key={sp.id} className="flex items-center justify-between text-on-surface/70">
-                                  <span className="truncate">• {sp.title}</span>
+                                  <span className="truncate">• Paket {sp.id}</span>
                                   <Button size="small" type="link" className="p-0 text-xs font-bold text-primary" onClick={() => navigate(`/paket/${sp.slug}`)}>
                                     Buka &rarr;
                                   </Button>

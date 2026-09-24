@@ -18,8 +18,8 @@ import (
 type packageSummaryResponse struct {
 	ID              uint     `json:"id"`
 	Slug            string   `json:"slug"`
-	Title           string   `json:"title"`
-	Description     string   `json:"description"`
+	Title           string   `json:"title,omitempty"`
+	Description     string   `json:"description,omitempty"`
 	Price           float64  `json:"price"`
 	Thumbnail       string   `json:"thumbnail"`
 	Category        string   `json:"category"`
@@ -175,19 +175,20 @@ func mapPackageResponse(pkg model.Package, qCount, mCount, vCount int64) package
 }
 
 func countEffectiveQuestions(packageID uint) int64 {
-	var questions []model.PackageQuestion
-	if err := connection.DB.Where("package_id = ?", packageID).Preload("SubQuestions").Find(&questions).Error; err != nil {
+	var total, linkedWithSubs, linkedSubs int64
+	if connection.DB.Model(&model.PackageQuestion{}).Where("package_id = ?", packageID).Count(&total).Error != nil || total == 0 {
 		return 0
 	}
-	var count int64 = 0
-	for _, q := range questions {
-		if q.Type == "linked" && len(q.SubQuestions) > 0 {
-			count += int64(len(q.SubQuestions))
-		} else {
-			count++
+	linkedIDs := connection.DB.Model(&model.PackageQuestion{}).Select("id").Where("package_id = ? AND type = ?", packageID, "linked")
+	if connection.DB.Model(&model.PackageSubQuestion{}).Where("question_id IN (?)", linkedIDs).Distinct("question_id").Count(&linkedWithSubs).Error != nil {
+		return 0
+	}
+	if linkedWithSubs > 0 {
+		if connection.DB.Model(&model.PackageSubQuestion{}).Where("question_id IN (?)", linkedIDs).Count(&linkedSubs).Error != nil {
+			return 0
 		}
 	}
-	return count
+	return total - linkedWithSubs + linkedSubs
 }
 
 func GetPackages(c echo.Context) error {
@@ -214,7 +215,53 @@ func GetPackageBySlug(c echo.Context) error {
 	if err := connection.DB.Select("id", "slug", "title", "price", "discount_type", "discount_value", "category", "classes_json", "subjects_json", "duration", "status", "thumbnail", "is_lifetime", "validity_days", "max_exam_attempts", "is_bundle", "bundled_package_ids_json", "original_price", "bundle_discount_type", "bundle_discount_value").Where("slug = ?", c.Param("slug")).First(&pkg).Error; err != nil {
 		return c.JSON(http.StatusNotFound, helpers.Response{Status: false, Message: "Paket tidak ditemukan"})
 	}
-	return c.JSON(http.StatusOK, helpers.Response{Status: true, Message: "Success", Data: mapPackageResponse(pkg, 0, 0, 0)})
+	classes := jsonStringSlice(pkg.ClassesJSON)
+	if classes == nil {
+		classes = []string{}
+	}
+	subjects := jsonStringSlice(pkg.SubjectsJSON)
+	if subjects == nil {
+		subjects = []string{}
+	}
+	response := packageListResponse{
+		ID: pkg.ID, Slug: pkg.Slug, Title: pkg.Title, Price: pkg.Price,
+		DiscountType: pkg.DiscountType, DiscountValue: pkg.DiscountValue, Category: pkg.Category,
+		Classes: classes, Subjects: subjects, Duration: pkg.Duration, Status: pkg.Status,
+		Thumbnail: pkg.Thumbnail, IsLifetime: pkg.IsLifetime, ValidityDays: pkg.ValidityDays,
+		MaxExamAttempts: pkg.MaxExamAttempts, IsBundle: pkg.IsBundle,
+		BundledPackageIDs: pkg.GetBundledPackageIDs(), OriginalPrice: pkg.OriginalPrice,
+		BundleDiscountType: pkg.BundleDiscountType, BundleDiscountValue: pkg.BundleDiscountValue,
+		QuestionsCount: countEffectiveQuestions(pkg.ID),
+	}
+	if pkg.IsBundle {
+		response.BundledPackages = getBundledListSummaries(pkg)
+	}
+	return c.JSON(http.StatusOK, helpers.Response{Status: true, Message: "Success", Data: response})
+}
+
+// Bundle detail only needs IDs and counts; omit subpackage names and descriptions from its initial payload.
+func getBundledListSummaries(pkg model.Package) []packageSummaryResponse {
+	ids := pkg.GetBundledPackageIDs()
+	if len(ids) == 0 {
+		return []packageSummaryResponse{}
+	}
+	type item struct {
+		ID   uint
+		Slug string
+	}
+	var packages []item
+	if err := connection.DB.Model(&model.Package{}).Select("id", "slug").Where("id IN ?", ids).Find(&packages).Error; err != nil {
+		return []packageSummaryResponse{}
+	}
+	results := make([]packageSummaryResponse, 0, len(packages))
+	for _, sub := range packages {
+		var mCount, vCount int64
+		qCount := countEffectiveQuestions(sub.ID)
+		connection.DB.Model(&model.PackageMaterial{}).Where("package_id = ?", sub.ID).Count(&mCount)
+		connection.DB.Model(&model.PackageVideo{}).Where("package_id = ?", sub.ID).Count(&vCount)
+		results = append(results, packageSummaryResponse{ID: sub.ID, Slug: sub.Slug, QuestionsCount: qCount, MaterialsCount: mCount, VideosCount: vCount})
+	}
+	return results
 }
 
 func GetPackageDescription(c echo.Context) error {
