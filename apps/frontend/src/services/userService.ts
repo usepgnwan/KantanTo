@@ -53,7 +53,7 @@ export const getUsers = async (page: number, limit: number, search?: string): Pr
   return response.data.data;
 };
 
-export const registerUser = async (data: { name: string; email: string; nohp: string; password: string; asal_sekolah?: string }): Promise<User> => {
+export const registerUser = async (data: { name: string; email: string; nohp: string; password: string; asal_sekolah: string }): Promise<User> => {
   const response = await api.post('/user/register', data);
   return response.data.data;
 };

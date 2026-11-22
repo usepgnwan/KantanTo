@@ -6,6 +6,7 @@ import (
 	. "server/app/helpers"
 	"server/app/model"
 	"server/connection"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"golang.org/x/crypto/bcrypt"
@@ -46,7 +47,26 @@ type RegisterRequest struct {
 	Email       string `json:"email" validate:"required,email"`
 	Nohp        string `json:"nohp" validate:"required"`
 	Password    string `json:"password" validate:"required,min=6"`
-	AsalSekolah string `json:"asal_sekolah"`
+	AsalSekolah string `json:"asal_sekolah" validate:"required"`
+}
+
+func normalizePhoneVariants(raw string) []string {
+	cleaned := strings.TrimSpace(raw)
+	cleaned = strings.ReplaceAll(cleaned, " ", "")
+	cleaned = strings.ReplaceAll(cleaned, "-", "")
+	cleaned = strings.ReplaceAll(cleaned, "+", "")
+
+	if cleaned == "" {
+		return nil
+	}
+
+	variants := []string{cleaned}
+	if strings.HasPrefix(cleaned, "0") && len(cleaned) > 1 {
+		variants = append(variants, "62"+cleaned[1:])
+	} else if strings.HasPrefix(cleaned, "62") && len(cleaned) > 2 {
+		variants = append(variants, "0"+cleaned[2:])
+	}
+	return variants
 }
 
 // RegisterUser godoc
@@ -65,17 +85,43 @@ func RegisterUser(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Format request tidak valid"})
 	}
 
-	// Cek keunikan email
+	req.Name = strings.TrimSpace(req.Name)
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	req.Nohp = strings.TrimSpace(req.Nohp)
+	req.AsalSekolah = strings.TrimSpace(req.AsalSekolah)
+
+	if req.Name == "" {
+		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Nama lengkap wajib diisi"})
+	}
+	if req.Email == "" {
+		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Email wajib diisi"})
+	}
+	if req.Nohp == "" {
+		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Nomor HP wajib diisi"})
+	}
+	if req.AsalSekolah == "" {
+		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Asal sekolah wajib diisi"})
+	}
+	if len(req.Password) < 6 {
+		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Password minimal 6 karakter"})
+	}
+
+	// Cek keunikan email (case-insensitive)
 	var count int64
-	connection.DB.Model(&model.User{}).Where("email = ?", req.Email).Count(&count)
+	connection.DB.Model(&model.User{}).Where("LOWER(TRIM(email)) = ?", req.Email).Count(&count)
 	if count > 0 {
 		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Email sudah terdaftar"})
 	}
 
-	// Cek keunikan no hp
-	connection.DB.Model(&model.User{}).Where("nohp = ?", req.Nohp).Count(&count)
-	if count > 0 {
-		return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Nomor HP sudah terdaftar"})
+	// Cek keunikan no hp (termasuk variasi format 08 / 62 / +62 / spasi / tanda hubung)
+	phoneVariants := normalizePhoneVariants(req.Nohp)
+	if len(phoneVariants) > 0 {
+		connection.DB.Model(&model.User{}).
+			Where("REPLACE(REPLACE(REPLACE(TRIM(nohp), ' ', ''), '-', ''), '+', '') IN ?", phoneVariants).
+			Count(&count)
+		if count > 0 {
+			return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Nomor HP sudah terdaftar"})
+		}
 	}
 
 	// Hash Password
@@ -96,6 +142,13 @@ func RegisterUser(c echo.Context) error {
 	}
 
 	if err := connection.DB.Create(&newUser).Error; err != nil {
+		errLower := strings.ToLower(err.Error())
+		if strings.Contains(errLower, "email") {
+			return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Email sudah terdaftar"})
+		}
+		if strings.Contains(errLower, "nohp") {
+			return c.JSON(http.StatusBadRequest, Response{Status: false, Message: "Nomor HP sudah terdaftar"})
+		}
 		return c.JSON(http.StatusInternalServerError, Response{Status: false, Message: "Gagal menyimpan pendaftaran"})
 	}
 
