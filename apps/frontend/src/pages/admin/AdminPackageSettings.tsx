@@ -490,6 +490,7 @@ const TableQuestionEditor: React.FC<TableQuestionEditorProps> = React.memo(({
 interface SubQuestionEditorProps {
   sub: SubQuestion;
   index: number;
+  questionNumber?: number;
   onUpdate: (updatedSub: SubQuestion) => void;
   onDelete: () => void;
 }
@@ -497,9 +498,11 @@ interface SubQuestionEditorProps {
 const SubQuestionEditor: React.FC<SubQuestionEditorProps> = React.memo(({
   sub,
   index,
+  questionNumber,
   onUpdate,
   onDelete,
 }) => {
+  const displayNumber = questionNumber ?? (index + 1);
   const subType: QuestionType = sub.type || 'single';
   const options = (sub.options && sub.options.length > 0) ? sub.options : ['', '', '', '', ''];
   const correctIndexes = getCorrectIndexes(sub.correct);
@@ -605,7 +608,7 @@ const SubQuestionEditor: React.FC<SubQuestionEditorProps> = React.memo(({
       <div className="flex items-center justify-between flex-wrap gap-3 pb-4 border-b border-on-surface/5">
         <div className="flex items-center gap-3 flex-wrap">
           <Tag className="rounded-xl bg-primary text-white border-none font-black px-4 py-1.5 text-xs">
-            Pertanyaan #{index + 1}
+            Pertanyaan #{displayNumber}
           </Tag>
 
           {/* Question Type Selector */}
@@ -673,14 +676,14 @@ const SubQuestionEditor: React.FC<SubQuestionEditorProps> = React.memo(({
           {/* Table Instructions / Prompt */}
           <div>
             <Text className="text-[10px] font-black uppercase tracking-wider text-on-surface/40 block mb-1">
-              Petunjuk / Soal Pengantar Tabel #{index + 1}
+              Petunjuk / Soal Pengantar Tabel #{displayNumber}
             </Text>
             <KantanEditor
               value={sub.question}
               onChange={val => onUpdate({ ...sub, question: val })}
               placeholder="Contoh: Berdasarkan teks bacaan di samping, tentukan apakah pernyataan-pernyataan berikut Benar atau Salah..."
               rows={3}
-              label={`Petunjuk Soal #${index + 1}`}
+              label={`Petunjuk Soal #${displayNumber}`}
             />
             {hasPreviewContent(sub.question) && (
               <div className="mt-3 p-4 rounded-2xl bg-surface-low/30 dark:bg-zinc-900/40 border border-on-surface/5">
@@ -713,14 +716,14 @@ const SubQuestionEditor: React.FC<SubQuestionEditorProps> = React.memo(({
           {/* Overall discussion for table */}
           <div>
             <Text className="text-[10px] font-black uppercase tracking-wider text-on-surface/40 block mb-1">
-              Pembahasan Umum Soal Tabel #{index + 1} (Opsional)
+              Pembahasan Umum Soal Tabel #{displayNumber} (Opsional)
             </Text>
             <KantanEditor
               value={sub.discussion || ''}
               onChange={val => onUpdate({ ...sub, discussion: val })}
               placeholder="Tuliskan rangkuman pembahasan untuk soal tabel ini..."
               rows={2}
-              label={`Pembahasan Tabel #${index + 1}`}
+              label={`Pembahasan Tabel #${displayNumber}`}
             />
             {hasPreviewContent(sub.discussion) && (
               <div className="mt-3 p-4 rounded-2xl bg-green-500/5 dark:bg-green-900/10 border border-green-500/20">
@@ -739,14 +742,14 @@ const SubQuestionEditor: React.FC<SubQuestionEditorProps> = React.memo(({
           {/* Question Text */}
           <div>
             <Text className="text-[10px] font-black uppercase tracking-wider text-on-surface/40 block mb-1">
-              Pertanyaan #{index + 1}
+              Pertanyaan #{displayNumber}
             </Text>
             <KantanEditor
               value={sub.question}
               onChange={val => onUpdate({ ...sub, question: val })}
               placeholder="Tulis pertanyaan sub-soal di sini..."
               rows={3}
-              label={`Pertanyaan #${index + 1}`}
+              label={`Pertanyaan #${displayNumber}`}
             />
             {hasPreviewContent(sub.question) && (
               <div className="mt-3 p-4 rounded-xl bg-surface-low/30 dark:bg-zinc-900/40 border border-on-surface/5">
@@ -846,13 +849,13 @@ const SubQuestionEditor: React.FC<SubQuestionEditorProps> = React.memo(({
 
           {/* Discussion */}
           <div>
-            <Text className="text-[10px] font-black uppercase text-on-surface/40 block mb-1">Pembahasan Singkat Sub-Soal #{index + 1}</Text>
+            <Text className="text-[10px] font-black uppercase text-on-surface/40 block mb-1">Pembahasan Singkat Sub-Soal #{displayNumber}</Text>
             <KantanEditor
               value={sub.discussion}
               onChange={val => onUpdate({ ...sub, discussion: val })}
               placeholder="Tulis pembahasan singkat sub-soal di sini..."
               rows={3}
-              label={`Pembahasan #${index + 1}`}
+              label={`Pembahasan #${displayNumber}`}
             />
             {hasPreviewContent(sub.discussion) && (
               <div className="mt-3 p-4 rounded-xl bg-green-500/5 dark:bg-green-900/10 border border-green-500/20">
@@ -895,6 +898,31 @@ const AdminPackageSettings: React.FC = () => {
   };
 
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
+
+  const questionNumberRanges = useMemo(() => {
+    let current = 1;
+    return questions.map((q) => {
+      const count = q.type === 'linked' && q.subQuestions && q.subQuestions.length > 0
+        ? q.subQuestions.length
+        : 1;
+      const start = current;
+      const end = current + count - 1;
+      current = end + 1;
+      return {
+        start,
+        end,
+        count,
+        label: start === end ? `${start}` : `${start}-${end}`,
+      };
+    });
+  }, [questions]);
+
+  const activeQRange = questionNumberRanges[activeQIndex] || {
+    start: activeQIndex + 1,
+    end: activeQIndex + 1,
+    count: 1,
+    label: `${activeQIndex + 1}`,
+  };
 
   const getScenarioPoints = (question: Question) =>
     (question.subQuestions || []).reduce((sum, sub) => {
@@ -1047,7 +1075,7 @@ const AdminPackageSettings: React.FC = () => {
       return next;
     });
     setActiveQIndex(activeQIndex + 1);
-    message.success(`Soal #${activeQIndex + 1} berhasil diduplikasi!`);
+    message.success(`Soal #${activeQRange.label} berhasil diduplikasi!`);
   };
 
   const saveActiveQuestion = async () => {
@@ -1055,7 +1083,7 @@ const AdminPackageSettings: React.FC = () => {
     try {
       const saved = await savePackageQuestion(id, serializeQuestion(activeQ));
       updateActiveQ(deserializeQuestion(saved));
-      message.success(`Soal #${activeQIndex + 1} berhasil disimpan!`);
+      message.success(`Soal #${activeQRange.label} berhasil disimpan!`);
     } catch {
       message.error('Gagal menyimpan soal ke backend.');
     }
@@ -1075,7 +1103,7 @@ const AdminPackageSettings: React.FC = () => {
   const confirmRemoveQuestion = () => {
     if (questions.length === 1) return;
     Modal.confirm({
-      title: `Hapus Soal ${activeQIndex + 1}?`,
+      title: `Hapus Soal ${activeQRange.label}?`,
       content: 'Yakin ingin menghapus soal ini? Perubahan akan tersimpan setelah kamu klik Simpan Semua.',
       okText: 'Ya, hapus',
       cancelText: 'Batal',
@@ -1219,16 +1247,9 @@ const AdminPackageSettings: React.FC = () => {
   };
 
   const effectiveQuestionsCount = useMemo(() => {
-    let total = 0;
-    for (const q of questions) {
-      if (q.type === 'linked' && q.subQuestions && q.subQuestions.length > 0) {
-        total += q.subQuestions.length;
-      } else {
-        total += 1;
-      }
-    }
-    return total;
-  }, [questions]);
+    if (questionNumberRanges.length === 0) return 0;
+    return questionNumberRanges[questionNumberRanges.length - 1].end;
+  }, [questionNumberRanges]);
 
   const tabItems = [
     {
@@ -1248,24 +1269,30 @@ const AdminPackageSettings: React.FC = () => {
                   <Button type="primary" ghost size="small" icon={<PlusOutlined />} onClick={addQuestion} className="rounded-lg font-bold text-[10px] h-7">Tambah</Button>
                 </div>
                 <div className="grid grid-cols-5 gap-2">
-                  {questions.map((q, i) => (
-                    <div
-                      key={q.id}
-                      onClick={() => setActiveQIndex(i)}
-                      className={`h-10 rounded-xl flex items-center justify-center font-bold text-sm cursor-pointer transition-all border-2 relative
-                        ${activeQIndex === i
-                          ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105'
-                          : 'bg-white dark:bg-zinc-800 border-transparent text-on-surface/60 hover:border-primary/30'}`}
-                    >
-                      {i + 1}
-                      {q.type === 'linked' && (
-                        <span
-                          title={`Soal Berhubungan (${q.subQuestions?.length || 0} sub-soal)`}
-                          className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-green-500 border border-white dark:border-zinc-900"
-                        />
-                      )}
-                    </div>
-                  ))}
+                  {questions.map((q, i) => {
+                    const range = questionNumberRanges[i];
+                    const isRange = range && range.start !== range.end;
+                    return (
+                      <div
+                        key={q.id}
+                        onClick={() => setActiveQIndex(i)}
+                        title={isRange ? `Soal #${range.label} (${range.count} nomor)` : `Soal #${range?.label ?? i + 1}`}
+                        className={`h-10 rounded-xl flex items-center justify-center font-bold cursor-pointer transition-all border-2 relative px-1
+                          ${isRange ? 'text-[11px] tracking-tight' : 'text-sm'}
+                          ${activeQIndex === i
+                            ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105'
+                            : 'bg-white dark:bg-zinc-800 border-transparent text-on-surface/60 hover:border-primary/30'}`}
+                      >
+                        {range?.label ?? (i + 1)}
+                        {q.type === 'linked' && (
+                          <span
+                            title={`Soal Berhubungan (${q.subQuestions?.length || 0} sub-soal)`}
+                            className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-green-500 border border-white dark:border-zinc-900"
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
                   <div onClick={addQuestion} className="h-10 rounded-xl border-2 border-dashed border-primary/20 flex items-center justify-center text-primary/40 hover:text-primary hover:border-primary/40 cursor-pointer transition-all">
                     <PlusOutlined />
                   </div>
@@ -1283,7 +1310,7 @@ const AdminPackageSettings: React.FC = () => {
                   </div>
                   <Button danger ghost block icon={<DeleteOutlined />} size="small" className="rounded-lg font-bold h-9"
                     onClick={confirmRemoveQuestion}>
-                    Hapus Soal {activeQIndex + 1}
+                    Hapus Soal {activeQRange.label}
                   </Button>
                 </div>
               </Card>
@@ -1486,7 +1513,9 @@ const AdminPackageSettings: React.FC = () => {
                     </div>
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <Title level={5} className="!m-0 !font-manrope !font-black">Soal-Soal ({activeQ.subQuestions?.length || 0} nomor)</Title>
+                        <Title level={5} className="!m-0 !font-manrope !font-black">
+                          Soal-Soal ({activeQ.subQuestions && activeQ.subQuestions.length > 0 ? `Nomor ${activeQRange.label} · ${activeQ.subQuestions.length} nomor` : '0 nomor'})
+                        </Title>
                         <Text className="text-xs text-on-surface/50">Setiap soal akan muncul sebagai nomor terpisah di peta ujian.</Text>
                       </div>
                       <Button type="primary" ghost icon={<PlusOutlined />} onClick={addSubQuestion} className="rounded-xl font-bold">Tambah Soal</Button>
@@ -1497,6 +1526,7 @@ const AdminPackageSettings: React.FC = () => {
                           key={sub.id || String(si)}
                           sub={sub}
                           index={si}
+                          questionNumber={activeQRange.start + si}
                           onUpdate={updatedSub => {
                             const next = (activeQ.subQuestions || []).map(s => s.id === sub.id ? updatedSub : s);
                             updateActiveQ({ subQuestions: next });
@@ -1589,7 +1619,7 @@ const AdminPackageSettings: React.FC = () => {
                   </Space>
                   <Button type="primary" icon={<SaveOutlined />} size="large" className="rounded-2xl h-12 px-10 font-black shadow-xl shadow-primary/20"
                     onClick={saveActiveQuestion}>
-                    Simpan Soal {activeQIndex + 1}
+                    Simpan Soal {activeQRange.label}
                   </Button>
                 </div>
               </Card>
@@ -1609,7 +1639,7 @@ const AdminPackageSettings: React.FC = () => {
             title={
               <div className="flex items-center gap-3">
                 <Tag className="rounded-full px-3 py-0.5 text-xs font-black border-none bg-primary/10 text-primary">
-                  Pratinjau Soal #{activeQIndex + 1}
+                  Pratinjau Soal #{activeQRange.label}
                 </Tag>
                 <Tag color="blue" className="rounded-full border-none font-bold text-xs capitalize">
                   {activeQ.type === 'single' ? 'Single Choice' : activeQ.type === 'multiple' ? 'Multiple Choice' : activeQ.type === 'table' ? 'Tabel / Pernyataan' : activeQ.type === 'linked' ? '📖 Soal Berhubungan' : 'Scenario Based'}
@@ -1814,7 +1844,7 @@ const AdminPackageSettings: React.FC = () => {
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <div className="flex items-center gap-2">
                             <Tag className="rounded-lg bg-green-500 text-white border-none font-black text-xs px-3 py-0.5">
-                              Soal #{si + 1}
+                              Soal #{activeQRange.start + si}
                             </Tag>
                             <Tag color={subType === 'table' ? 'blue' : subType === 'multiple' ? 'purple' : 'cyan'} className="rounded-full border-none font-bold text-[11px] capitalize">
                               {subType === 'table' ? 'Tabel / Pernyataan' : subType === 'multiple' ? 'Multiple Choice' : 'Single Choice'}

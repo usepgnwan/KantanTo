@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Divider, Typography, Checkbox, message } from 'antd';
-import { MailOutlined, LockOutlined, UserOutlined, WhatsAppOutlined, GoogleOutlined, AppleOutlined } from '@ant-design/icons';
+import { Form, Input, Button, Divider, Typography, Checkbox, Alert, App } from 'antd';
+import { MailOutlined, LockOutlined, UserOutlined, WhatsAppOutlined, BankOutlined, GoogleOutlined, AppleOutlined } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthLayout from '../layouts/AuthLayout';
 import loginAnimation from '../assets/login.json';
@@ -9,21 +9,28 @@ import { registerUser } from '../services/userService';
 
 const { Text } = Typography;
 
-const RegisterPage: React.FC = () => {
+export default function RegisterPage() {
+  const [form] = Form.useForm();
+  const { message } = App.useApp();
   const [loading, setLoading] = useState(false);
   const [pageLoading, setPageLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const onFinish = async (values: any) => {
     setLoading(true);
+    setErrorMessage(null);
+    let succeeded = false;
     try {
       await registerUser({
-        name: values.name,
-        email: values.email,
-        nohp: values.whatsapp,
+        name: values.name.trim(),
+        email: values.email.trim().toLowerCase(),
+        nohp: values.whatsapp.trim(),
+        asal_sekolah: values.asal_sekolah.trim(),
         password: values.password,
       });
 
+      succeeded = true;
       message.success('Registrasi berhasil! Silakan masuk dengan akun Anda.');
       setPageLoading(true);
       setTimeout(() => {
@@ -31,13 +38,18 @@ const RegisterPage: React.FC = () => {
       }, 1500);
 
     } catch (error: any) {
-      if (error.response && error.response.data && error.response.data.message) {
-        message.error(error.response.data.message);
-      } else {
-        message.error('Gagal melakukan pendaftaran. Silahkan coba lagi nanti.');
+      const errMsg = error?.response?.data?.message || 'Gagal melakukan pendaftaran. Silahkan coba lagi nanti.';
+      setErrorMessage(errMsg);
+      message.error(errMsg);
+
+      const lowerMsg = errMsg.toLowerCase();
+      if (lowerMsg.includes('email')) {
+        form.setFields([{ name: 'email', errors: [errMsg] }]);
+      } else if (lowerMsg.includes('hp') || lowerMsg.includes('whatsapp') || lowerMsg.includes('telepon') || lowerMsg.includes('telp')) {
+        form.setFields([{ name: 'whatsapp', errors: [errMsg] }]);
       }
     } finally {
-      if (!pageLoading) setLoading(false);
+      if (!succeeded) setLoading(false);
     }
   };
 
@@ -53,7 +65,18 @@ const RegisterPage: React.FC = () => {
         author: "Rifaya Education",
       }}
     >
+      {errorMessage && (
+        <Alert
+          type="error"
+          showIcon
+          closable
+          message={errorMessage}
+          onClose={() => setErrorMessage(null)}
+          className="mb-4 rounded-xl"
+        />
+      )}
       <Form
+        form={form}
         name="register"
         layout="vertical"
         onFinish={onFinish}
@@ -92,6 +115,21 @@ const RegisterPage: React.FC = () => {
           <Input
             prefix={<WhatsAppOutlined className="text-on-surface/20 mr-2" />}
             placeholder="0812xxxx"
+            className="h-12 rounded-xl bg-surface-low border-none px-4 focus:bg-white transition-all"
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="asal_sekolah"
+          label={<span className="text-[10px] font-bold uppercase tracking-widest text-on-surface/40">Asal Sekolah</span>}
+          rules={[
+            { required: true, message: 'Mohon masukkan asal sekolah Anda!' },
+            { whitespace: true, message: 'Asal sekolah tidak boleh kosong!' },
+          ]}
+        >
+          <Input
+            prefix={<BankOutlined className="text-on-surface/20 mr-2" />}
+            placeholder="Contoh: SMAN 1 Jakarta"
             className="h-12 rounded-xl bg-surface-low border-none px-4 focus:bg-white transition-all"
           />
         </Form.Item>
@@ -150,6 +188,4 @@ const RegisterPage: React.FC = () => {
       </Form>
     </AuthLayout>
   );
-};
-
-export default RegisterPage;
+}

@@ -8,7 +8,7 @@ import type { MenuProps, TableColumnsType } from 'antd';
 import {
   SearchOutlined, UserAddOutlined, MoreOutlined, FilterOutlined,
   UserOutlined, MailOutlined, CheckCircleOutlined, CloseCircleOutlined,
-  ExportOutlined, TeamOutlined, RiseOutlined, PhoneOutlined,
+  ExportOutlined, TeamOutlined, RiseOutlined, PhoneOutlined, BankOutlined,
 } from '@ant-design/icons';
 import { getUsers, User } from '../../services/userService';
 
@@ -84,6 +84,25 @@ const AdminUsers: React.FC = () => {
           </div>
         </div>
       ),
+    },
+    {
+      title: 'Asal Sekolah',
+      dataIndex: 'asal_sekolah',
+      key: 'asal_sekolah',
+      render: (asalSekolah: string, record) => {
+        const isAdminRole = record.role_id === 1 || record.role?.title?.toLowerCase() === 'admin';
+        if (isAdminRole) {
+          return <Text className="text-xs text-on-surface/30">-</Text>;
+        }
+        return asalSekolah ? (
+          <Text className="text-xs font-medium text-on-surface/80 flex items-center gap-1.5">
+            <BankOutlined className="text-primary/60 text-xs shrink-0" />
+            <span>{asalSekolah}</span>
+          </Text>
+        ) : (
+          <Text className="text-xs text-on-surface/30">-</Text>
+        );
+      },
     },
     {
       title: 'Roles',
@@ -233,7 +252,7 @@ const AdminUsers: React.FC = () => {
                 showTotal: (t) => `Total ${t} pengguna`
               }}
               className="weightless-table"
-              scroll={{ x: 600 }}
+              scroll={{ x: 760 }}
             />
           </Card>
         </div>
