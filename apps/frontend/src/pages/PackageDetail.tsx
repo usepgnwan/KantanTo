@@ -632,7 +632,7 @@ const PackageDetailPage: React.FC = () => {
                 </Col>
 
                 <Col xs={24} lg={8}>
-                  <Card className={`border-none shadow-2xl rounded-[2rem] p-6 ${packageData?.thumbnail ? 'lg:-mt-6' : 'lg:-mt-24'} relative z-20 bg-white dark:bg-zinc-950`}>
+                  <Card className="border-none shadow-2xl rounded-[2rem] p-6 lg:-mt-24 relative z-20 bg-white dark:bg-zinc-950">
                     {hasAccess ? (
                       <Space direction="vertical" size="large" className="w-full">
                         <div>
