@@ -2,8 +2,13 @@ package controller
 
 import (
 	"encoding/json"
+	"fmt"
+	"io"
 	"math"
+	"math/rand"
 	"net/http"
+	"os"
+	"path/filepath"
 	"server/app/helpers"
 	"server/app/model"
 	"server/connection"
@@ -390,6 +395,54 @@ func DeletePackage(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, helpers.Response{Status: false, Message: "Gagal menghapus paket"})
 	}
 	return c.JSON(http.StatusOK, helpers.Response{Status: true, Message: "Paket berhasil dihapus"})
+}
+
+func UploadPackageThumbnail(c echo.Context) error {
+	file, err := c.FormFile("thumbnail")
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, helpers.Response{Status: false, Message: "File cover tidak ditemukan"})
+	}
+
+	if file.Size > 5*1024*1024 {
+		return c.JSON(http.StatusBadRequest, helpers.Response{Status: false, Message: "Ukuran gambar maksimal 5MB"})
+	}
+
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	src, err := file.Open()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, helpers.Response{Status: false, Message: "Gagal membaca file cover"})
+	}
+	defer src.Close()
+
+	var thumbPath string
+	if ext == ".webp" {
+		uploadDir := "./uploads/thumbnail"
+		if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
+			return c.JSON(http.StatusInternalServerError, helpers.Response{Status: false, Message: "Gagal menyiapkan folder upload"})
+		}
+		filename := fmt.Sprintf("%d_%d%s", time.Now().Unix(), rand.Intn(9999), ext)
+		outPath := filepath.Join(uploadDir, filename)
+		dst, err := os.Create(outPath)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, helpers.Response{Status: false, Message: "Gagal menyimpan file cover"})
+		}
+		defer dst.Close()
+		if _, err := io.Copy(dst, src); err != nil {
+			return c.JSON(http.StatusInternalServerError, helpers.Response{Status: false, Message: "Gagal menulis file cover"})
+		}
+		thumbPath = "/uploads/thumbnail/" + filename
+	} else {
+		thumbPath, err = saveThumbnail(nil, src, file.Filename)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, helpers.Response{Status: false, Message: "Format gambar harus JPG, PNG, atau WEBP"})
+		}
+	}
+
+	return c.JSON(http.StatusOK, helpers.Response{
+		Status:  true,
+		Message: "Cover berhasil diupload",
+		Data:    map[string]string{"url": thumbPath},
+	})
 }
 
 func findPackageBySlug(c echo.Context) (model.Package, error) {
