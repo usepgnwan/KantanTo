@@ -56,6 +56,7 @@ type PackageQuestion struct {
 	Package        Package              `gorm:"foreignKey:PackageID;constraint:OnDelete:CASCADE" json:"-"`
 	PackageSlug    string               `gorm:"index" json:"package_slug"`
 	ClientID       string               `gorm:"index;not null" json:"client_id"`
+	SortOrder      int                  `gorm:"default:0;index" json:"sort_order"`
 	Type           string               `json:"type"`
 	Title          string               `json:"title"`
 	Question       string               `json:"question"`
@@ -74,6 +75,7 @@ type PackageSubQuestion struct {
 	ID            uint      `gorm:"primaryKey" json:"id"`
 	QuestionID    uint      `gorm:"index;not null" json:"question_id"`
 	ClientID      string    `gorm:"index;not null" json:"client_id"`
+	SortOrder     int       `gorm:"default:0;index" json:"sort_order"`
 	Type          string    `json:"type"`
 	Title         string    `json:"title"`
 	Question      string    `json:"question"`

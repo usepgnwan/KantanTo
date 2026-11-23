@@ -132,8 +132,8 @@ func SubmitExam(c echo.Context) error {
 	// 2. Fetch all questions for this package
 	var questions []model.PackageQuestion
 	if err := connection.DB.Preload("SubQuestions", func(db *gorm.DB) *gorm.DB {
-		return db.Order("id asc")
-	}).Where("package_id = ?", pkg.ID).Order("id asc").Find(&questions).Error; err != nil {
+		return db.Order("sort_order asc, id asc")
+	}).Where("package_id = ?", pkg.ID).Order("sort_order asc, id asc").Find(&questions).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]interface{}{
 			"status":  false,
 			"message": "Failed to fetch questions",

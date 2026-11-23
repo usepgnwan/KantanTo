@@ -556,8 +556,10 @@ func GetPackageQuestions(c echo.Context) error {
 	var questions []model.PackageQuestion
 	if err := connection.DB.
 		Where("package_id = ?", pkg.ID).
-		Preload("SubQuestions").
-		Order("id asc").
+		Preload("SubQuestions", func(db *gorm.DB) *gorm.DB {
+			return db.Order("sort_order asc, id asc")
+		}).
+		Order("sort_order asc, id asc").
 		Find(&questions).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, helpers.Response{Status: false, Message: "Gagal mengambil soal"})
 	}
@@ -624,10 +626,11 @@ func SavePackageQuestions(c echo.Context) error {
 			}
 		}
 
-		// Upsert remaining questions
+		// Upsert remaining questions (preserving order via sort_order without recreating IDs)
 		for i := range payload {
 			normalizeQuestionPayload(&payload[i])
-			question, err := persistQuestionWithDB(tx, pkg, payload[i])
+			sortOrder := i + 1
+			question, err := persistQuestionWithDB(tx, pkg, payload[i], &sortOrder)
 			if err != nil {
 				return err
 			}
@@ -640,6 +643,46 @@ func SavePackageQuestions(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, helpers.Response{Status: true, Message: "Daftar soal berhasil disimpan", Data: response})
+}
+
+type reorderQuestionsPayload struct {
+	QuestionIDs []string `json:"question_ids"`
+}
+
+// ReorderPackageQuestions updates ONLY sort_order for existing questions in a package.
+// It never deletes or recreates questions/sub-questions, so student exam_answers remain completely untouched.
+func ReorderPackageQuestions(c echo.Context) error {
+	pkg, err := findPackageBySlug(c)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, helpers.Response{Status: false, Message: "Paket tidak ditemukan"})
+	}
+
+	var payload reorderQuestionsPayload
+	if err := c.Bind(&payload); err != nil {
+		return c.JSON(http.StatusBadRequest, helpers.Response{Status: false, Message: err.Error()})
+	}
+	if len(payload.QuestionIDs) == 0 {
+		return c.JSON(http.StatusBadRequest, helpers.Response{Status: false, Message: "Daftar urutan soal tidak boleh kosong"})
+	}
+
+	err = connection.DB.Transaction(func(tx *gorm.DB) error {
+		for idx, clientID := range payload.QuestionIDs {
+			if clientID == "" {
+				continue
+			}
+			if err := tx.Model(&model.PackageQuestion{}).
+				Where("package_id = ? AND client_id = ?", pkg.ID, clientID).
+				Update("sort_order", idx+1).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, helpers.Response{Status: false, Message: "Gagal memperbarui urutan soal"})
+	}
+
+	return c.JSON(http.StatusOK, helpers.Response{Status: true, Message: "Urutan soal berhasil diperbarui"})
 }
 
 func ScoreQuestion(c echo.Context) error {
@@ -823,7 +866,7 @@ func DeletePackageVideo(c echo.Context) error {
 }
 
 func persistQuestion(pkg model.Package, payload packageQuestionPayload) (model.PackageQuestion, error) {
-	return persistQuestionWithDB(connection.DB, pkg, payload)
+	return persistQuestionWithDB(connection.DB, pkg, payload, nil)
 }
 
 func persistMaterial(packageID uint, payload packageMaterialPayload) (model.PackageMaterial, error) {
@@ -834,7 +877,7 @@ func persistVideo(packageID uint, payload packageVideoPayload) (model.PackageVid
 	return persistVideoWithDB(connection.DB, packageID, payload)
 }
 
-func persistQuestionWithDB(db *gorm.DB, pkg model.Package, payload packageQuestionPayload) (model.PackageQuestion, error) {
+func persistQuestionWithDB(db *gorm.DB, pkg model.Package, payload packageQuestionPayload, sortOrder *int) (model.PackageQuestion, error) {
 	optionsJSON := toJSON(payload.Options)
 	correctJSON := toJSON(payload.Correct)
 	discussionJSON := toJSON(payload.DiscussionRefs)
@@ -858,6 +901,14 @@ func persistQuestionWithDB(db *gorm.DB, pkg model.Package, payload packageQuesti
 	question.Points = payload.Points
 	question.ScoringMethod = payload.ScoringMethod
 
+	if sortOrder != nil {
+		question.SortOrder = *sortOrder
+	} else if err == gorm.ErrRecordNotFound {
+		var maxOrder int
+		db.Model(&model.PackageQuestion{}).Where("package_id = ?", pkg.ID).Select("COALESCE(MAX(sort_order), 0)").Scan(&maxOrder)
+		question.SortOrder = maxOrder + 1
+	}
+
 	if err == gorm.ErrRecordNotFound {
 		if err := db.Create(&question).Error; err != nil {
 			return question, err
@@ -866,32 +917,71 @@ func persistQuestionWithDB(db *gorm.DB, pkg model.Package, payload packageQuesti
 		return question, err
 	}
 
-	if err := db.Where("question_id = ?", question.ID).Delete(&model.PackageSubQuestion{}).Error; err != nil {
+	// Upsert sub-questions in place so existing PackageSubQuestion.ID (referenced by ExamAnswer.SubQuestionID) is preserved.
+	var existingSubs []model.PackageSubQuestion
+	if err := db.Where("question_id = ?", question.ID).Find(&existingSubs).Error; err != nil {
 		return question, err
 	}
-	for _, sub := range payload.SubQuestions {
+	existingSubByClientID := make(map[string]model.PackageSubQuestion, len(existingSubs))
+	for _, s := range existingSubs {
+		existingSubByClientID[s.ClientID] = s
+	}
+
+	incomingSubIDs := make([]string, 0, len(payload.SubQuestions))
+	for subIdx, sub := range payload.SubQuestions {
 		if sub.Type == "" {
 			sub.Type = QuestionTypeSingle
 		}
-		row := model.PackageSubQuestion{
-			QuestionID:    question.ID,
-			ClientID:      sub.ID,
-			Type:          sub.Type,
-			Title:         sub.Title,
-			Question:      sub.Question,
-			Discussion:    sub.Discussion,
-			OptionsJSON:   toJSON(sub.Options),
-			CorrectJSON:   toJSON(sub.Correct),
-			RowsJSON:      toJSON(sub.Rows),
-			ScoringMethod: sub.ScoringMethod,
-			Points:        sub.Points,
+		incomingSubIDs = append(incomingSubIDs, sub.ID)
+
+		if existing, ok := existingSubByClientID[sub.ID]; ok {
+			existing.SortOrder = subIdx + 1
+			existing.Type = sub.Type
+			existing.Title = sub.Title
+			existing.Question = sub.Question
+			existing.Discussion = sub.Discussion
+			existing.OptionsJSON = toJSON(sub.Options)
+			existing.CorrectJSON = toJSON(sub.Correct)
+			existing.RowsJSON = toJSON(sub.Rows)
+			existing.ScoringMethod = sub.ScoringMethod
+			existing.Points = sub.Points
+			if err := db.Save(&existing).Error; err != nil {
+				return question, err
+			}
+		} else {
+			row := model.PackageSubQuestion{
+				QuestionID:    question.ID,
+				ClientID:      sub.ID,
+				SortOrder:     subIdx + 1,
+				Type:          sub.Type,
+				Title:         sub.Title,
+				Question:      sub.Question,
+				Discussion:    sub.Discussion,
+				OptionsJSON:   toJSON(sub.Options),
+				CorrectJSON:   toJSON(sub.Correct),
+				RowsJSON:      toJSON(sub.Rows),
+				ScoringMethod: sub.ScoringMethod,
+				Points:        sub.Points,
+			}
+			if err := db.Create(&row).Error; err != nil {
+				return question, err
+			}
 		}
-		if err := db.Create(&row).Error; err != nil {
+	}
+
+	if len(incomingSubIDs) > 0 {
+		if err := db.Where("question_id = ? AND client_id NOT IN ?", question.ID, incomingSubIDs).Delete(&model.PackageSubQuestion{}).Error; err != nil {
+			return question, err
+		}
+	} else {
+		if err := db.Where("question_id = ?", question.ID).Delete(&model.PackageSubQuestion{}).Error; err != nil {
 			return question, err
 		}
 	}
 
-	if err := db.Preload("SubQuestions").First(&question, question.ID).Error; err != nil {
+	if err := db.Preload("SubQuestions", func(tx *gorm.DB) *gorm.DB {
+		return tx.Order("sort_order asc, id asc")
+	}).First(&question, question.ID).Error; err != nil {
 		return question, err
 	}
 	return question, nil
