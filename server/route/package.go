@@ -18,6 +18,7 @@ func RoutePackage(api *echo.Group) {
 	packages.GET("/:slug/questions", controller.GetPackageQuestions)
 	packages.POST("/:slug/questions", controller.SavePackageQuestion)
 	packages.PUT("/:slug/questions", controller.SavePackageQuestions)
+	packages.PUT("/:slug/questions/reorder", controller.ReorderPackageQuestions)
 	packages.GET("/:slug/materials", controller.GetPackageMaterials)
 	packages.POST("/:slug/materials", controller.SavePackageMaterial)
 	packages.PUT("/:slug/materials", controller.SavePackageMaterials)

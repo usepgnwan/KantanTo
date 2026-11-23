@@ -9,6 +9,7 @@ import {
   getPackageMaterials,
   getPackageQuestions,
   getPackageVideos,
+  reorderPackageQuestions,
   savePackageMaterial,
   savePackageQuestion,
   savePackageQuestions,
@@ -20,7 +21,7 @@ import {
   Radio, Checkbox, Select, Badge, Empty, InputNumber, Spin,
 } from 'antd';
 import {
-  ArrowLeftOutlined, ExperimentOutlined, FileSearchOutlined,
+  ArrowLeftOutlined, ArrowRightOutlined, ExperimentOutlined, FileSearchOutlined,
   VideoCameraOutlined, PlusOutlined, DeleteOutlined,
   FilePdfOutlined, SaveOutlined, EyeOutlined,
   CopyOutlined, CheckCircleFilled,
@@ -899,6 +900,9 @@ const AdminPackageSettings: React.FC = () => {
 
   const [loadingData, setLoadingData] = useState(true);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [draggedQIndex, setDraggedQIndex] = useState<number | null>(null);
+  const [dragOverQIndex, setDragOverQIndex] = useState<number | null>(null);
+  const [reordering, setReordering] = useState(false);
 
   const questionNumberRanges = useMemo(() => {
     let current = 1;
@@ -1080,6 +1084,48 @@ const AdminPackageSettings: React.FC = () => {
 
   const updateActiveQ = (changes: Partial<Question>) => {
     setQuestions(prev => prev.map((q, i) => i === activeQIndex ? { ...q, ...changes } : q));
+  };
+
+  const moveQuestion = async (fromIndex: number, toIndex: number) => {
+    if (
+      reordering ||
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= questions.length ||
+      toIndex >= questions.length
+    ) {
+      return;
+    }
+
+    const previousQuestions = questions;
+    const previousActiveIndex = activeQIndex;
+
+    const nextQuestions = [...questions];
+    const [moved] = nextQuestions.splice(fromIndex, 1);
+    nextQuestions.splice(toIndex, 0, moved);
+
+    setQuestions(nextQuestions);
+    if (activeQIndex === fromIndex) {
+      setActiveQIndex(toIndex);
+    } else if (fromIndex < activeQIndex && toIndex >= activeQIndex) {
+      setActiveQIndex(activeQIndex - 1);
+    } else if (fromIndex > activeQIndex && toIndex <= activeQIndex) {
+      setActiveQIndex(activeQIndex + 1);
+    }
+
+    if (!id) return;
+    setReordering(true);
+    try {
+      await reorderPackageQuestions(id, nextQuestions.map(q => q.id));
+      message.success('Urutan soal diperbarui (jawaban siswa tetap aman).');
+    } catch {
+      setQuestions(previousQuestions);
+      setActiveQIndex(previousActiveIndex);
+      message.error('Gagal menyimpan urutan soal ke backend.');
+    } finally {
+      setReordering(false);
+    }
   };
 
   const addSubQuestion = () => {
@@ -1296,13 +1342,43 @@ const AdminPackageSettings: React.FC = () => {
                   {questions.map((q, i) => {
                     const range = questionNumberRanges[i];
                     const isRange = range && range.start !== range.end;
+                    const isDragOver = dragOverQIndex === i && draggedQIndex !== null && draggedQIndex !== i;
                     return (
                       <div
                         key={q.id}
+                        draggable={!reordering && questions.length > 1}
+                        onDragStart={(e) => {
+                          setDraggedQIndex(i);
+                          e.dataTransfer.effectAllowed = 'move';
+                          e.dataTransfer.setData('text/plain', String(i));
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.dataTransfer.dropEffect = 'move';
+                          if (dragOverQIndex !== i) setDragOverQIndex(i);
+                        }}
+                        onDragLeave={() => {
+                          if (dragOverQIndex === i) setDragOverQIndex(null);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const fromIdx = draggedQIndex ?? Number(e.dataTransfer.getData('text/plain'));
+                          setDraggedQIndex(null);
+                          setDragOverQIndex(null);
+                          if (Number.isInteger(fromIdx)) {
+                            moveQuestion(fromIdx, i);
+                          }
+                        }}
+                        onDragEnd={() => {
+                          setDraggedQIndex(null);
+                          setDragOverQIndex(null);
+                        }}
                         onClick={() => setActiveQIndex(i)}
-                        title={isRange ? `Soal #${range.label} (${range.count} nomor)` : `Soal #${range?.label ?? i + 1}`}
-                        className={`h-10 rounded-xl flex items-center justify-center font-bold cursor-pointer transition-all border-2 relative px-1
+                        title={isRange ? `Soal #${range.label} (${range.count} nomor) — drag untuk geser urutan` : `Soal #${range?.label ?? i + 1} — drag untuk geser urutan`}
+                        className={`h-10 rounded-xl flex items-center justify-center font-bold cursor-grab active:cursor-grabbing transition-all border-2 relative px-1 select-none
                           ${isRange ? 'text-[11px] tracking-tight' : 'text-sm'}
+                          ${draggedQIndex === i ? 'opacity-40 scale-95' : ''}
+                          ${isDragOver ? 'ring-2 ring-primary ring-offset-1 border-primary/70' : ''}
                           ${activeQIndex === i
                             ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20 scale-105'
                             : 'bg-white dark:bg-zinc-800 border-transparent text-on-surface/60 hover:border-primary/30'}`}
@@ -1321,6 +1397,11 @@ const AdminPackageSettings: React.FC = () => {
                     <PlusOutlined />
                   </div>
                 </div>
+                {questions.length > 1 && (
+                  <Text className="block px-2 pt-2 text-[10px] text-on-surface/40">
+                    Drag &amp; drop nomor soal untuk mengubah urutan (aman bagi jawaban siswa).
+                  </Text>
+                )}
                 {effectiveQuestionsCount !== questions.length && (
                   <div className="px-2 pt-3 text-[11px] font-bold text-green-600 dark:text-green-400">
                     Total butir ujian: {effectiveQuestionsCount} nomor
@@ -1332,6 +1413,31 @@ const AdminPackageSettings: React.FC = () => {
                     <Text className="text-xs text-on-surface/60">Tipe Aktif</Text>
                     <Tag className="rounded-lg border-none bg-primary/10 text-primary font-bold capitalize m-0">{activeQ.type}</Tag>
                   </div>
+                  {questions.length > 1 && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        size="small"
+                        icon={<ArrowLeftOutlined />}
+                        disabled={activeQIndex === 0 || reordering}
+                        loading={reordering}
+                        onClick={() => moveQuestion(activeQIndex, activeQIndex - 1)}
+                        className="rounded-lg font-bold h-8 text-[11px]"
+                      >
+                        Geser Kiri
+                      </Button>
+                      <Button
+                        size="small"
+                        icon={<ArrowRightOutlined />}
+                        iconPosition="end"
+                        disabled={activeQIndex === questions.length - 1 || reordering}
+                        loading={reordering}
+                        onClick={() => moveQuestion(activeQIndex, activeQIndex + 1)}
+                        className="rounded-lg font-bold h-8 text-[11px]"
+                      >
+                        Geser Kanan
+                      </Button>
+                    </div>
+                  )}
                   <Button danger ghost block icon={<DeleteOutlined />} size="small" className="rounded-lg font-bold h-9"
                     onClick={confirmRemoveQuestion}>
                     Hapus Soal {activeQRange.label}

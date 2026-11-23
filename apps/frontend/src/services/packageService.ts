@@ -298,6 +298,10 @@ export const savePackageQuestions = async (slug: string, questions: PackageQuest
   return (response.data.data || []).map(normalizeQuestion);
 };
 
+export const reorderPackageQuestions = async (slug: string, questionIds: string[]): Promise<void> => {
+  await api.put(`/packages/${slug}/questions/reorder`, { question_ids: questionIds });
+};
+
 export const getPackageMaterials = async (slug: string): Promise<PackageMaterialPayload[]> => {
   const response = await api.get(`/packages/${slug}/materials`);
   return (response.data.data || []).map(normalizeMaterial);
