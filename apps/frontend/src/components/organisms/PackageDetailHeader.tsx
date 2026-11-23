@@ -39,41 +39,22 @@ const PackageDetailHeader: React.FC<PackageDetailHeaderProps> = ({
   onLoadDescription,
   descriptionLoading,
 }) => {
-  const hasCover = Boolean(thumbnail);
-
   return (
-    <div className="relative pt-32 pb-20 overflow-hidden">
-      {/* Background Cover / Aesthetic */}
-      {hasCover ? (
-        <>
-          <img
-            src={thumbnail}
-            alt={title}
-            className="absolute inset-0 w-full h-full object-cover object-center"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/90 via-slate-900/75 to-slate-900/50" />
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-slate-950/30" />
-        </>
-      ) : (
-        <>
-          <div className="absolute top-0 left-0 w-full h-full bg-surface-low -z-10" />
-          <div className="absolute -top-24 -right-24 w-96 h-96 bg-primary/10 rounded-full blur-[100px] -z-10" />
-          <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-border-color to-transparent" />
-        </>
-      )}
+    <div className="relative pt-32 pb-16 overflow-hidden">
+      {/* Background Aesthetic */}
+      <div className="absolute top-0 left-0 w-full h-full bg-surface-low -z-10" />
+      <div className="absolute -top-24 -right-24 w-96 h-96 bg-primary/10 rounded-full blur-[100px] -z-10" />
+      <div className="absolute bottom-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-border-color to-transparent" />
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <Breadcrumb
-          className={`mb-8 ${hasCover ? '[&_.ant-breadcrumb-separator]:!text-white/50' : ''}`}
-          items={[
-            { title: <a href="/" className={hasCover ? '!text-white/75 hover:!text-white' : undefined}>Beranda</a> },
-            { title: <a href="/paket" className={hasCover ? '!text-white/75 hover:!text-white' : undefined}>Katalog Paket</a> },
-            { title: <span className={hasCover ? 'text-white font-semibold' : undefined}>{title}</span> },
-          ]}
-        />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <Breadcrumb className="mb-8">
+          <Breadcrumb.Item><a href="/">Beranda</a></Breadcrumb.Item>
+          <Breadcrumb.Item><a href="/paket">Katalog Paket</a></Breadcrumb.Item>
+          <Breadcrumb.Item>{title}</Breadcrumb.Item>
+        </Breadcrumb>
 
-        <Row gutter={[48, 48]} align="middle">
-          <Col xs={24} lg={16}>
+        <Row gutter={[48, 32]} align="middle">
+          <Col xs={24} lg={thumbnail ? 15 : 24}>
             <Space direction="vertical" size="large" className="w-full">
               <Space size="middle" wrap>
                 {is_bundle && (
@@ -85,57 +66,21 @@ const PackageDetailHeader: React.FC<PackageDetailHeaderProps> = ({
                   {category}
                 </Tag>
                 <Space size={4} wrap>
-                  {classes?.map(c => (
-                    <Tag
-                      key={c}
-                      className={`rounded-full px-3 border-none font-bold text-[10px] m-0 ${
-                        hasCover
-                          ? 'bg-white/15 text-white backdrop-blur-sm'
-                          : 'bg-on-surface/5 text-on-surface/40'
-                      }`}
-                    >
-                      {c}
-                    </Tag>
-                  ))}
-                  {subjects?.map(s => (
-                    <Tag
-                      key={s}
-                      className={`rounded-full px-3 border-none font-bold text-[10px] m-0 ${
-                        hasCover
-                          ? 'bg-blue-400/25 text-blue-100 backdrop-blur-sm'
-                          : 'bg-blue-500/10 text-blue-500'
-                      }`}
-                    >
-                      {s}
-                    </Tag>
-                  ))}
+                  {classes?.map(c => <Tag key={c} className="rounded-full px-3 border-none bg-on-surface/5 text-on-surface/40 font-bold text-[10px] m-0">{c}</Tag>)}
+                  {subjects?.map(s => <Tag key={s} className="rounded-full px-3 border-none bg-blue-500/10 text-blue-500 font-bold text-[10px] m-0">{s}</Tag>)}
                 </Space>
               </Space>
 
               <div>
-                <Title
-                  level={1}
-                  className={`!text-4xl md:!text-6xl !font-manrope !m-0 !leading-[1.1] ${
-                    hasCover ? '!text-white drop-shadow-sm' : ''
-                  }`}
-                >
+                <Title level={1} className="!text-4xl md:!text-6xl !font-manrope !m-0 !leading-[1.1]">
                   {title}
                 </Title>
                 {description ? (
-                  <Paragraph
-                    className={`text-md text-justify mt-6 leading-relaxed line-clamp-5 ${
-                      hasCover ? '!text-white/85' : 'text-surface-on/60'
-                    }`}
-                  >
+                  <Paragraph className="text-md text-justify text-surface-on/60 mt-6 leading-relaxed line-clamp-5">
                     {description}
                   </Paragraph>
                 ) : (
-                  <Button
-                    type="link"
-                    className={`mt-4 px-0 ${hasCover ? '!text-blue-200 hover:!text-white font-semibold' : ''}`}
-                    onClick={onLoadDescription}
-                    loading={descriptionLoading}
-                  >
+                  <Button type="link" className="mt-4 px-0" onClick={onLoadDescription} loading={descriptionLoading}>
                     Lihat deskripsi paket
                   </Button>
                 )}
@@ -143,51 +88,51 @@ const PackageDetailHeader: React.FC<PackageDetailHeaderProps> = ({
 
               <div className="flex flex-wrap gap-8 items-center pt-4">
                 <div className="flex items-center gap-3">
-                  <div className={`p-3 rounded-2xl ${hasCover ? 'bg-white/15 backdrop-blur-sm' : 'bg-primary/10'}`}>
-                    <TeamOutlined className={`text-xl ${hasCover ? 'text-white' : 'text-primary'}`} />
+                  <div className="bg-primary/10 p-3 rounded-2xl">
+                    <TeamOutlined className="text-primary text-xl" />
                   </div>
                   <div>
-                    <Text className={`block text-[10px] uppercase font-bold tracking-widest ${hasCover ? '!text-white/70' : 'text-surface-on/40'}`}>
-                      Siswa Terdaftar
-                    </Text>
-                    <Title level={4} className={`!m-0 ${hasCover ? '!text-white' : ''}`}>
-                      {joinedCount.toLocaleString('id-ID')}+
-                    </Title>
+                    <Text className="block text-[10px] text-surface-on/40 uppercase font-bold tracking-widest">Siswa Terdaftar</Text>
+                    <Title level={4} className="!m-0">{joinedCount.toLocaleString('id-ID')}+</Title>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <div className={`p-3 rounded-2xl ${hasCover ? 'bg-white/15 backdrop-blur-sm' : 'bg-primary/10'}`}>
-                    <ClockCircleOutlined className={`text-xl ${hasCover ? 'text-white' : 'text-primary'}`} />
+                  <div className="bg-primary/10 p-3 rounded-2xl">
+                    <ClockCircleOutlined className="text-primary text-xl" />
                   </div>
                   <div>
-                    <Text className={`block text-[10px] uppercase font-bold tracking-widest ${hasCover ? '!text-white/70' : 'text-surface-on/40'}`}>
-                      Estimasi Waktu
-                    </Text>
-                    <Title level={4} className={`!m-0 ${hasCover ? '!text-white' : ''}`}>
-                      {duration}
-                    </Title>
+                    <Text className="block text-[10px] text-surface-on/40 uppercase font-bold tracking-widest">Estimasi Waktu</Text>
+                    <Title level={4} className="!m-0">{duration}</Title>
                   </div>
                 </div>
 
                 {typeof questionCount === 'number' && questionCount > 0 && (
                   <div className="flex items-center gap-3">
-                    <div className={`p-3 rounded-2xl ${hasCover ? 'bg-white/15 backdrop-blur-sm' : 'bg-primary/10'}`}>
-                      <ExperimentOutlined className={`text-xl ${hasCover ? 'text-white' : 'text-primary'}`} />
+                    <div className="bg-primary/10 p-3 rounded-2xl">
+                      <ExperimentOutlined className="text-primary text-xl" />
                     </div>
                     <div>
-                      <Text className={`block text-[10px] uppercase font-bold tracking-widest ${hasCover ? '!text-white/70' : 'text-surface-on/40'}`}>
-                        Total Soal
-                      </Text>
-                      <Title level={4} className={`!m-0 ${hasCover ? '!text-white' : ''}`}>
-                        {questionCount} Soal
-                      </Title>
+                      <Text className="block text-[10px] text-surface-on/40 uppercase font-bold tracking-widest">Total Soal</Text>
+                      <Title level={4} className="!m-0">{questionCount} Soal</Title>
                     </div>
                   </div>
                 )}
               </div>
             </Space>
           </Col>
+
+          {thumbnail && (
+            <Col xs={24} lg={9}>
+              <div className="rounded-3xl overflow-hidden shadow-2xl border-4 border-white/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 aspect-[16/10]">
+                <img
+                  src={thumbnail}
+                  alt={title}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </Col>
+          )}
         </Row>
       </div>
     </div>
