@@ -1,7 +1,23 @@
 import axios from 'axios';
 
 const backendUrl = process.env.REACT_APP_LINK_BACKEND || 'http://127.0.0.1:3026/api';
+const backendOrigin = backendUrl.replace(/\/api\/?$/, '');
 const secretKey = process.env.REACT_APP_SECRET_BACKEND || 'Z9ToSwagger1413999';
+
+export const resolvePackageThumbnail = (path?: string): string => {
+  if (!path) return '';
+  if (/^(https?:\/\/|data:|blob:)/i.test(path)) return path;
+  if (path.startsWith('/')) return `${backendOrigin}${path}`;
+  return `${backendOrigin}/${path}`;
+};
+
+export const normalizeThumbnailForSave = (path?: string): string => {
+  if (!path) return '';
+  if (path.startsWith(backendOrigin)) {
+    return path.slice(backendOrigin.length) || '';
+  }
+  return path;
+};
 
 const api = axios.create({
   baseURL: backendUrl,
@@ -112,7 +128,7 @@ const normalizePackage = (pkg: any): PackageListItem => ({
   subjects: asStringArray(pkg?.subjects ?? pkg?.Subjects),
   duration: Number(pkg?.duration) || 0,
   status: normalizeStatus(pkg?.status),
-  thumbnail: String(pkg?.thumbnail || ''),
+  thumbnail: resolvePackageThumbnail(String(pkg?.thumbnail || '')),
   is_lifetime: Boolean(pkg?.is_lifetime ?? true),
   validity_days: Number(pkg?.validity_days) || 0,
   max_exam_attempts: Number(pkg?.max_exam_attempts) || 0,
@@ -158,13 +174,29 @@ export const getPackageDescription = async (slug: string): Promise<string> => {
 };
 
 export const createPackage = async (payload: PackagePayload): Promise<PackageListItem> => {
-  const response = await api.post('/packages', payload);
+  const response = await api.post('/packages', {
+    ...payload,
+    thumbnail: normalizeThumbnailForSave(payload.thumbnail),
+  });
   return normalizePackage(unwrapItem(response.data));
 };
 
 export const updatePackage = async (slug: string, payload: Partial<PackagePayload>): Promise<PackageListItem> => {
-  const response = await api.put(`/packages/${slug}`, payload);
+  const response = await api.put(`/packages/${slug}`, {
+    ...payload,
+    ...(payload.thumbnail !== undefined ? { thumbnail: normalizeThumbnailForSave(payload.thumbnail) } : {}),
+  });
   return normalizePackage(unwrapItem(response.data));
+};
+
+export const uploadPackageThumbnail = async (file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append('thumbnail', file);
+  const response = await api.post('/packages/upload-thumbnail', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  const url = response.data?.data?.url || '';
+  return resolvePackageThumbnail(url);
 };
 
 export const deletePackage = async (slug: string): Promise<void> => {

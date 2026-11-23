@@ -10,6 +10,7 @@ func RoutePackage(api *echo.Group) {
 	packages := api.Group("/packages")
 	packages.GET("", controller.GetPackages)
 	packages.POST("", controller.CreatePackage)
+	packages.POST("/upload-thumbnail", controller.UploadPackageThumbnail)
 	packages.PUT("/:slug", controller.UpdatePackage)
 	packages.DELETE("/:slug", controller.DeletePackage)
 	packages.GET("/:slug/meta", controller.GetPackageExamMeta)

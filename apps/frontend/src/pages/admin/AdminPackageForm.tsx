@@ -17,6 +17,7 @@ import {
   createPackage,
   updatePackage,
   deletePackage,
+  uploadPackageThumbnail,
   PackageListItem,
 } from '../../services/packageService';
 import { getGrades, Grade } from '../../services/gradeService';
@@ -59,6 +60,8 @@ const AdminPackageForm: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<PackageRow | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string>('');
+  const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
   const [form] = Form.useForm();
   const navigate = useNavigate();
   const [grades, setGrades] = useState<Grade[]>([]);
@@ -88,6 +91,7 @@ const AdminPackageForm: React.FC = () => {
   // ── Modal helpers ─────────────────────────────────────────────────────────
   const openCreate = () => {
     setEditTarget(null);
+    setThumbnailUrl('');
     form.resetFields();
     form.setFieldsValue({
       status: 'published',
@@ -109,6 +113,7 @@ const AdminPackageForm: React.FC = () => {
 
   const openEdit = (pkg: PackageRow) => {
     setEditTarget(pkg);
+    setThumbnailUrl(pkg.thumbnail || '');
     form.setFieldsValue({
       title: pkg.title,
       description: pkg.description,
@@ -168,7 +173,7 @@ const AdminPackageForm: React.FC = () => {
         subjects: vals.subjects ?? [],
         duration: isBundle ? 0 : (vals.duration ?? 0),
         status: vals.status ?? 'draft',
-        thumbnail: editTarget?.thumbnail || '',
+        thumbnail: thumbnailUrl || '',
         discount_type: isBundle ? '' : (vals.discount_type ?? ''),
         discount_value: isBundle ? 0 : (vals.discount_value ?? 0),
         is_lifetime: isBundle ? true : (vals.is_lifetime ?? true),
@@ -322,7 +327,8 @@ const AdminPackageForm: React.FC = () => {
       render: (title, record) => (
         <div className="flex items-start gap-3">
           <Avatar
-            size={40}
+            size={44}
+            src={record.thumbnail || undefined}
             className={`${record.is_bundle ? 'bg-purple-100 text-purple-700' : 'bg-primary/10 text-primary'} shrink-0 text-lg font-black rounded-xl`}
             shape="square"
           >
@@ -810,20 +816,93 @@ const AdminPackageForm: React.FC = () => {
               </Form.Item>
             </Col>
             <Col span={24}>
-              <Form.Item label={<span className="font-bold text-sm">Thumbnail Paket</span>}>
-                <Upload.Dragger
-                  accept="image/*"
-                  beforeUpload={() => false}
-                  maxCount={1}
-                  multiple={false}
-                  className="rounded-2xl"
-                >
-                  <div className="py-4">
-                    <PictureOutlined className="text-2xl text-primary/40 block mb-2" />
-                    <Text className="text-xs font-bold block">Upload Gambar Sampul</Text>
-                    <Text className="text-[10px] text-on-surface/40">Rasio 4:3 disarankan</Text>
+              <Form.Item label={<span className="font-bold text-sm">Cover / Thumbnail Tryout</span>}>
+                {thumbnailUrl ? (
+                  <div className="space-y-3">
+                    <div className="relative rounded-2xl overflow-hidden border border-on-surface/10 bg-surface-low/50 aspect-[16/9] max-h-52 flex items-center justify-center">
+                      <img
+                        src={thumbnailUrl}
+                        alt="Cover Paket"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Upload
+                        accept="image/png,image/jpeg,image/webp"
+                        showUploadList={false}
+                        beforeUpload={async (file) => {
+                          if (file.size > 5 * 1024 * 1024) {
+                            message.error('Ukuran gambar maksimal 5MB');
+                            return Upload.LIST_IGNORE;
+                          }
+                          setUploadingThumbnail(true);
+                          try {
+                            const url = await uploadPackageThumbnail(file);
+                            setThumbnailUrl(url);
+                            message.success('Cover paket berhasil diupload');
+                          } catch (err: any) {
+                            message.error(err?.response?.data?.message || 'Gagal mengupload cover');
+                          } finally {
+                            setUploadingThumbnail(false);
+                          }
+                          return false;
+                        }}
+                      >
+                        <Button
+                          size="small"
+                          icon={<PictureOutlined />}
+                          loading={uploadingThumbnail}
+                          className="rounded-lg font-bold"
+                        >
+                          Ganti Cover
+                        </Button>
+                      </Upload>
+                      <Button
+                        size="small"
+                        danger
+                        icon={<DeleteOutlined />}
+                        disabled={uploadingThumbnail}
+                        onClick={() => setThumbnailUrl('')}
+                        className="rounded-lg font-bold"
+                      >
+                        Hapus Cover
+                      </Button>
+                    </div>
                   </div>
-                </Upload.Dragger>
+                ) : (
+                  <Spin spinning={uploadingThumbnail} tip="Mengupload cover...">
+                    <Upload.Dragger
+                      accept="image/png,image/jpeg,image/webp"
+                      showUploadList={false}
+                      maxCount={1}
+                      multiple={false}
+                      className="rounded-2xl"
+                      beforeUpload={async (file) => {
+                        if (file.size > 5 * 1024 * 1024) {
+                          message.error('Ukuran gambar maksimal 5MB');
+                          return Upload.LIST_IGNORE;
+                        }
+                        setUploadingThumbnail(true);
+                        try {
+                          const url = await uploadPackageThumbnail(file);
+                          setThumbnailUrl(url);
+                          message.success('Cover paket berhasil diupload');
+                        } catch (err: any) {
+                          message.error(err?.response?.data?.message || 'Gagal mengupload cover');
+                        } finally {
+                          setUploadingThumbnail(false);
+                        }
+                        return false;
+                      }}
+                    >
+                      <div className="py-4">
+                        <PictureOutlined className="text-2xl text-primary/40 block mb-2" />
+                        <Text className="text-xs font-bold block">Upload Cover Tryout (JPG / PNG / WEBP)</Text>
+                        <Text className="text-[10px] text-on-surface/40">Rasio 16:9 atau 4:3 disarankan · Maksimal 5MB</Text>
+                      </div>
+                    </Upload.Dragger>
+                  </Spin>
+                )}
               </Form.Item>
             </Col>
             <Col xs={24} sm={12}>
