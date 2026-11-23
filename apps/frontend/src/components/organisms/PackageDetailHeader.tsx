@@ -1,11 +1,9 @@
 import React from 'react';
 import { Typography, Space, Tag, Breadcrumb, Row, Col, Button } from 'antd';
 import {
-  UserOutlined,
   ClockCircleOutlined,
   TeamOutlined,
-  SafetyCertificateFilled,
-  ExperimentOutlined
+  ExperimentOutlined,
 } from '@ant-design/icons';
 
 const { Title, Paragraph, Text } = Typography;
@@ -13,6 +11,7 @@ const { Title, Paragraph, Text } = Typography;
 interface PackageDetailHeaderProps {
   title: string;
   description: string;
+  thumbnail?: string;
   joinedCount: number;
   duration: string;
   questionCount?: number;
@@ -28,6 +27,7 @@ interface PackageDetailHeaderProps {
 const PackageDetailHeader: React.FC<PackageDetailHeaderProps> = ({
   title,
   description,
+  thumbnail,
   joinedCount,
   duration,
   questionCount,
@@ -37,7 +37,7 @@ const PackageDetailHeader: React.FC<PackageDetailHeaderProps> = ({
   is_bundle,
   bundledPackageCount,
   onLoadDescription,
-  descriptionLoading
+  descriptionLoading,
 }) => {
   return (
     <div className="relative pt-32 pb-16 overflow-hidden">
@@ -53,8 +53,8 @@ const PackageDetailHeader: React.FC<PackageDetailHeaderProps> = ({
           <Breadcrumb.Item>{title}</Breadcrumb.Item>
         </Breadcrumb>
 
-        <Row gutter={[48, 48]} align="middle">
-          <Col span={24}>
+        <Row gutter={[48, 32]} align="middle">
+          <Col xs={24} lg={thumbnail ? 15 : 24}>
             <Space direction="vertical" size="large" className="w-full">
               <Space size="middle" wrap>
                 {is_bundle && (
@@ -121,6 +121,18 @@ const PackageDetailHeader: React.FC<PackageDetailHeaderProps> = ({
               </div>
             </Space>
           </Col>
+
+          {thumbnail && (
+            <Col xs={24} lg={9}>
+              <div className="rounded-3xl overflow-hidden shadow-2xl border-4 border-white/80 dark:border-zinc-800 bg-white dark:bg-zinc-900 aspect-[16/10]">
+                <img
+                  src={thumbnail}
+                  alt={title}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </Col>
+          )}
         </Row>
       </div>
     </div>
