@@ -17,7 +17,7 @@ import {
 import {
   Tabs, Card, Form, Input, Button, Upload, Typography, Tag,
   Space, Divider, Modal, message, Switch, Row, Col,
-  Radio, Checkbox, Select, Badge, Empty, InputNumber,
+  Radio, Checkbox, Select, Badge, Empty, InputNumber, Spin,
 } from 'antd';
 import {
   ArrowLeftOutlined, ExperimentOutlined, FileSearchOutlined,
@@ -897,6 +897,7 @@ const AdminPackageSettings: React.FC = () => {
     scoringMethod: 'all_or_nothing',
   };
 
+  const [loadingData, setLoadingData] = useState(true);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
 
   const questionNumberRanges = useMemo(() => {
@@ -1001,39 +1002,62 @@ const AdminPackageSettings: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!id) return;
-    getPackageQuestions(id)
+    if (!id) {
+      setLoadingData(false);
+      return;
+    }
+
+    let mounted = true;
+    setLoadingData(true);
+
+    const fetchQuestions = getPackageQuestions(id)
       .then(data => {
-        if (data.length > 0) {
+        if (mounted && data.length > 0) {
           setQuestions(data.map(deserializeQuestion));
           setActiveQIndex(0);
         }
       })
       .catch(() => {
-        message.warning('Belum bisa mengambil data soal dari backend. Editor memakai data lokal sementara.');
+        if (mounted) {
+          message.warning('Belum bisa mengambil data soal dari backend. Editor memakai data lokal sementara.');
+        }
       });
 
-    getPackageMaterials(id)
+    const fetchMaterials = getPackageMaterials(id)
       .then(data => {
-        if (data.length > 0) {
+        if (mounted && data.length > 0) {
           setMaterials(data);
           setActiveMIndex(0);
         }
       })
       .catch(() => {
-        message.warning('Belum bisa mengambil data materi dari backend. Editor memakai data lokal sementara.');
+        if (mounted) {
+          message.warning('Belum bisa mengambil data materi dari backend. Editor memakai data lokal sementara.');
+        }
       });
 
-    getPackageVideos(id)
+    const fetchVideos = getPackageVideos(id)
       .then(data => {
-        if (data.length > 0) {
+        if (mounted && data.length > 0) {
           setVideos(data);
           setActiveVIndex(0);
         }
       })
       .catch(() => {
-        message.warning('Belum bisa mengambil data video dari backend. Editor memakai data lokal sementara.');
+        if (mounted) {
+          message.warning('Belum bisa mengambil data video dari backend. Editor memakai data lokal sementara.');
+        }
       });
+
+    Promise.allSettled([fetchQuestions, fetchMaterials, fetchVideos]).finally(() => {
+      if (mounted) {
+        setLoadingData(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+    };
   }, [id]);
 
   // ── ACTIONS: Questions ──
@@ -2300,14 +2324,36 @@ const AdminPackageSettings: React.FC = () => {
                 <Badge dot status="processing" offset={[-2, 5]}>
                   <Tag color="blue" className="rounded-lg font-bold border-none px-3 py-0.5">Backend aktif</Tag>
                 </Badge>
-                <Button type="primary" icon={<SaveOutlined />} onClick={saveAllQuestions} className="rounded-xl font-bold">
+                <Button
+                  type="primary"
+                  icon={<SaveOutlined />}
+                  onClick={saveAllQuestions}
+                  disabled={loadingData}
+                  className="rounded-xl font-bold"
+                >
                   Simpan Semua
                 </Button>
               </Space>
             </div>
           </div>
 
-          <Tabs defaultActiveKey="soal" className="weightless-tabs" items={tabItems} />
+          {loadingData ? (
+            <Card className="weightless-card border-none bg-white dark:bg-zinc-900 shadow-md rounded-[2.5rem] py-24 text-center">
+              <div className="flex flex-col items-center justify-center gap-4">
+                <Spin size="large" />
+                <div>
+                  <Title level={5} className="!m-0 !font-manrope !font-black text-on-surface dark:text-zinc-100">
+                    Memuat Data Paket...
+                  </Title>
+                  <Text className="text-xs text-on-surface/50 dark:text-zinc-400">
+                    Sedang mengambil daftar soal, materi pembahasan, dan video dari server.
+                  </Text>
+                </div>
+              </div>
+            </Card>
+          ) : (
+            <Tabs defaultActiveKey="soal" className="weightless-tabs" items={tabItems} />
+          )}
         </div>
       </div>
     </AdminLayout>
