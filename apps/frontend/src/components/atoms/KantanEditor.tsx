@@ -58,6 +58,124 @@ window.katex = katex;
 
 const isProbablyHtml = (value: string) => /<\/?[a-z][\s\S]*>/i.test(value);
 
+const LATEX_DELIMITER_REGEX = /\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)|(?<!\\)(?<!\$)\$([^$\n]+?)(?<!\\)\$(?!\$)/g;
+
+const convertLatexToFormulaHtml = (raw: string): string => {
+  if (!raw) return '';
+  if (!raw.includes('$') && !raw.includes('\\(') && !raw.includes('\\[')) {
+    return raw;
+  }
+
+  let html = raw;
+  if (!isProbablyHtml(raw)) {
+    const escaped = raw
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    html = escaped
+      .split('\n')
+      .map(line => `<p>${line || '<br>'}</p>`)
+      .join('');
+  }
+
+  if (typeof document === 'undefined') return html;
+
+  const container = document.createElement('div');
+  container.innerHTML = html;
+
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  const textNodes: Text[] = [];
+  let currentNode = walker.nextNode();
+  while (currentNode) {
+    const parentEl = currentNode.parentElement;
+    if (
+      parentEl &&
+      !parentEl.closest('.ql-formula') &&
+      !parentEl.closest('code') &&
+      !parentEl.closest('pre')
+    ) {
+      textNodes.push(currentNode as Text);
+    }
+    currentNode = walker.nextNode();
+  }
+
+  for (const textNode of textNodes) {
+    const text = textNode.nodeValue || '';
+    LATEX_DELIMITER_REGEX.lastIndex = 0;
+    if (!LATEX_DELIMITER_REGEX.test(text)) continue;
+
+    LATEX_DELIMITER_REGEX.lastIndex = 0;
+    const frag = document.createDocumentFragment();
+    let lastIdx = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = LATEX_DELIMITER_REGEX.exec(text)) !== null) {
+      if (match.index > lastIdx) {
+        frag.appendChild(document.createTextNode(text.slice(lastIdx, match.index)));
+      }
+      const latex = (match[1] ?? match[2] ?? match[3] ?? match[4] ?? '').trim();
+      if (latex) {
+        const span = document.createElement('span');
+        span.className = 'ql-formula';
+        span.setAttribute('data-value', latex);
+        frag.appendChild(span);
+      } else {
+        frag.appendChild(document.createTextNode(match[0]));
+      }
+      lastIdx = match.index + match[0].length;
+    }
+
+    if (lastIdx < text.length) {
+      frag.appendChild(document.createTextNode(text.slice(lastIdx)));
+    }
+
+    textNode.parentNode?.replaceChild(frag, textNode);
+  }
+
+  return container.innerHTML;
+};
+
+const convertLatexInQuill = (quill: Quill): boolean => {
+  const delta = quill.getContents();
+  let offset = 0;
+  const replacements: { index: number; length: number; latex: string }[] = [];
+
+  for (const op of delta.ops || []) {
+    if (typeof op.insert === 'string') {
+      const text = op.insert;
+      LATEX_DELIMITER_REGEX.lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = LATEX_DELIMITER_REGEX.exec(text)) !== null) {
+        const rawLatex = (match[1] ?? match[2] ?? match[3] ?? match[4] ?? '').trim();
+        if (!rawLatex) continue;
+        replacements.push({
+          index: offset + match.index,
+          length: match[0].length,
+          latex: rawLatex,
+        });
+      }
+      offset += text.length;
+    } else {
+      offset += 1;
+    }
+  }
+
+  if (replacements.length === 0) return false;
+
+  for (let i = replacements.length - 1; i >= 0; i--) {
+    const { index, length, latex } = replacements[i];
+    quill.deleteText(index, length, Quill.sources.SILENT);
+    quill.insertEmbed(index, 'formula', latex, Quill.sources.SILENT);
+  }
+
+  const last = replacements[replacements.length - 1];
+  const totalDelta = replacements.reduce((sum, r) => sum + (1 - r.length), 0);
+  const nextCursor = Math.max(0, last.index + last.length + totalDelta);
+  quill.setSelection(nextCursor, 0, Quill.sources.SILENT);
+
+  return true;
+};
+
 // ── CUSTOM IMAGE BLOT (QUILL V2) ─────────────────────────────────────────────
 // Preserves style, width, height, class, and align formats in Quill Deltas & HTML
 const BaseImage = Quill.import('formats/image') as any;
@@ -518,11 +636,20 @@ function setupImageResizer(quill: Quill, onChangeCallback: () => void) {
 
 const MathModal: React.FC<{
   open: boolean;
+  initialLatex?: string;
+  isEditing?: boolean;
   onClose: () => void;
   onInsert: (latex: string, block: boolean) => void;
-}> = ({ open, onClose, onInsert }) => {
-  const [latex, setLatex] = useState('');
+}> = ({ open, initialLatex = '', isEditing = false, onClose, onInsert }) => {
+  const [latex, setLatex] = useState(initialLatex);
   const [block, setBlock] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setLatex(initialLatex || '');
+      setBlock(false);
+    }
+  }, [open, initialLatex]);
   const templates = [
     { label: 'Pecahan', value: '\\frac{a}{b}' },
     { label: 'Akar', value: '\\sqrt{x}' },
@@ -541,7 +668,7 @@ const MathModal: React.FC<{
       open={open}
       onCancel={onClose}
       width={520}
-      title={<span className="font-black font-manrope flex items-center gap-2"><FunctionOutlined className="text-primary" /> Sisipkan Rumus LaTeX</span>}
+      title={<span className="font-black font-manrope flex items-center gap-2"><FunctionOutlined className="text-primary" /> {isEditing ? 'Edit Rumus LaTeX' : 'Sisipkan Rumus LaTeX'}</span>}
       footer={[
         <Button key="cancel" onClick={onClose}>Batal</Button>,
         <Button
@@ -555,7 +682,7 @@ const MathModal: React.FC<{
             onClose();
           }}
         >
-          Sisipkan
+          {isEditing ? 'Simpan Perubahan' : 'Sisipkan'}
         </Button>,
       ]}
     >
@@ -606,7 +733,9 @@ const KantanEditor: React.FC<KantanEditorProps> = ({ value, onChange, placeholde
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lastHtmlRef = useRef(value || '');
   const onChangeRef = useRef(onChange);
+  const editingFormulaIndexRef = useRef<number | null>(null);
   const [mathModalOpen, setMathModalOpen] = useState(false);
+  const [editingLatex, setEditingLatex] = useState('');
 
   const editorMinHeight = useMemo(() => Math.max(rows * 40, 120), [rows]);
 
@@ -628,7 +757,11 @@ const KantanEditor: React.FC<KantanEditorProps> = ({ value, onChange, placeholde
             container: toolbarOptions,
             handlers: {
               image: () => fileInputRef.current?.click(),
-              formula: () => setMathModalOpen(true),
+              formula: () => {
+                editingFormulaIndexRef.current = null;
+                setEditingLatex('');
+                setMathModalOpen(true);
+              },
             },
           },
           'table-better': {
@@ -645,11 +778,12 @@ const KantanEditor: React.FC<KantanEditorProps> = ({ value, onChange, placeholde
       quillRef.current = quill;
 
       if (value) {
-        if (isProbablyHtml(value)) {
-          const delta = quill.clipboard.convert({ html: value });
+        const prepared = convertLatexToFormulaHtml(value);
+        if (isProbablyHtml(prepared)) {
+          const delta = quill.clipboard.convert({ html: prepared });
           quill.updateContents(delta, Quill.sources.SILENT);
         } else {
-          quill.setText(value, Quill.sources.SILENT);
+          quill.setText(prepared, Quill.sources.SILENT);
         }
       }
 
@@ -681,7 +815,10 @@ const KantanEditor: React.FC<KantanEditorProps> = ({ value, onChange, placeholde
       setTimeout(updateSizePickerLabels, 0);
       setTimeout(updateSizePickerLabels, 150);
 
-      quill.on('text-change', () => {
+      quill.on('text-change', (_delta, _oldDelta, source) => {
+        if (source === Quill.sources.USER) {
+          convertLatexInQuill(quill!);
+        }
         const html = quill!.root.innerHTML;
         const normalized = html === '<p><br></p>' ? '' : html;
         lastHtmlRef.current = normalized;
@@ -705,7 +842,25 @@ const KantanEditor: React.FC<KantanEditorProps> = ({ value, onChange, placeholde
 
     const cleanupResizer = setupImageResizer(quill!, emitChange);
 
+    const onFormulaClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      const formulaEl = target?.closest('.ql-formula') as HTMLElement | null;
+      if (formulaEl && quill!.root.contains(formulaEl)) {
+        e.preventDefault();
+        e.stopPropagation();
+        const blot = Quill.find(formulaEl) as any;
+        if (blot) {
+          editingFormulaIndexRef.current = quill!.getIndex(blot);
+          setEditingLatex(formulaEl.getAttribute('data-value') || '');
+          setMathModalOpen(true);
+        }
+      }
+    };
+
+    quill!.root.addEventListener('click', onFormulaClick);
+
     return () => {
+      quill!.root.removeEventListener('click', onFormulaClick);
       cleanupResizer();
     };
   }, []);
@@ -720,11 +875,12 @@ const KantanEditor: React.FC<KantanEditorProps> = ({ value, onChange, placeholde
     quill.setContents([], Quill.sources.SILENT);
     if (!nextValue) return;
 
-    if (isProbablyHtml(nextValue)) {
-      const delta = quill.clipboard.convert({ html: nextValue });
+    const prepared = convertLatexToFormulaHtml(nextValue);
+    if (isProbablyHtml(prepared)) {
+      const delta = quill.clipboard.convert({ html: prepared });
       quill.updateContents(delta, Quill.sources.SILENT);
     } else {
-      quill.setText(nextValue, Quill.sources.SILENT);
+      quill.setText(prepared, Quill.sources.SILENT);
     }
   }, [value]);
 
@@ -744,6 +900,16 @@ const KantanEditor: React.FC<KantanEditorProps> = ({ value, onChange, placeholde
   const insertFormula = (latex: string, block: boolean) => {
     const quill = quillRef.current;
     if (!quill) return;
+
+    if (editingFormulaIndexRef.current !== null) {
+      const editIdx = editingFormulaIndexRef.current;
+      editingFormulaIndexRef.current = null;
+      setEditingLatex('');
+      quill.deleteText(editIdx, 1, Quill.sources.SILENT);
+      quill.insertEmbed(editIdx, 'formula', latex, Quill.sources.USER);
+      quill.setSelection(editIdx + 1, 0, Quill.sources.SILENT);
+      return;
+    }
 
     const range = quill.getSelection(true);
     const index = range?.index || quill.getLength();
@@ -772,6 +938,16 @@ const KantanEditor: React.FC<KantanEditorProps> = ({ value, onChange, placeholde
         .kantan-quill .ql-editor img:hover {
           outline: 2px dashed #0053dd !important;
           outline-offset: 2px;
+        }
+        .kantan-quill .ql-editor .ql-formula {
+          cursor: pointer;
+          padding: 1px 4px;
+          border-radius: 6px;
+          transition: background-color 0.15s ease, outline 0.15s ease;
+        }
+        .kantan-quill .ql-editor .ql-formula:hover {
+          background-color: rgba(0, 83, 221, 0.08);
+          outline: 1px dashed rgba(0, 83, 221, 0.5);
         }
 
         /* ── Quill Size Dropdown Styles ── */
@@ -837,7 +1013,17 @@ const KantanEditor: React.FC<KantanEditorProps> = ({ value, onChange, placeholde
       `}</style>
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={insertImage} />
       <div ref={editorRef} style={{ minHeight: theme === 'bubble' ? 20 : editorMinHeight }} />
-      <MathModal open={mathModalOpen} onClose={() => setMathModalOpen(false)} onInsert={insertFormula} />
+      <MathModal
+        open={mathModalOpen}
+        initialLatex={editingLatex}
+        isEditing={editingFormulaIndexRef.current !== null}
+        onClose={() => {
+          editingFormulaIndexRef.current = null;
+          setEditingLatex('');
+          setMathModalOpen(false);
+        }}
+        onInsert={insertFormula}
+      />
     </div>
   );
 };
