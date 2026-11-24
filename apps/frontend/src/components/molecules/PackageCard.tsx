@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, Tag, Typography, Button, Space, Rate } from 'antd';
 import { UserOutlined, ClockCircleOutlined, ThunderboltOutlined, CheckCircleFilled } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
+import dayjs from 'dayjs';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { recordMenuLogAPI } from '../../services/logService';
@@ -25,6 +26,7 @@ export interface PackageProps {
   isOwned?: boolean;
   is_lifetime?: boolean;
   validity_days?: number;
+  active_until?: string | null;
   max_exam_attempts?: number;
   questions_count?: number;
   materials_count?: number;
@@ -51,6 +53,7 @@ const PackageCard: React.FC<PackageProps> = ({
   isOwned,
   is_lifetime,
   validity_days,
+  active_until,
   max_exam_attempts,
   questions_count,
   materials_count,
@@ -182,7 +185,11 @@ const PackageCard: React.FC<PackageProps> = ({
               ))
             ) : (
               [
-                is_lifetime ? 'Akses Selamanya (Lifetime)' : `Akses ${validity_days} Hari`,
+                is_lifetime
+                  ? 'Akses Selamanya (Lifetime)'
+                  : active_until
+                    ? `Akses s/d ${dayjs(active_until).format('DD MMM YYYY')}`
+                    : `Akses ${validity_days} Hari`,
                 max_exam_attempts === 0 ? 'Bebas Ujian Berkali-kali' : `Maksimal ${max_exam_attempts}x Ujian`,
                 `${questions_count || 0} Soal`,
                 (materials_count ?? 0) > 0 ? `${materials_count} Materi Pembahasan` : 'Pembahasan dalam soal',

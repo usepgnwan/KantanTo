@@ -58,6 +58,7 @@ const toPackageCard = (pkg: PackageListItem): PackageProps => {
     isPopular: pkg.questions_count > 0 || Boolean(pkg.is_bundle),
     is_lifetime: pkg.is_lifetime,
     validity_days: pkg.validity_days,
+    active_until: pkg.active_until,
     max_exam_attempts: pkg.max_exam_attempts,
     questions_count: pkg.questions_count,
     materials_count: pkg.materials_count,
