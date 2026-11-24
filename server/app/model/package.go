@@ -21,6 +21,7 @@ type Package struct {
 	Thumbnail             string            `gorm:"default:''" json:"thumbnail"`
 	IsLifetime            bool              `gorm:"default:true" json:"is_lifetime"` // Default to true based on user request
 	ValidityDays          int               `gorm:"default:0" json:"validity_days"`  // Hari expired
+	ActiveUntil           *time.Time        `json:"active_until"`                    // Tanggal expired tetap (opsional)
 	MaxExamAttempts       int               `gorm:"default:0" json:"max_exam_attempts"` // 0 = unlimited
 	IsBundle              bool              `gorm:"default:false" json:"is_bundle"`
 	BundledPackageIDsJSON string            `gorm:"type:text;default:'[]'" json:"-"`

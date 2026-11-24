@@ -51,6 +51,7 @@ export interface PackageListItem {
   thumbnail: string;
   is_lifetime: boolean;
   validity_days: number;
+  active_until?: string | null;
   max_exam_attempts: number;
   questions_count: number;
   materials_count: number;
@@ -78,6 +79,7 @@ export interface PackagePayload {
   thumbnail?: string;
   is_lifetime: boolean;
   validity_days: number;
+  active_until?: string | null;
   max_exam_attempts: number;
   is_bundle?: boolean;
   bundled_package_ids?: number[];
@@ -131,6 +133,7 @@ const normalizePackage = (pkg: any): PackageListItem => ({
   thumbnail: resolvePackageThumbnail(String(pkg?.thumbnail || '')),
   is_lifetime: Boolean(pkg?.is_lifetime ?? true),
   validity_days: Number(pkg?.validity_days) || 0,
+  active_until: pkg?.active_until || null,
   max_exam_attempts: Number(pkg?.max_exam_attempts) || 0,
   questions_count: Number(pkg?.questions_count) || 0,
   materials_count: Number(pkg?.materials_count) || 0,

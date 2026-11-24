@@ -3,8 +3,9 @@ import AdminLayout from '../../layouts/AdminLayout';
 import {
   Card, Table, Button, Tag, Typography, Space, Modal,
   Form, Input, InputNumber, Dropdown, message, Avatar,
-  Col, Row, Select, Upload, Spin,
+  Col, Row, Select, Upload, Spin, DatePicker,
 } from 'antd';
+import dayjs from 'dayjs';
 import type { TableColumnsType, MenuProps } from 'antd';
 import {
   PlusOutlined, SettingOutlined, DeleteOutlined, MoreOutlined,
@@ -99,8 +100,10 @@ const AdminPackageForm: React.FC = () => {
       subjects: [],
       duration: 120,
       price: 0,
+      validity_mode: 'lifetime',
       is_lifetime: true,
       validity_days: 30,
+      active_until_date: null,
       max_exam_attempts: 0,
       is_bundle: false,
       bundled_package_ids: [],
@@ -125,8 +128,10 @@ const AdminPackageForm: React.FC = () => {
       price: pkg.price,
       discount_type: pkg.discount_type || '',
       discount_value: pkg.discount_value || 0,
+      validity_mode: pkg.is_lifetime ? 'lifetime' : (pkg.active_until ? 'date' : 'days'),
       is_lifetime: pkg.is_lifetime,
       validity_days: pkg.validity_days || 30,
+      active_until_date: pkg.active_until ? dayjs(pkg.active_until) : null,
       max_exam_attempts: pkg.max_exam_attempts || 0,
       is_bundle: Boolean(pkg.is_bundle),
       bundled_package_ids: pkg.bundled_package_ids || [],
@@ -164,6 +169,7 @@ const AdminPackageForm: React.FC = () => {
     setSubmitting(true);
     try {
       const isBundle = Boolean(vals.is_bundle);
+      const validityMode: 'lifetime' | 'days' | 'date' = vals.validity_mode || 'lifetime';
       const payload = {
         title: vals.title,
         description: vals.description,
@@ -176,8 +182,9 @@ const AdminPackageForm: React.FC = () => {
         thumbnail: thumbnailUrl || '',
         discount_type: isBundle ? '' : (vals.discount_type ?? ''),
         discount_value: isBundle ? 0 : (vals.discount_value ?? 0),
-        is_lifetime: isBundle ? true : (vals.is_lifetime ?? true),
-        validity_days: isBundle ? 0 : (vals.validity_days ?? 0),
+        is_lifetime: isBundle ? true : validityMode === 'lifetime',
+        validity_days: isBundle ? 0 : (validityMode === 'days' ? (vals.validity_days ?? 30) : 0),
+        active_until: isBundle ? null : (validityMode === 'date' && vals.active_until_date ? dayjs(vals.active_until_date).endOf('day').toISOString() : null),
         max_exam_attempts: isBundle ? 0 : (vals.max_exam_attempts ?? 0),
         is_bundle: isBundle,
         bundled_package_ids: isBundle ? (vals.bundled_package_ids ?? []) : [],
@@ -240,6 +247,7 @@ const AdminPackageForm: React.FC = () => {
         discount_value: pkg.discount_value,
         is_lifetime: pkg.is_lifetime,
         validity_days: pkg.validity_days,
+        active_until: pkg.active_until || null,
         max_exam_attempts: pkg.max_exam_attempts,
         is_bundle: pkg.is_bundle,
         bundled_package_ids: pkg.bundled_package_ids,
@@ -479,6 +487,10 @@ const AdminPackageForm: React.FC = () => {
           <Space direction="vertical" size={2}>
             {r.is_lifetime ? (
               <Tag color="green" className="m-0 rounded-lg border-none font-bold text-[9px] px-2">Lifetime</Tag>
+            ) : r.active_until ? (
+              <Tag color="cyan" className="m-0 rounded-lg border-none font-bold text-[9px] px-2">
+                s/d {dayjs(r.active_until).format('DD MMM YYYY')}
+              </Tag>
             ) : (
               <Tag color="blue" className="m-0 rounded-lg border-none font-bold text-[9px] px-2">{r.validity_days} Hari</Tag>
             )}
@@ -942,27 +954,42 @@ const AdminPackageForm: React.FC = () => {
                         </Form.Item>
                       </Col>
                       <Col xs={24} sm={12}>
-                        <Form.Item name="is_lifetime" label={<span className="font-bold text-sm">Masa Aktif Paket</span>} initialValue={true}>
+                        <Form.Item name="validity_mode" label={<span className="font-bold text-sm">Masa Aktif Paket</span>} initialValue="lifetime">
                           <Select
                             className="rounded-xl w-full"
                             style={{ height: 44 }}
                             options={[
-                              { value: true, label: 'Lifetime (Selamanya)' },
-                              { value: false, label: 'Terbatas (Hari)' },
+                              { value: 'lifetime', label: 'Lifetime (Selamanya)' },
+                              { value: 'days', label: 'Terbatas (Jumlah Hari)' },
+                              { value: 'date', label: 'Sampai Tanggal Tertentu' },
                             ]}
                           />
                         </Form.Item>
                       </Col>
                       <Col xs={24} sm={12}>
-                        <Form.Item noStyle shouldUpdate={(prev, curr) => prev.is_lifetime !== curr.is_lifetime}>
+                        <Form.Item noStyle shouldUpdate={(prev, curr) => prev.validity_mode !== curr.validity_mode}>
                           {({ getFieldValue: getFieldVal }) => {
-                            const isLifetime = getFieldVal('is_lifetime');
-                            if (isLifetime) return null;
-                            return (
-                              <Form.Item name="validity_days" label={<span className="font-bold text-sm">Jumlah Hari Aktif</span>} rules={[{ required: true, message: 'Wajib diisi' }]}>
-                                <InputNumber min={1} placeholder="30" className="w-full rounded-xl" style={{ height: 44, display: 'flex', alignItems: 'center' }} />
-                              </Form.Item>
-                            );
+                            const mode = getFieldVal('validity_mode');
+                            if (mode === 'days') {
+                              return (
+                                <Form.Item name="validity_days" label={<span className="font-bold text-sm">Jumlah Hari Aktif</span>} rules={[{ required: true, message: 'Wajib diisi' }]}>
+                                  <InputNumber min={1} placeholder="30" className="w-full rounded-xl" style={{ height: 44, display: 'flex', alignItems: 'center' }} />
+                                </Form.Item>
+                              );
+                            }
+                            if (mode === 'date') {
+                              return (
+                                <Form.Item name="active_until_date" label={<span className="font-bold text-sm">Berlaku Sampai Tanggal</span>} rules={[{ required: true, message: 'Harap pilih tanggal berakhir' }]}>
+                                  <DatePicker
+                                    format="DD MMM YYYY"
+                                    placeholder="Pilih tanggal berakhir..."
+                                    className="w-full rounded-xl"
+                                    style={{ height: 44 }}
+                                  />
+                                </Form.Item>
+                              );
+                            }
+                            return null;
                           }}
                         </Form.Item>
                       </Col>

@@ -2,7 +2,6 @@ package controller
 
 import (
 	"net/http"
-	"time"
 	"server/app/model"
 	"server/connection"
 	. "server/app/helpers"
@@ -79,12 +78,7 @@ func UpdateTransactionStatus(c echo.Context) error {
 			if tx.IsLifetime {
 				tx.ActiveUntil = nil
 			} else {
-				durationDays := 30
-				if tx.Package.ValidityDays > 0 {
-					durationDays = tx.Package.ValidityDays
-				}
-				t := time.Now().AddDate(0, 0, durationDays)
-				tx.ActiveUntil = &t
+				tx.ActiveUntil = resolvePackageActiveUntil(tx.Package)
 			}
 		} else {
 			tx.ActiveUntil = nil

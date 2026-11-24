@@ -229,14 +229,7 @@ func Checkout(c echo.Context) error {
 
 		var activeUntil *time.Time
 		if status == "active" {
-			if !pkg.IsLifetime {
-				durationDays := 30
-				if pkg.ValidityDays > 0 {
-					durationDays = pkg.ValidityDays
-				}
-				t := time.Now().AddDate(0, 0, durationDays)
-				activeUntil = &t
-			}
+			activeUntil = resolvePackageActiveUntil(pkg)
 		}
 
 		t := model.Transaction{
@@ -269,14 +262,7 @@ func Checkout(c echo.Context) error {
 				for subIdx, sp := range subPkgs {
 					var subActiveUntil *time.Time
 					if status == "active" {
-						if !sp.IsLifetime {
-							durationDays := 30
-							if sp.ValidityDays > 0 {
-								durationDays = sp.ValidityDays
-							}
-							t := time.Now().AddDate(0, 0, durationDays)
-							subActiveUntil = &t
-						}
+						subActiveUntil = resolvePackageActiveUntil(sp)
 					}
 					subTx := model.Transaction{
 						InvoiceCode:     fmt.Sprintf("%s-b%d-%d", invoiceCode, sp.ID, subIdx+1),
