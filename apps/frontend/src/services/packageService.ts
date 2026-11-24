@@ -385,8 +385,79 @@ export const submitExam = async (slug: string, payload: ExamSubmitPayload): Prom
   return response.data.data;
 };
 
+export interface SubQuestionManifestItem {
+  id: string;
+  type: QuestionType;
+}
+
+export interface QuestionManifestItem {
+  id: string;
+  type: QuestionType;
+  sub_questions?: SubQuestionManifestItem[];
+}
+
+export const getPackageQuestionsManifest = async (slug: string): Promise<QuestionManifestItem[]> => {
+  const response = await api.get(`/packages/${slug}/questions/manifest`);
+  return (response.data.data || []).map((q: any) => ({
+    id: String(q.id),
+    type: q.type || 'single',
+    sub_questions: Array.isArray(q.sub_questions)
+      ? q.sub_questions.map((sub: any) => ({
+          id: String(sub.id),
+          type: sub.type || 'single',
+        }))
+      : undefined,
+  }));
+};
+
+export const getPackageQuestionDetail = async (slug: string, clientId: string): Promise<PackageQuestionPayload> => {
+  const response = await api.get(`/packages/${slug}/questions/${encodeURIComponent(clientId)}`);
+  return normalizeQuestion(response.data.data);
+};
+
 export const getExamSession = async (sessionId: string) => {
   const { data } = await api.get(`/exam-sessions/${sessionId}`);
+  return data.data;
+};
+
+export interface ReviewGroupSummary {
+  key: string;
+  question_id: number;
+  sub_question_id?: number | null;
+  type: string;
+  status: 'correct' | 'wrong' | 'partial' | 'empty';
+  linked_sub_index?: number;
+  linked_group_size?: number;
+}
+
+export interface ExamSessionSummaryResponse {
+  id: number;
+  score: number;
+  is_testing: boolean;
+  created_at: string;
+  package: any;
+  user: any;
+  stats: {
+    total: number;
+    benar: number;
+    salah: number;
+    kosong: number;
+  };
+  groups: ReviewGroupSummary[];
+}
+
+export const getExamSessionSummary = async (sessionId: string): Promise<ExamSessionSummaryResponse> => {
+  const { data } = await api.get(`/exam-sessions/${sessionId}/summary`);
+  return data.data;
+};
+
+export const getExamSessionQuestionDetail = async (
+  sessionId: string,
+  questionId: number,
+  subQuestionId?: number | null
+) => {
+  const params = subQuestionId ? `?sub_question_id=${subQuestionId}` : '';
+  const { data } = await api.get(`/exam-sessions/${sessionId}/questions/${questionId}${params}`);
   return data.data;
 };
 

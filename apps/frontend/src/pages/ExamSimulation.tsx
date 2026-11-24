@@ -13,7 +13,14 @@ import {
   ExclamationCircleOutlined,
   FileTextOutlined
 } from '@ant-design/icons';
-import { getPackageQuestions, submitExam, PackageQuestionPayload, getPackageExamMeta } from '../services/packageService';
+import {
+  getPackageQuestionsManifest,
+  getPackageQuestionDetail,
+  submitExam,
+  PackageQuestionPayload,
+  QuestionManifestItem,
+  getPackageExamMeta,
+} from '../services/packageService';
 import { useAuth } from '../context/AuthContext';
 import { renderQuillHtml as renderLatex } from '../utils/renderContent';
 
@@ -24,7 +31,10 @@ const ExamSimulation: React.FC = () => {
   const navigate = useNavigate();
   const { payload } = useAuth();
 
-  const [questions, setQuestions] = useState<PackageQuestionPayload[]>([]);
+  const [questionManifest, setQuestionManifest] = useState<QuestionManifestItem[]>([]);
+  const [loadedQuestionsMap, setLoadedQuestionsMap] = useState<Record<string, PackageQuestionPayload>>({});
+  const [questionLoading, setQuestionLoading] = useState(false);
+  const loadingQuestionIdsRef = React.useRef<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isMapVisible, setIsMapVisible] = useState(false);
@@ -101,13 +111,15 @@ const ExamSimulation: React.FC = () => {
   useEffect(() => {
     if (!slug) return;
     setLoading(true);
+    setLoadedQuestionsMap({});
+    loadingQuestionIdsRef.current.clear();
 
     Promise.all([
-      getPackageQuestions(slug),
+      getPackageQuestionsManifest(slug),
       getPackageExamMeta(slug)
     ])
-      .then(([questionsData, packageData]) => {
-        setQuestions(questionsData);
+      .then(([manifestData, packageData]) => {
+        setQuestionManifest(manifestData);
         // Only set duration from backend if there's no saved timer in localStorage
         const savedTime = localStorage.getItem(lsKey('time'));
         if (!savedTime && packageData && packageData.duration > 0) {
@@ -119,14 +131,14 @@ const ExamSimulation: React.FC = () => {
   }, [slug]);
 
   useEffect(() => {
-    if (loading || questions.length === 0) return;
+    if (loading || questionManifest.length === 0) return;
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = ''; // Required for Chrome to show native prompt
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [loading, questions.length]);
+  }, [loading, questionManifest.length]);
 
   // Persist answers to localStorage whenever they change
   useEffect(() => {
@@ -150,7 +162,7 @@ const ExamSimulation: React.FC = () => {
 
   // Countdown Timer Effect
   useEffect(() => {
-    if (loading || questions.length === 0) return;
+    if (loading || questionManifest.length === 0) return;
     const timer = setInterval(() => {
       setTimeRemaining((prev) => {
         if (prev <= 1) {
@@ -162,7 +174,7 @@ const ExamSimulation: React.FC = () => {
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [loading, questions]);
+  }, [loading, questionManifest.length]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -252,6 +264,8 @@ const ExamSimulation: React.FC = () => {
   // ── FLAT QUESTION LIST: expand 'linked' into individual numbered entries ──
   type FlatQuestion = {
     id: string;                  // sub-question id (for linked) or question id
+    parentClientId: string;      // parent PackageQuestion client_id for lazy-load + cache
+    isLoaded: boolean;
     type: string;
     question: string;
     options: string[];
@@ -272,43 +286,98 @@ const ExamSimulation: React.FC = () => {
 
   const flatQuestions: FlatQuestion[] = React.useMemo(() => {
     const result: FlatQuestion[] = [];
-    for (const q of questions) {
-      if (q.type === 'linked' && q.sub_questions && q.sub_questions.length > 0) {
+    for (const m of questionManifest) {
+      const fullQ = loadedQuestionsMap[m.id];
+      const isLoaded = Boolean(fullQ);
+
+      if (m.type === 'linked' && m.sub_questions && m.sub_questions.length > 0) {
         const groupStart = result.length;
-        q.sub_questions.forEach((sub: any, subIdx: number) => {
+        m.sub_questions.forEach((subM, subIdx) => {
+          const fullSub = fullQ?.sub_questions?.find((s) => String(s.id) === String(subM.id)) || fullQ?.sub_questions?.[subIdx];
           result.push({
-            id: String(sub.id),
-            type: sub.type || 'single',
-            question: sub.question || '',
-            options: (sub.options as string[]) || (sub.type === 'table' ? ['Benar', 'Salah'] : []),
-            title: (sub as any).title || '',
-            discussion: sub.discussion || '',
-            rows: (sub as any).rows || [],
-            scoring_method: (sub as any).scoring_method || 'all_or_nothing',
+            id: String(subM.id),
+            parentClientId: m.id,
+            isLoaded,
+            type: fullSub?.type || subM.type || 'single',
+            question: fullSub?.question || '',
+            options: (fullSub?.options as string[]) || ((fullSub?.type || subM.type) === 'table' ? ['Benar', 'Salah'] : []),
+            title: (fullSub as any)?.title || '',
+            discussion: fullSub?.discussion || '',
+            rows: (fullSub as any)?.rows || [],
+            scoring_method: (fullSub as any)?.scoring_method || 'all_or_nothing',
             isLinked: true,
-            linkedPassage: q.question,
-            linkedPassageTitle: q.title,
-            linkedParentId: String(q.id),
+            linkedPassage: fullQ?.question || '',
+            linkedPassageTitle: fullQ?.title || '',
+            linkedParentId: String(m.id),
             linkedSubIndex: subIdx,
-            linkedGroupSize: q.sub_questions!.length,
+            linkedGroupSize: m.sub_questions!.length,
             linkedGroupStart: groupStart,
           });
         });
       } else {
         result.push({
-          id: String(q.id),
-          type: q.type,
-          question: q.question,
-          options: q.options,
-          title: q.title,
-          discussion: q.discussion,
-          sub_questions: q.sub_questions,
+          id: String(m.id),
+          parentClientId: m.id,
+          isLoaded,
+          type: fullQ?.type || m.type,
+          question: fullQ?.question || '',
+          options: fullQ?.options || [],
+          title: fullQ?.title || '',
+          discussion: fullQ?.discussion || '',
+          sub_questions: fullQ?.sub_questions || m.sub_questions,
           isLinked: false,
         });
       }
     }
     return result;
-  }, [questions]);
+  }, [questionManifest, loadedQuestionsMap]);
+
+  useEffect(() => {
+    if (flatQuestions.length > 0 && currentQuestionIndex >= flatQuestions.length) {
+      setCurrentQuestionIndex(0);
+    }
+  }, [flatQuestions.length, currentQuestionIndex]);
+
+  // Lazy-load ONLY the active question when entered; skip DB call if already cached
+  const activeFlatQuestion = flatQuestions[currentQuestionIndex] || flatQuestions[0];
+  useEffect(() => {
+    if (!slug || !activeFlatQuestion) return;
+    const parentId = activeFlatQuestion.parentClientId;
+    if (loadedQuestionsMap[parentId]) {
+      setQuestionLoading(false);
+      return;
+    }
+    if (loadingQuestionIdsRef.current.has(parentId)) {
+      setQuestionLoading(true);
+      return;
+    }
+
+    let cancelled = false;
+    loadingQuestionIdsRef.current.add(parentId);
+    setQuestionLoading(true);
+
+    getPackageQuestionDetail(slug, parentId)
+      .then((detail) => {
+        if (!cancelled) {
+          setLoadedQuestionsMap((prev) => ({ ...prev, [parentId]: detail }));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          message.error('Gagal memuat detail soal');
+        }
+      })
+      .finally(() => {
+        loadingQuestionIdsRef.current.delete(parentId);
+        if (!cancelled) {
+          setQuestionLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, activeFlatQuestion?.parentClientId, loadedQuestionsMap]);
 
   if (loading) {
     return (
@@ -318,7 +387,7 @@ const ExamSimulation: React.FC = () => {
     );
   }
 
-  if (questions.length === 0) {
+  if (questionManifest.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface">
         <Card className="text-center rounded-2xl shadow-sm max-w-md w-full p-8 border-none bg-surface-low">
@@ -332,8 +401,6 @@ const ExamSimulation: React.FC = () => {
   }
 
   const currentData = flatQuestions[currentQuestionIndex] || flatQuestions[0];
-  // Also keep access to the original question for table/nested rendering (non-linked)
-  const currentOriginal = questions[currentQuestionIndex];
   const totalQuestionsCount = flatQuestions.length;
 
   return (
@@ -400,7 +467,12 @@ const ExamSimulation: React.FC = () => {
       {/* EXAM BODY */}
       <main className="flex-grow overflow-y-auto flex flex-col">
 
-        {currentData.isLinked ? (
+        {!currentData.isLoaded || questionLoading ? (
+          <div className="flex-grow flex flex-col items-center justify-center py-20 gap-3">
+            <Spin size="large" />
+            <Text className="text-xs font-bold text-on-surface/50">Memuat soal #{currentQuestionIndex + 1}...</Text>
+          </div>
+        ) : currentData.isLinked ? (
           /* ── LINKED (PASSAGE) ── split layout: passage left, single sub-question right */
           <div key={currentData.id + '_' + currentQuestionIndex} className="flex-grow flex flex-col lg:flex-row">
 
@@ -821,48 +893,51 @@ const ExamSimulation: React.FC = () => {
 
 
       {/* EXAM FOOTER — fixed bottom bar */}
-      <footer className="bg-white border-t border-surface-container p-4 shrink-0 relative z-30">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <Button
-            size="large"
-            type="text"
-            icon={<LeftOutlined />}
-            disabled={currentQuestionIndex === 0}
-            onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
-            className="font-bold text-on-surface/80"
-          >
-            Kembali
-          </Button>
+      <footer className="bg-white border-t border-surface-container px-3 py-3 sm:px-6 sm:py-4 pb-safe shrink-0 relative z-30">
+        <div className="max-w-7xl mx-auto grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-4">
+          <div className="justify-self-start">
+            <Button
+              size="large"
+              type="text"
+              icon={<LeftOutlined />}
+              disabled={currentQuestionIndex === 0}
+              onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))}
+              className="rounded-xl font-bold text-on-surface/80 bg-surface-low/70 hover:bg-surface-low h-11 sm:h-12 px-3 sm:px-5 text-xs sm:text-sm flex items-center justify-center"
+            >
+              Kembali
+            </Button>
+          </div>
 
-          {/* Center: Ragu-ragu + mobile Peta Soal */}
-          <div className="flex items-center gap-3">
+          {/* Center: Ragu-ragu */}
+          <div className="justify-self-center">
             <div
               onClick={() => toggleDoubtful(currentData.id)}
-              className={`flex items-center gap-2.5 cursor-pointer rounded-xl border-2 px-4 py-2 transition-all select-none ${doubtfulQuestions[currentData.id]
+              className={`flex items-center justify-center gap-2 cursor-pointer rounded-xl border-2 h-11 sm:h-12 px-3 sm:px-4 transition-all select-none ${doubtfulQuestions[currentData.id]
                   ? 'border-yellow-400 bg-yellow-50 text-yellow-700'
                   : 'border-surface-container bg-surface-low/40 text-on-surface/60 hover:border-yellow-300 hover:bg-yellow-50/50'
                 }`}
             >
-              <span className={`text-lg transition-transform ${doubtfulQuestions[currentData.id] ? 'scale-110' : ''
+              <span className={`text-base sm:text-lg transition-transform ${doubtfulQuestions[currentData.id] ? 'scale-110' : ''
                 }`}>🚩</span>
-              <span className="font-bold text-sm hidden sm:inline">
+              <span className="font-bold text-sm hidden sm:inline whitespace-nowrap">
                 {doubtfulQuestions[currentData.id] ? 'Ditandai Ragu-ragu' : 'Tandai Ragu-ragu'}
               </span>
             </div>
-
           </div>
 
-          <Button
-            size="large"
-            type="primary"
-            icon={<RightOutlined />}
-            iconPosition="end"
-            onClick={() => setCurrentQuestionIndex(prev => prev < totalQuestionsCount - 1 ? prev + 1 : prev)}
-            disabled={currentQuestionIndex === totalQuestionsCount - 1}
-            className="rounded-xl font-bold shadow-xl shadow-primary/20 h-12 px-6"
-          >
-            Selanjutnya
-          </Button>
+          <div className="justify-self-end">
+            <Button
+              size="large"
+              type="primary"
+              icon={<RightOutlined />}
+              iconPosition="end"
+              onClick={() => setCurrentQuestionIndex(prev => prev < totalQuestionsCount - 1 ? prev + 1 : prev)}
+              disabled={currentQuestionIndex === totalQuestionsCount - 1}
+              className="rounded-xl font-bold shadow-lg shadow-primary/20 h-11 sm:h-12 px-3 sm:px-6 text-xs sm:text-sm flex items-center justify-center"
+            >
+              Selanjutnya
+            </Button>
+          </div>
         </div>
       </footer>
 
@@ -884,12 +959,16 @@ const ExamSimulation: React.FC = () => {
           {flatQuestions.map((q, i) => {
             const num = i + 1;
 
-            // Check if answered
+            // Check if answered (works even before question detail is loaded)
             let isAnswered = false;
-            if (!q.isLinked && (q.type === 'nested' || q.type === 'table') && q.sub_questions) {
-              isAnswered = q.sub_questions.some((sq: any, sqIdx: number) => (answers[`${q.id}_${sq.id || sqIdx}`] || []).length > 0);
-            } else if (q.isLinked && q.type === 'table' && q.rows && q.rows.length > 0) {
-              isAnswered = q.rows.some((r: any, rIdx: number) => (answers[`${q.id}_${r.id || rIdx}`] || []).length > 0);
+            if (!q.isLinked && (q.type === 'nested' || q.type === 'table')) {
+              const hasSubAns = q.sub_questions?.some((sq: any, sqIdx: number) => (answers[`${q.id}_${sq.id || sqIdx}`] || []).length > 0);
+              const hasPrefixedAns = Object.keys(answers).some((k) => k.startsWith(`${q.id}_`) && (answers[k] || []).length > 0);
+              isAnswered = Boolean(hasSubAns || hasPrefixedAns);
+            } else if (q.isLinked && q.type === 'table') {
+              const hasRowAns = q.rows?.some((r: any, rIdx: number) => (answers[`${q.id}_${r.id || rIdx}`] || []).length > 0);
+              const hasPrefixedAns = Object.keys(answers).some((k) => k.startsWith(`${q.id}_`) && (answers[k] || []).length > 0);
+              isAnswered = Boolean(hasRowAns || hasPrefixedAns);
             } else {
               isAnswered = (answers[q.id] || []).length > 0;
             }

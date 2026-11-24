@@ -17,6 +17,8 @@ func RoutePackage(api *echo.Group) {
 	packages.GET("/:slug/description", controller.GetPackageDescription)
 	packages.GET("/:slug", controller.GetPackageBySlug)
 	packages.GET("/:slug/questions", controller.GetPackageQuestions)
+	packages.GET("/:slug/questions/manifest", controller.GetPackageQuestionsManifest)
+	packages.GET("/:slug/questions/:clientId", controller.GetPackageQuestionByClientID)
 	packages.POST("/:slug/questions", controller.SavePackageQuestion)
 	packages.PUT("/:slug/questions", controller.SavePackageQuestions)
 	packages.PUT("/:slug/questions/reorder", controller.ReorderPackageQuestions)

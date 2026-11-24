@@ -665,6 +665,88 @@ func GetPackageQuestions(c echo.Context) error {
 	return c.JSON(http.StatusOK, helpers.Response{Status: true, Message: "Success", Data: response})
 }
 
+type subQuestionManifestItem struct {
+	ID   string `json:"id"`
+	Type string `json:"type"`
+}
+
+type questionManifestItem struct {
+	ID           string                    `json:"id"`
+	Type         string                    `json:"type"`
+	SubQuestions []subQuestionManifestItem `json:"sub_questions,omitempty"`
+}
+
+// GetPackageQuestionsManifest returns only lightweight IDs and types so /exam can build
+// the question map immediately and lazy-load full question content on demand.
+func GetPackageQuestionsManifest(c echo.Context) error {
+	pkg, err := findPackageBySlug(c)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, helpers.Response{Status: false, Message: "Paket tidak ditemukan"})
+	}
+
+	var questions []model.PackageQuestion
+	if err := connection.DB.
+		Select("id", "client_id", "type", "sort_order").
+		Where("package_id = ?", pkg.ID).
+		Preload("SubQuestions", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id", "question_id", "client_id", "type", "sort_order").Order("sort_order asc, id asc")
+		}).
+		Order("sort_order asc, id asc").
+		Find(&questions).Error; err != nil {
+		return c.JSON(http.StatusInternalServerError, helpers.Response{Status: false, Message: "Gagal mengambil daftar soal"})
+	}
+
+	manifest := make([]questionManifestItem, 0, len(questions))
+	for _, q := range questions {
+		item := questionManifestItem{
+			ID:   q.ClientID,
+			Type: q.Type,
+		}
+		if len(q.SubQuestions) > 0 {
+			subs := make([]subQuestionManifestItem, 0, len(q.SubQuestions))
+			for _, sub := range q.SubQuestions {
+				subType := sub.Type
+				if subType == "" {
+					subType = QuestionTypeSingle
+				}
+				subs = append(subs, subQuestionManifestItem{
+					ID:   sub.ClientID,
+					Type: subType,
+				})
+			}
+			item.SubQuestions = subs
+		}
+		manifest = append(manifest, item)
+	}
+
+	return c.JSON(http.StatusOK, helpers.Response{Status: true, Message: "Success", Data: manifest})
+}
+
+// GetPackageQuestionByClientID returns full content for a single question (and its sub-questions).
+func GetPackageQuestionByClientID(c echo.Context) error {
+	pkg, err := findPackageBySlug(c)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, helpers.Response{Status: false, Message: "Paket tidak ditemukan"})
+	}
+
+	clientID := c.Param("clientId")
+	if clientID == "" {
+		return c.JSON(http.StatusBadRequest, helpers.Response{Status: false, Message: "ID soal tidak valid"})
+	}
+
+	var question model.PackageQuestion
+	if err := connection.DB.
+		Where("package_id = ? AND client_id = ?", pkg.ID, clientID).
+		Preload("SubQuestions", func(db *gorm.DB) *gorm.DB {
+			return db.Order("sort_order asc, id asc")
+		}).
+		First(&question).Error; err != nil {
+		return c.JSON(http.StatusNotFound, helpers.Response{Status: false, Message: "Soal tidak ditemukan"})
+	}
+
+	return c.JSON(http.StatusOK, helpers.Response{Status: true, Message: "Success", Data: mapQuestionResponse(question)})
+}
+
 func SavePackageQuestion(c echo.Context) error {
 	pkg, err := findPackageBySlug(c)
 	if err != nil {

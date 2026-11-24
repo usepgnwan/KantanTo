@@ -1,18 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import AppLayout from '../layouts/AppLayout';
-import { Row, Col, Card, Typography, Tag, Button, Progress, Space, Divider, Spin, message } from 'antd';
+import { Row, Col, Card, Typography, Tag, Button, Progress, Space, Divider, Spin, Modal, message } from 'antd';
 import {
   CheckCircleFilled,
   CloseCircleFilled,
   ArrowLeftOutlined,
-  BulbOutlined,
+  ExpandOutlined,
   WarningOutlined,
   RightOutlined,
   LeftOutlined,
   LogoutOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
-import { getExamSession } from '../services/packageService';
+import {
+  getExamSessionSummary,
+  getExamSessionQuestionDetail,
+  ReviewGroupSummary,
+} from '../services/packageService';
 import { useAuth } from '../context/AuthContext';
 import { renderQuillHtml as renderLatex } from '../utils/renderContent';
 
@@ -72,106 +76,126 @@ const Review: React.FC = () => {
   const navigate = useNavigate();
   const { payload, isAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [detailLoading, setDetailLoading] = useState(false);
   const [session, setSession] = useState<any>(null);
-  const [answers, setAnswers] = useState<AnswerDetail[]>([]);
-  const [groupedQuestions, setGroupedQuestions] = useState<GroupedQuestion[]>([]);
+  const [stats, setStats] = useState({ total: 0, benar: 0, salah: 0, kosong: 0 });
+  const [groupSummaries, setGroupSummaries] = useState<ReviewGroupSummary[]>([]);
+  const [loadedGroupsCache, setLoadedGroupsCache] = useState<Record<string, GroupedQuestion>>({});
+  const loadingGroupKeysRef = React.useRef<Set<string>>(new Set());
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
+  const [zoomDiscussion, setZoomDiscussion] = useState<{ title: string; html: string } | null>(null);
 
+  // 1. Initial load: fetch ONLY lightweight session summary + stats + question map
   useEffect(() => {
     if (!id) return;
     setLoading(true);
-    getExamSession(id)
+    setLoadedGroupsCache({});
+    loadingGroupKeysRef.current.clear();
+    setSelectedIndex(0);
+
+    getExamSessionSummary(id)
       .then((data) => {
         if (!isAdmin() && payload?.user_id !== data.user?.id) {
           message.error('Anda tidak memiliki akses ke riwayat ujian ini');
           navigate('/riwayat');
           return;
         }
-
         setSession(data);
-        const raw: AnswerDetail[] = (data.answers || []).map((a: any, idx: number) => ({
+        setStats(data.stats || { total: 0, benar: 0, salah: 0, kosong: 0 });
+        setGroupSummaries(data.groups || []);
+      })
+      .catch(() => message.error('Gagal memuat detail hasil ujian'))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  // 2. Lazy-load ONLY the active question detail when entered; skip DB call if already cached
+  const activeSummary = groupSummaries[selectedIndex];
+  useEffect(() => {
+    if (!id || !activeSummary) return;
+    const cacheKey = activeSummary.key;
+    if (loadedGroupsCache[cacheKey]) {
+      setDetailLoading(false);
+      return;
+    }
+    if (loadingGroupKeysRef.current.has(cacheKey)) {
+      setDetailLoading(true);
+      return;
+    }
+
+    let cancelled = false;
+    loadingGroupKeysRef.current.add(cacheKey);
+    setDetailLoading(true);
+
+    getExamSessionQuestionDetail(id, activeSummary.question_id, activeSummary.sub_question_id)
+      .then((res) => {
+        if (cancelled) return;
+        const raw: AnswerDetail[] = (res?.answers || []).map((a: any) => ({
           ...a,
           selected_options: a.selected_options || [],
           options: a.options || [],
           correct_answers: a.correct_answers || [],
         }));
-        setAnswers(raw);
+        if (raw.length === 0) return;
 
-        // Group questions: table/nested stay grouped together,
-        // while linked (passage) questions appear separated per question number
-        const groups: GroupedQuestion[] = [];
-        const tableNestedMap = new Map<number, GroupedQuestion>();
+        const first = raw[0];
+        let grouped: GroupedQuestion;
+        if (activeSummary.type === 'linked') {
+          grouped = {
+            question_id: first.question_id,
+            sub_question_id: first.sub_question_id,
+            type: 'linked',
+            sub_type: first.question_type || 'single',
+            title: first.question_title || first.parent_title || 'Soal Berhubungan',
+            question_text: first.question_text,
+            parent_question: first.parent_question || '',
+            parent_title: first.parent_title || 'Teks Bacaan',
+            linkedSubIndex: activeSummary.linked_sub_index ?? 0,
+            linkedGroupSize: activeSummary.linked_group_size ?? 1,
+            options: first.options,
+            rows: first.rows,
+            row_answers: first.row_answers,
+            scoring_method: first.scoring_method,
+            answers: [first],
+          };
+        } else if (activeSummary.type === 'table' || activeSummary.type === 'nested' || first.sub_question_id !== null) {
+          const parentType = first.parent_type || activeSummary.type || 'nested';
+          grouped = {
+            question_id: first.question_id,
+            type: parentType,
+            title: first.parent_title || (parentType === 'table' ? 'Pernyataan' : 'Skenario'),
+            question_text: first.parent_question || '',
+            options: first.parent_options && first.parent_options.length > 0 ? first.parent_options : first.options || ['Benar', 'Salah'],
+            answers: raw,
+          };
+        } else {
+          grouped = {
+            question_id: first.question_id,
+            type: first.question_type || 'single',
+            title: first.question_title || '',
+            question_text: first.question_text,
+            options: first.options,
+            answers: [first],
+          };
+        }
 
-        // Count how many sub-questions each linked parent question has
-        const linkedCounts = new Map<number, number>();
-        raw.forEach(a => {
-          const parentType = a.parent_type || (a.question_type === 'table' ? 'table' : (a.question_type === 'linked' ? 'linked' : 'nested'));
-          if (parentType === 'linked') {
-            linkedCounts.set(a.question_id, (linkedCounts.get(a.question_id) || 0) + 1);
-          }
-        });
-
-        const linkedIndices = new Map<number, number>();
-
-        raw.forEach(a => {
-          const isSub = a.sub_question_id !== null && a.sub_question_id !== undefined;
-          const parentType = a.parent_type || (a.question_type === 'table' ? 'table' : (a.question_type === 'linked' ? 'linked' : 'nested'));
-
-          if (parentType === 'linked') {
-            // ── SOAL BERHUBUNGAN (PASSAGE): TERPISAH 1 PER 1 ──
-            const curSubIdx = linkedIndices.get(a.question_id) || 0;
-            linkedIndices.set(a.question_id, curSubIdx + 1);
-            const groupSize = linkedCounts.get(a.question_id) || 1;
-
-            groups.push({
-              question_id: a.question_id,
-              sub_question_id: a.sub_question_id,
-              type: 'linked',
-              sub_type: a.question_type || 'single',
-              title: a.question_title || a.parent_title || 'Soal Berhubungan',
-              question_text: a.question_text,
-              parent_question: a.parent_question || '',
-              parent_title: a.parent_title || 'Teks Bacaan',
-              linkedSubIndex: curSubIdx,
-              linkedGroupSize: groupSize,
-              options: a.options,
-              rows: a.rows,
-              row_answers: a.row_answers,
-              scoring_method: a.scoring_method,
-              answers: [a]
-            });
-          } else if (isSub) {
-            // ── TABLE / NESTED: Dikelompokkan bersama ──
-            if (!tableNestedMap.has(a.question_id)) {
-              const g: GroupedQuestion = {
-                question_id: a.question_id,
-                type: parentType,
-                title: a.parent_title || (parentType === 'table' ? 'Pernyataan' : 'Skenario'),
-                question_text: a.parent_question || '',
-                options: a.parent_options && a.parent_options.length > 0 ? a.parent_options : a.options || ['Benar', 'Salah'],
-                answers: []
-              };
-              tableNestedMap.set(a.question_id, g);
-              groups.push(g);
-            }
-            tableNestedMap.get(a.question_id)!.answers.push(a);
-          } else {
-            // ── SINGLE / MULTIPLE BIASA ──
-            groups.push({
-              question_id: a.question_id,
-              type: a.question_type || 'single',
-              title: a.question_title || '',
-              question_text: a.question_text,
-              options: a.options,
-              answers: [a]
-            });
-          }
-        });
-        setGroupedQuestions(groups);
+        setLoadedGroupsCache((prev) => ({ ...prev, [cacheKey]: grouped }));
       })
-      .catch(() => message.error('Gagal memuat detail hasil ujian'))
-      .finally(() => setLoading(false));
-  }, [id]);
+      .catch(() => {
+        if (!cancelled) {
+          message.error('Gagal memuat detail soal');
+        }
+      })
+      .finally(() => {
+        loadingGroupKeysRef.current.delete(cacheKey);
+        if (!cancelled) {
+          setDetailLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, activeSummary, loadedGroupsCache]);
 
   if (loading) {
     return (
@@ -183,7 +207,7 @@ const Review: React.FC = () => {
     );
   }
 
-  if (!session || answers.length === 0 || groupedQuestions.length === 0) {
+  if (!session || groupSummaries.length === 0) {
     return (
       <AppLayout hideBottomNav={true}>
         <div className="min-h-screen flex items-center justify-center bg-surface">
@@ -198,28 +222,74 @@ const Review: React.FC = () => {
     );
   }
 
-  const total = answers.length;
-  const benar = answers.filter(a => a.is_correct).length;
-  const kosong = answers.filter(a => a.selected_options.length === 0).length;
-  const salah = total - benar - kosong;
+  const total = stats.total;
+  const benar = stats.benar;
+  const salah = stats.salah;
   const score = session.score || 0;
-  
-  const currentGroup = groupedQuestions[selectedIndex];
 
-  const getGroupStatusColor = (group: GroupedQuestion) => {
-    if (group.answers.length === 0) return 'bg-gray-200 text-gray-500';
-    const allEmpty = group.answers.every(a => a.selected_options.length === 0);
-    if (allEmpty) return 'bg-gray-200 text-gray-500';
-    const allCorrect = group.answers.every(a => a.is_correct);
-    if (allCorrect) return 'bg-green-500 text-white';
-    const anyCorrect = group.answers.some(a => a.is_correct);
-    if (anyCorrect) return 'bg-yellow-400 text-white'; // Mixed: some correct, some wrong
-    return 'bg-red-500 text-white';
+  const currentSummary = groupSummaries[selectedIndex];
+  const currentGroup = currentSummary ? loadedGroupsCache[currentSummary.key] : undefined;
+
+  const getSummaryStatusColor = (status: ReviewGroupSummary['status']) => {
+    if (status === 'correct') return 'bg-green-500 text-white';
+    if (status === 'partial') return 'bg-yellow-400 text-white';
+    if (status === 'wrong') return 'bg-red-500 text-white';
+    return 'bg-gray-200 text-gray-500';
   };
 
   return (
     <AppLayout hideBottomNav={true}>
-      <div className="bg-surface-low/30 min-h-screen pt-24 pb-8 lg:pt-32 lg:pb-12 transition-colors duration-500">
+      <style>{`
+        .review-discussion-content {
+          text-align: left !important;
+          line-height: 1.75;
+          overflow-x: auto;
+          max-width: 100%;
+          word-break: normal;
+          overflow-wrap: break-word;
+        }
+        .review-discussion-content p,
+        .review-discussion-content div,
+        .review-discussion-content li {
+          text-align: left !important;
+        }
+        .review-discussion-content p {
+          margin: 0 0 0.65rem 0;
+        }
+        .review-discussion-content p:last-child {
+          margin-bottom: 0;
+        }
+        .review-discussion-content table {
+          width: max-content;
+          min-width: 100%;
+          border-collapse: collapse;
+          margin: 12px 0;
+          font-size: 0.875rem;
+          background: #ffffff;
+        }
+        .review-discussion-content th,
+        .review-discussion-content td {
+          border: 1px solid rgba(59, 130, 246, 0.25);
+          padding: 8px 12px;
+          text-align: left !important;
+          white-space: nowrap;
+        }
+        .review-discussion-content th {
+          background: rgba(59, 130, 246, 0.08);
+          font-weight: 700;
+        }
+        .review-discussion-content img {
+          max-width: 100%;
+          height: auto;
+          border-radius: 12px;
+        }
+        .review-discussion-content .katex-display {
+          overflow-x: auto;
+          overflow-y: hidden;
+          padding: 4px 0;
+        }
+      `}</style>
+      <div className="bg-surface-low/30 min-h-screen pt-24 pb-28 sm:pb-12 lg:pt-32 lg:pb-12 transition-colors duration-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
           {/* Header */}
@@ -299,20 +369,23 @@ const Review: React.FC = () => {
                     <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 bg-emerald-600 rounded-full" /> Berhubungan</span>
                   </div>
                   <div className="grid grid-cols-5 sm:grid-cols-8 lg:grid-cols-5 gap-2">
-                    {groupedQuestions.map((group, idx) => {
+                    {groupSummaries.map((group, idx) => {
                       const isCurrent = selectedIndex === idx;
-                      const allEmpty = group.answers.every(a => a.selected_options.length === 0);
-                      const allCorrect = !allEmpty && group.answers.every(a => a.is_correct);
-                      const anyCorrect = !allEmpty && !allCorrect && group.answers.some(a => a.is_correct);
-                      const tooltip = allEmpty ? 'Tidak dijawab' : allCorrect ? 'Benar' : anyCorrect ? 'Sebagian benar' : 'Salah';
+                      const tooltip = group.status === 'empty'
+                        ? 'Tidak dijawab'
+                        : group.status === 'correct'
+                          ? 'Benar'
+                          : group.status === 'partial'
+                            ? 'Sebagian benar'
+                            : 'Salah';
                       return (
                         <button
-                          key={`${group.question_id}_${group.sub_question_id || idx}`}
+                          key={group.key}
                           onClick={() => setSelectedIndex(idx)}
                           title={`Soal ${idx + 1}: ${tooltip}${group.type === 'linked' ? ' (Soal Berhubungan)' : ''}`}
                           className={`
                             w-full aspect-square rounded-xl flex items-center justify-center font-bold text-sm transition-all relative
-                            ${getGroupStatusColor(group)}
+                            ${getSummaryStatusColor(group.status)}
                             ${isCurrent ? 'ring-4 ring-primary/40 scale-110 shadow-lg' : 'hover:opacity-80 hover:scale-105'}
                           `}
                         >
@@ -334,7 +407,7 @@ const Review: React.FC = () => {
 
             {/* Right: Question Detail */}
             <Col xs={24} lg={16}>
-              <Card className="weightless-card border-none h-full p-4 lg:p-8">
+              <Card className="weightless-card border-none h-full p-2 sm:p-5 lg:p-8">
                 <div className="animate-fade-in flex flex-col h-full">
                   
                   {/* General Header for the Question */}
@@ -343,24 +416,29 @@ const Review: React.FC = () => {
                       <Tag className="rounded-full px-4 py-1 text-sm font-black border-none bg-surface-low text-on-surface">
                         Soal #{selectedIndex + 1}
                       </Tag>
-                      {currentGroup.type === 'nested' && (
+                      {(currentGroup?.type || currentSummary?.type) === 'nested' && (
                         <Tag color="blue" className="rounded-full border-none font-bold px-3">Skenario</Tag>
                       )}
-                      {currentGroup.type === 'table' && (
+                      {(currentGroup?.type || currentSummary?.type) === 'table' && (
                         <Tag color="blue" className="rounded-full border-none font-bold px-3">Tabel / Pernyataan</Tag>
                       )}
-                      {currentGroup.type === 'linked' && (
+                      {(currentGroup?.type || currentSummary?.type) === 'linked' && (
                         <Tag color="green" className="rounded-full border-none font-bold px-3">
-                          📖 Soal Berhubungan (Bagian {(currentGroup.linkedSubIndex ?? 0) + 1}/{currentGroup.linkedGroupSize})
+                          📖 Soal Berhubungan (Bagian {((currentGroup?.linkedSubIndex ?? currentSummary?.linked_sub_index) ?? 0) + 1}/{currentGroup?.linkedGroupSize ?? currentSummary?.linked_group_size ?? 1})
                         </Tag>
                       )}
-                      {currentGroup.type === 'multiple' && (
+                      {(currentGroup?.type || currentSummary?.type) === 'multiple' && (
                         <Tag color="blue" className="rounded-full border-none font-bold px-3">Pilih lebih dari satu</Tag>
                       )}
                     </Space>
                   </div>
 
-                  {currentGroup.type === 'linked' ? (
+                  {!currentGroup || detailLoading ? (
+                    <div className="py-24 flex flex-col items-center justify-center gap-3">
+                      <Spin size="large" />
+                      <Text className="text-xs font-bold text-on-surface/50">Memuat detail soal #{selectedIndex + 1}...</Text>
+                    </div>
+                  ) : currentGroup.type === 'linked' ? (
                     /* ── SOAL BERHUBUNGAN (PASSAGE): SINGLE COLUMN REVIEW ── */
                     <div className="flex flex-col gap-8 mb-8">
                       {/* Top: Passage */}
@@ -510,29 +588,42 @@ const Review: React.FC = () => {
 
                                 {/* Row discussions */}
                                 {current.rows.some(r => r.discussion && r.discussion.trim() !== '') && (
-                                  <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-5 space-y-4">
-                                    <div className="flex gap-2.5 items-center mb-1">
-                                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-500 text-sm shrink-0">
-                                        <BulbOutlined />
-                                      </div>
+                                  <div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-4 sm:p-5 space-y-4">
+                                    <div className="flex items-center justify-between gap-3 pb-3 border-b border-blue-200/60">
                                       <Title level={5} className="!m-0 !font-manrope !font-black !text-sm !text-blue-900">Pembahasan Baris</Title>
+                                      <Button
+                                        size="small"
+                                        icon={<ExpandOutlined />}
+                                        onClick={() => {
+                                          const combinedHtml = (current.rows || [])
+                                            .map((row, rIdx) => {
+                                              if (!row.discussion || row.discussion.trim() === '') return '';
+                                              return `<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #dbeafe;"><div style="font-weight:700;color:#1d4ed8;margin-bottom:4px;">Baris ${rIdx + 1}</div><div style="font-size:13px;color:#475569;margin-bottom:6px;">${renderLatex(row.question)}</div><div>${renderLatex(row.discussion)}</div></div>`;
+                                            })
+                                            .filter(Boolean)
+                                            .join('');
+                                          setZoomDiscussion({
+                                            title: `Pembahasan Baris Soal #${selectedIndex + 1}`,
+                                            html: combinedHtml,
+                                          });
+                                        }}
+                                        className="rounded-xl font-bold text-xs border-blue-200 text-blue-700 hover:!text-blue-800 hover:!border-blue-400 bg-white shrink-0"
+                                      >
+                                        Zoom
+                                      </Button>
                                     </div>
                                     {current.rows.map((row, rIdx) => {
                                       if (!row.discussion || row.discussion.trim() === '') return null;
                                       return (
-                                        <div key={`disc-${rIdx}`} className="border-t border-blue-100 pt-3 first:border-0 first:pt-0">
-                                          <div className="flex items-start gap-2.5">
-                                            <Tag className="rounded-lg bg-blue-500 text-white border-none font-bold text-[11px] shrink-0 mt-0.5">
-                                              Baris {rIdx + 1}
-                                            </Tag>
-                                            <div className="flex-1 space-y-1">
-                                              <div className="text-xs font-bold text-blue-900/50 leading-snug" dangerouslySetInnerHTML={{ __html: renderLatex(row.question) }} />
-                                              <div
-                                                className="text-xs text-blue-950/90 font-normal font-sans leading-relaxed"
-                                                dangerouslySetInnerHTML={{ __html: renderLatex(row.discussion) }}
-                                              />
-                                            </div>
-                                          </div>
+                                        <div key={`disc-${rIdx}`} className="border-t border-blue-100 pt-3 first:border-0 first:pt-0 space-y-2">
+                                          <Tag className="rounded-lg bg-blue-500 text-white border-none font-bold text-[11px] m-0">
+                                            Baris {rIdx + 1}
+                                          </Tag>
+                                          <div className="text-xs font-bold text-blue-900/60 leading-snug" dangerouslySetInnerHTML={{ __html: renderLatex(row.question) }} />
+                                          <div
+                                            className="review-discussion-content text-sm text-blue-950/90 font-normal font-sans"
+                                            dangerouslySetInnerHTML={{ __html: renderLatex(row.discussion) }}
+                                          />
                                         </div>
                                       );
                                     })}
@@ -633,22 +724,29 @@ const Review: React.FC = () => {
 
                             {/* Discussion */}
                             {current.discussion && (
-                              <div className="bg-blue-50/50 border border-blue-100 rounded-3xl p-6 lg:p-8 mt-6">
-                                <div className="flex gap-4">
-                                  <div className="shrink-0">
-                                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-500 text-xl">
-                                      <BulbOutlined />
-                                    </div>
-                                  </div>
-                                  <div className="w-full">
-                                    <Title level={5} className="!text-blue-900 !font-black !font-manrope !mb-3 mt-1">
-                                      Pembahasan
-                                    </Title>
-                                    <Paragraph className="text-blue-900/80 leading-loose text-base font-medium mb-0">
-                                      <span dangerouslySetInnerHTML={{ __html: renderLatex(current.discussion) }} />
-                                    </Paragraph>
-                                  </div>
+                              <div className="bg-blue-50/60 border border-blue-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 mt-6">
+                                <div className="flex items-center justify-between gap-3 mb-3 pb-3 border-b border-blue-200/60">
+                                  <Title level={5} className="!m-0 !text-blue-900 !font-black !font-manrope">
+                                    Pembahasan
+                                  </Title>
+                                  <Button
+                                    size="small"
+                                    icon={<ExpandOutlined />}
+                                    onClick={() =>
+                                      setZoomDiscussion({
+                                        title: `Pembahasan Soal #${selectedIndex + 1}`,
+                                        html: renderLatex(current.discussion),
+                                      })
+                                    }
+                                    className="rounded-xl font-bold text-xs border-blue-200 text-blue-700 hover:!text-blue-800 hover:!border-blue-400 bg-white shrink-0"
+                                  >
+                                    Zoom
+                                  </Button>
                                 </div>
+                                <div
+                                  className="review-discussion-content text-blue-950/90 text-sm sm:text-base font-normal font-sans"
+                                  dangerouslySetInnerHTML={{ __html: renderLatex(current.discussion) }}
+                                />
                               </div>
                             )}
                           </div>
@@ -784,29 +882,42 @@ const Review: React.FC = () => {
 
                       {/* Pembahasan – satu per baris */}
                       {currentGroup.answers.some(a => a.discussion && a.discussion.trim() !== '') && (
-                        <div className="bg-blue-50/50 border border-blue-100 rounded-3xl p-6 lg:p-8 space-y-5">
-                          <div className="flex gap-3 items-center mb-2">
-                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-500 text-lg shrink-0">
-                              <BulbOutlined />
-                            </div>
+                        <div className="bg-blue-50/60 border border-blue-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 space-y-4">
+                          <div className="flex items-center justify-between gap-3 pb-3 border-b border-blue-200/60">
                             <Title level={5} className="!m-0 !font-manrope !font-black !text-blue-900">Pembahasan</Title>
+                            <Button
+                              size="small"
+                              icon={<ExpandOutlined />}
+                              onClick={() => {
+                                const combinedHtml = currentGroup.answers
+                                  .map((ans, aIdx) => {
+                                    if (!ans.discussion || ans.discussion.trim() === '') return '';
+                                    return `<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #dbeafe;"><div style="font-weight:700;color:#1d4ed8;margin-bottom:4px;">Baris ${aIdx + 1}</div><div style="font-size:13px;color:#475569;margin-bottom:6px;">${renderLatex(ans.question_text)}</div><div>${renderLatex(ans.discussion)}</div></div>`;
+                                  })
+                                  .filter(Boolean)
+                                  .join('');
+                                setZoomDiscussion({
+                                  title: `Pembahasan Soal #${selectedIndex + 1}`,
+                                  html: combinedHtml,
+                                });
+                              }}
+                              className="rounded-xl font-bold text-xs border-blue-200 text-blue-700 hover:!text-blue-800 hover:!border-blue-400 bg-white shrink-0"
+                            >
+                              Zoom
+                            </Button>
                           </div>
                           {currentGroup.answers.map((ans, aIdx) => {
                             if (!ans.discussion || ans.discussion.trim() === '') return null;
                             return (
-                              <div key={`disc-${aIdx}`} className="border-t border-blue-100 pt-4 first:border-0 first:pt-0">
-                                <div className="flex items-start gap-3">
-                                  <Tag className="rounded-lg bg-blue-500 text-white border-none font-bold text-xs shrink-0 mt-0.5">
-                                    Baris {aIdx + 1}
-                                  </Tag>
-                                  <div className="flex-1 space-y-1">
-                                    <div className="text-xs font-bold text-blue-900/50 leading-snug" dangerouslySetInnerHTML={{ __html: renderLatex(ans.question_text) }} />
-                                    <div
-                                      className="text-sm text-blue-950/90 font-normal font-sans leading-relaxed"
-                                      dangerouslySetInnerHTML={{ __html: renderLatex(ans.discussion) }}
-                                    />
-                                  </div>
-                                </div>
+                              <div key={`disc-${aIdx}`} className="border-t border-blue-100 pt-4 first:border-0 first:pt-0 space-y-2">
+                                <Tag className="rounded-lg bg-blue-500 text-white border-none font-bold text-xs m-0">
+                                  Baris {aIdx + 1}
+                                </Tag>
+                                <div className="text-xs font-bold text-blue-900/60 leading-snug" dangerouslySetInnerHTML={{ __html: renderLatex(ans.question_text) }} />
+                                <div
+                                  className="review-discussion-content text-sm sm:text-base text-blue-950/90 font-normal font-sans"
+                                  dangerouslySetInnerHTML={{ __html: renderLatex(ans.discussion) }}
+                                />
                               </div>
                             );
                           })}
@@ -942,22 +1053,29 @@ const Review: React.FC = () => {
 
                         {/* Discussion */}
                         {current.discussion && (
-                          <div className="bg-blue-50/50 border border-blue-100 rounded-3xl p-6 lg:p-8 mt-6">
-                            <div className="flex gap-4">
-                              <div className="shrink-0">
-                                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-500 text-xl">
-                                  <BulbOutlined />
-                                </div>
-                              </div>
-                              <div className="w-full">
-                                <Title level={5} className="!text-blue-900 !font-black !font-manrope !mb-3 mt-1">
-                                  Pembahasan
-                                </Title>
-                                <Paragraph className="text-blue-900/80 leading-loose text-base font-medium mb-0">
-                                  <span dangerouslySetInnerHTML={{ __html: renderLatex(current.discussion) }} />
-                                </Paragraph>
-                              </div>
+                          <div className="bg-blue-50/60 border border-blue-100 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 mt-6">
+                            <div className="flex items-center justify-between gap-3 mb-3 pb-3 border-b border-blue-200/60">
+                              <Title level={5} className="!m-0 !text-blue-900 !font-black !font-manrope">
+                                Pembahasan
+                              </Title>
+                              <Button
+                                size="small"
+                                icon={<ExpandOutlined />}
+                                onClick={() =>
+                                  setZoomDiscussion({
+                                    title: `Pembahasan Soal #${selectedIndex + 1}`,
+                                    html: renderLatex(current.discussion),
+                                  })
+                                }
+                                className="rounded-xl font-bold text-xs border-blue-200 text-blue-700 hover:!text-blue-800 hover:!border-blue-400 bg-white shrink-0"
+                              >
+                                Zoom
+                              </Button>
                             </div>
+                            <div
+                              className="review-discussion-content text-blue-950/90 text-sm sm:text-base font-normal font-sans"
+                              dangerouslySetInnerHTML={{ __html: renderLatex(current.discussion) }}
+                            />
                           </div>
                         )}
                         
@@ -992,8 +1110,8 @@ const Review: React.FC = () => {
                         size="large"
                         type="primary"
                         className="w-auto h-12 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
-                        disabled={selectedIndex === groupedQuestions.length - 1}
-                        onClick={() => setSelectedIndex(prev => Math.min(groupedQuestions.length - 1, prev + 1))}
+                        disabled={selectedIndex === groupSummaries.length - 1}
+                        onClick={() => setSelectedIndex(prev => Math.min(groupSummaries.length - 1, prev + 1))}
                       >
                         Soal Selanjutnya <RightOutlined />
                       </Button>
@@ -1022,8 +1140,8 @@ const Review: React.FC = () => {
                         size="large"
                         type="primary"
                         className="flex-1 h-12 rounded-xl font-bold flex items-center justify-center shadow-lg shadow-primary/20 text-[11px]"
-                        disabled={selectedIndex === groupedQuestions.length - 1}
-                        onClick={() => setSelectedIndex(prev => Math.min(groupedQuestions.length - 1, prev + 1))}
+                        disabled={selectedIndex === groupSummaries.length - 1}
+                        onClick={() => setSelectedIndex(prev => Math.min(groupSummaries.length - 1, prev + 1))}
                       >
                         Selanjutnya <RightOutlined />
                       </Button>
@@ -1037,6 +1155,39 @@ const Review: React.FC = () => {
 
         </div>
       </div>
+
+      {/* Full-Page Zoom Discussion Modal */}
+      <Modal
+        open={Boolean(zoomDiscussion)}
+        onCancel={() => setZoomDiscussion(null)}
+        footer={[
+          <Button
+            key="close"
+            type="primary"
+            onClick={() => setZoomDiscussion(null)}
+            className="rounded-xl font-bold px-6"
+          >
+            Tutup
+          </Button>,
+        ]}
+        title={
+          <span className="font-black font-manrope text-base sm:text-lg text-blue-900">
+            {zoomDiscussion?.title || 'Pembahasan'}
+          </span>
+        }
+        width="100vw"
+        style={{ top: 0, maxWidth: '100vw', paddingBottom: 0 }}
+        styles={{
+          body: { minHeight: 'calc(100dvh - 120px)', maxHeight: 'calc(100dvh - 120px)', overflowY: 'auto', padding: '16px 20px' },
+        }}
+      >
+        {zoomDiscussion && (
+          <div
+            className="review-discussion-content max-w-4xl mx-auto text-blue-950/90 text-base sm:text-lg font-normal font-sans"
+            dangerouslySetInnerHTML={{ __html: zoomDiscussion.html }}
+          />
+        )}
+      </Modal>
     </AppLayout>
   );
 };
