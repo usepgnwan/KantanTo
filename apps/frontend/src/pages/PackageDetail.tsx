@@ -335,52 +335,96 @@ const PackageDetailPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {packageData.bundled_packages.map((sub, idx) => (
               <Card
                 key={sub.id}
-                className="weightless-card border border-surface-container hover:border-purple-400 transition-all rounded-2xl overflow-hidden shadow-sm flex flex-col p-4"
+                styles={{ body: { padding: 0 } }}
+                className="weightless-card border border-surface-container hover:border-purple-400 transition-all rounded-2xl overflow-hidden shadow-sm flex flex-col"
               >
-                <div className="flex gap-3 items-start">
-                  <div className="w-14 h-14 rounded-xl bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 flex items-center justify-center font-black text-xl shrink-0 overflow-hidden">
-                    {sub.thumbnail ? (
-                      <img src={sub.thumbnail} alt={sub.title} className="w-full h-full object-cover" />
-                    ) : (
-                      <span>#{idx + 1}</span>
+                {/* Cover Sub-Paket */}
+                <div className="relative aspect-[16/9] w-full bg-gradient-to-br from-purple-100 via-blue-50 to-indigo-100 dark:from-purple-950/60 dark:to-zinc-800 overflow-hidden">
+                  {sub.thumbnail ? (
+                    <img
+                      src={sub.thumbnail}
+                      alt={sub.title || `Sub-Paket #${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-purple-600/60 dark:text-purple-300/60">
+                      <GiftOutlined className="text-3xl mb-1" />
+                      <span className="text-xs font-black uppercase tracking-widest">Paket #{idx + 1}</span>
+                    </div>
+                  )}
+                  <div className="absolute top-3 left-3 flex items-center gap-1.5 flex-wrap">
+                    <Tag className="m-0 border-none bg-slate-900/75 text-white backdrop-blur-sm font-black text-[10px] px-2 py-0.5 rounded-lg">
+                      #{idx + 1}
+                    </Tag>
+                    {sub.category && (
+                      <Tag className="m-0 border-none bg-purple-600/90 text-white backdrop-blur-sm font-bold text-[10px] px-2 py-0.5 rounded-lg">
+                        {sub.category}
+                      </Tag>
                     )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                      {sub.category && (
-                        <Tag color="purple" className="m-0 border-none font-bold text-[9px] px-2 rounded-md">
-                          {sub.category}
-                        </Tag>
-                      )}
-                    </div>
-                    <h4 className="font-bold text-on-surface text-sm truncate mb-1">Sub-Paket #{idx + 1}</h4>
-                  </div>
+                  {sub.duration > 0 && (
+                    <Tag className="absolute top-3 right-3 m-0 border-none bg-white/90 dark:bg-zinc-900/90 text-on-surface font-bold text-[10px] px-2 py-0.5 rounded-lg shadow-sm">
+                      {sub.duration} Menit
+                    </Tag>
+                  )}
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-surface-container flex items-center justify-between">
-                  <Space size={4} wrap>
-                    <Tag className="rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-none font-bold text-[10px] px-2">
-                      {sub.questions_count || 0} Soal
-                    </Tag>
-                    <Tag className="rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-none font-bold text-[10px] px-2">
-                      {sub.materials_count || 0} Materi
-                    </Tag>
-                    <Tag className="rounded-full bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400 border-none font-bold text-[10px] px-2">
-                      {sub.videos_count || 0} Video
-                    </Tag>
-                  </Space>
-                  <Button
-                    size="small"
-                    type="link"
-                    className="font-bold text-primary p-0"
-                    onClick={() => navigate(`/paket/${sub.slug}`)}
-                  >
-                    Buka Detail &rarr;
-                  </Button>
+                {/* Detail Informasi Sub-Paket */}
+                <div className="p-4 flex-1 flex flex-col">
+                  <h4 className="font-black text-on-surface text-base leading-snug mb-1.5 line-clamp-2">
+                    {sub.title || `Sub-Paket #${idx + 1}`}
+                  </h4>
+
+                  {sub.description && (
+                    <p className="text-xs text-on-surface/60 line-clamp-2 mb-3 leading-relaxed">
+                      {sub.description}
+                    </p>
+                  )}
+
+                  {((sub.classes && sub.classes.length > 0) || (sub.subjects && sub.subjects.length > 0)) && (
+                    <div className="flex items-center gap-1 flex-wrap mb-3">
+                      {sub.classes?.map((cls) => (
+                        <Tag key={cls} className="m-0 border-none rounded-md bg-on-surface/5 text-on-surface/60 font-bold text-[10px] px-2">
+                          {cls}
+                        </Tag>
+                      ))}
+                      {sub.subjects?.map((subj) => (
+                        <Tag key={subj} className="m-0 border-none rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold text-[10px] px-2">
+                          {subj}
+                        </Tag>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="mt-auto pt-3 border-t border-surface-container flex items-center justify-between gap-2">
+                    <Space size={4} wrap>
+                      <Tag className="rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-none font-bold text-[10px] px-2 m-0">
+                        {sub.questions_count || 0} Soal
+                      </Tag>
+                      {sub.materials_count > 0 && (
+                        <Tag className="rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-none font-bold text-[10px] px-2 m-0">
+                          {sub.materials_count} Materi
+                        </Tag>
+                      )}
+                      {sub.videos_count > 0 && (
+                        <Tag className="rounded-full bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400 border-none font-bold text-[10px] px-2 m-0">
+                          {sub.videos_count} Video
+                        </Tag>
+                      )}
+                    </Space>
+                    <Button
+                      size="small"
+                      type="link"
+                      className="font-bold text-primary p-0 shrink-0"
+                      onClick={() => navigate(`/paket/${sub.slug}`)}
+                    >
+                      Buka Detail &rarr;
+                    </Button>
+                  </div>
                 </div>
               </Card>
             ))}
@@ -428,7 +472,7 @@ const PackageDetailPage: React.FC = () => {
                     </div>
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-black text-on-surface text-base m-0">Sub-Paket #{idx + 1}</h3>
+                        <h3 className="font-black text-on-surface text-base m-0">{subItem.package.title || `Sub-Paket #${idx + 1}`}</h3>
                         {subItem.package.category && (
                           <Tag color="purple" className="m-0 border-none font-bold text-[9px] px-2 rounded-md">
                             {subItem.package.category}
@@ -656,10 +700,10 @@ const PackageDetailPage: React.FC = () => {
                               <div className="font-bold text-purple-900 dark:text-purple-200">
                                 🎁 Termasuk {packageData.bundled_packages?.length || 0} Sub-Paket:
                               </div>
-                              {packageData.bundled_packages?.map(sp => (
-                                <div key={sp.id} className="flex items-center justify-between text-on-surface/70">
-                                  <span className="truncate">• Paket {sp.id}</span>
-                                  <Button size="small" type="link" className="p-0 text-xs font-bold text-primary" onClick={() => navigate(`/paket/${sp.slug}`)}>
+                              {packageData.bundled_packages?.map((sp, spIdx) => (
+                                <div key={sp.id} className="flex items-center justify-between gap-2 text-on-surface/70">
+                                  <span className="truncate">• {sp.title || `Sub-Paket #${spIdx + 1}`}</span>
+                                  <Button size="small" type="link" className="p-0 text-xs font-bold text-primary shrink-0" onClick={() => navigate(`/paket/${sp.slug}`)}>
                                     Buka &rarr;
                                   </Button>
                                 </div>
@@ -759,7 +803,13 @@ const PackageDetailPage: React.FC = () => {
                                 })()}
                               </Title>
                               <Text className="text-xs text-surface-on/40">
-                                {packageData?.is_bundle ? '/ paket bundle' : `/ ${packageData?.is_lifetime ? 'Selamanya (Lifetime)' : `${packageData?.validity_days} Hari`}`}
+                                {packageData?.is_bundle
+                                  ? '/ paket bundle'
+                                  : `/ ${packageData?.is_lifetime
+                                      ? 'Selamanya (Lifetime)'
+                                      : packageData?.active_until
+                                        ? `s/d ${dayjs(packageData.active_until).format('DD MMM YYYY')}`
+                                        : `${packageData?.validity_days} Hari`}`}
                               </Text>
                             </div>
                             <div className="mt-2 text-[10px] uppercase font-bold tracking-widest text-primary/60">

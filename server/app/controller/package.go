@@ -26,16 +26,18 @@ type packageSummaryResponse struct {
 	Title           string   `json:"title,omitempty"`
 	Description     string   `json:"description,omitempty"`
 	Price           float64  `json:"price"`
-	Thumbnail       string   `json:"thumbnail"`
-	Category        string   `json:"category"`
-	QuestionsCount  int64    `json:"questions_count"`
+	Thumbnail       string     `json:"thumbnail"`
+	Category        string     `json:"category"`
+	Duration        int        `json:"duration"`
+	QuestionsCount  int64      `json:"questions_count"`
 	MaterialsCount  int64    `json:"materials_count"`
 	VideosCount     int64    `json:"videos_count"`
 	Classes         []string `json:"classes"`
 	Subjects        []string `json:"subjects"`
-	IsLifetime      bool     `json:"is_lifetime"`
-	ValidityDays    int      `json:"validity_days"`
-	MaxExamAttempts int      `json:"max_exam_attempts"`
+	IsLifetime      bool       `json:"is_lifetime"`
+	ValidityDays    int        `json:"validity_days"`
+	ActiveUntil     *time.Time `json:"active_until"`
+	MaxExamAttempts int        `json:"max_exam_attempts"`
 }
 
 type packageListResponse struct {
@@ -54,6 +56,7 @@ type packageListResponse struct {
 	Thumbnail           string                   `json:"thumbnail"`
 	IsLifetime          bool                     `json:"is_lifetime"`
 	ValidityDays        int                      `json:"validity_days"`
+	ActiveUntil         *time.Time               `json:"active_until"`
 	MaxExamAttempts     int                      `json:"max_exam_attempts"`
 	IsBundle            bool                     `json:"is_bundle"`
 	BundledPackageIDs   []uint                   `json:"bundled_package_ids"`
@@ -79,9 +82,10 @@ type packageCreatePayload struct {
 	Duration            int      `json:"duration"`
 	Status              string   `json:"status"`
 	Thumbnail           string   `json:"thumbnail"`
-	IsLifetime          bool     `json:"is_lifetime"`
-	ValidityDays        int      `json:"validity_days"`
-	MaxExamAttempts     int      `json:"max_exam_attempts"`
+	IsLifetime          bool       `json:"is_lifetime"`
+	ValidityDays        int        `json:"validity_days"`
+	ActiveUntil         *time.Time `json:"active_until"`
+	MaxExamAttempts     int        `json:"max_exam_attempts"`
 	IsBundle            bool     `json:"is_bundle"`
 	BundledPackageIDs   []uint   `json:"bundled_package_ids"`
 	OriginalPrice       float64  `json:"original_price"`
@@ -125,6 +129,7 @@ func getBundledSummaries(pkg model.Package) []packageSummaryResponse {
 			Price:           sp.Price,
 			Thumbnail:       sp.Thumbnail,
 			Category:        sp.Category,
+			Duration:        sp.Duration,
 			QuestionsCount:  sqCount,
 			MaterialsCount:  smCount,
 			VideosCount:     svCount,
@@ -132,6 +137,7 @@ func getBundledSummaries(pkg model.Package) []packageSummaryResponse {
 			Subjects:        subjects,
 			IsLifetime:      sp.IsLifetime,
 			ValidityDays:    sp.ValidityDays,
+			ActiveUntil:     sp.ActiveUntil,
 			MaxExamAttempts: sp.MaxExamAttempts,
 		})
 	}
@@ -166,6 +172,7 @@ func mapPackageResponse(pkg model.Package, qCount, mCount, vCount int64) package
 		Thumbnail:           pkg.Thumbnail,
 		IsLifetime:          pkg.IsLifetime,
 		ValidityDays:        pkg.ValidityDays,
+		ActiveUntil:         pkg.ActiveUntil,
 		MaxExamAttempts:     pkg.MaxExamAttempts,
 		IsBundle:            pkg.IsBundle,
 		BundledPackageIDs:   pkg.GetBundledPackageIDs(),
@@ -217,7 +224,7 @@ func GetPackages(c echo.Context) error {
 // GetPackageBySlug returns a single package so detail and exam pages do not download every package description.
 func GetPackageBySlug(c echo.Context) error {
 	var pkg model.Package
-	if err := connection.DB.Select("id", "slug", "title", "price", "discount_type", "discount_value", "category", "classes_json", "subjects_json", "duration", "status", "thumbnail", "is_lifetime", "validity_days", "max_exam_attempts", "is_bundle", "bundled_package_ids_json", "original_price", "bundle_discount_type", "bundle_discount_value").Where("slug = ?", c.Param("slug")).First(&pkg).Error; err != nil {
+	if err := connection.DB.Select("id", "slug", "title", "price", "discount_type", "discount_value", "category", "classes_json", "subjects_json", "duration", "status", "thumbnail", "is_lifetime", "validity_days", "active_until", "max_exam_attempts", "is_bundle", "bundled_package_ids_json", "original_price", "bundle_discount_type", "bundle_discount_value").Where("slug = ?", c.Param("slug")).First(&pkg).Error; err != nil {
 		return c.JSON(http.StatusNotFound, helpers.Response{Status: false, Message: "Paket tidak ditemukan"})
 	}
 	classes := jsonStringSlice(pkg.ClassesJSON)
@@ -232,14 +239,14 @@ func GetPackageBySlug(c echo.Context) error {
 		ID: pkg.ID, Slug: pkg.Slug, Title: pkg.Title, Price: pkg.Price,
 		DiscountType: pkg.DiscountType, DiscountValue: pkg.DiscountValue, Category: pkg.Category,
 		Classes: classes, Subjects: subjects, Duration: pkg.Duration, Status: pkg.Status,
-		Thumbnail: pkg.Thumbnail, IsLifetime: pkg.IsLifetime, ValidityDays: pkg.ValidityDays,
+		Thumbnail: pkg.Thumbnail, IsLifetime: pkg.IsLifetime, ValidityDays: pkg.ValidityDays, ActiveUntil: pkg.ActiveUntil,
 		MaxExamAttempts: pkg.MaxExamAttempts, IsBundle: pkg.IsBundle,
 		BundledPackageIDs: pkg.GetBundledPackageIDs(), OriginalPrice: pkg.OriginalPrice,
 		BundleDiscountType: pkg.BundleDiscountType, BundleDiscountValue: pkg.BundleDiscountValue,
 		QuestionsCount: countEffectiveQuestions(pkg.ID),
 	}
 	if pkg.IsBundle {
-		response.BundledPackages = getBundledListSummaries(pkg)
+		response.BundledPackages = getBundledSummaries(pkg)
 	}
 	return c.JSON(http.StatusOK, helpers.Response{Status: true, Message: "Success", Data: response})
 }
@@ -306,6 +313,13 @@ func CreatePackage(c echo.Context) error {
 		payload.Status = "draft"
 	}
 
+	if payload.IsLifetime {
+		payload.ValidityDays = 0
+		payload.ActiveUntil = nil
+	} else if payload.ActiveUntil != nil {
+		payload.ValidityDays = 0
+	}
+
 	pkg := model.Package{
 		Slug:                payload.Slug,
 		Title:               payload.Title,
@@ -321,6 +335,7 @@ func CreatePackage(c echo.Context) error {
 		Thumbnail:           payload.Thumbnail,
 		IsLifetime:          payload.IsLifetime,
 		ValidityDays:        payload.ValidityDays,
+		ActiveUntil:         payload.ActiveUntil,
 		MaxExamAttempts:     payload.MaxExamAttempts,
 		IsBundle:            payload.IsBundle,
 		OriginalPrice:       payload.OriginalPrice,
@@ -362,7 +377,16 @@ func UpdatePackage(c echo.Context) error {
 	pkg.Status = payload.Status
 	pkg.Thumbnail = payload.Thumbnail
 	pkg.IsLifetime = payload.IsLifetime
-	pkg.ValidityDays = payload.ValidityDays
+	if payload.IsLifetime {
+		pkg.ValidityDays = 0
+		pkg.ActiveUntil = nil
+	} else if payload.ActiveUntil != nil {
+		pkg.ValidityDays = 0
+		pkg.ActiveUntil = payload.ActiveUntil
+	} else {
+		pkg.ValidityDays = payload.ValidityDays
+		pkg.ActiveUntil = nil
+	}
 	pkg.MaxExamAttempts = payload.MaxExamAttempts
 	pkg.IsBundle = payload.IsBundle
 	pkg.OriginalPrice = payload.OriginalPrice
@@ -387,6 +411,22 @@ func UpdatePackage(c echo.Context) error {
 	connection.DB.Model(&model.PackageVideo{}).Where("package_id = ?", pkg.ID).Count(&vCount)
 
 	return c.JSON(http.StatusOK, helpers.Response{Status: true, Message: "Paket berhasil diperbarui", Data: mapPackageResponse(pkg, qCount, mCount, vCount)})
+}
+
+func resolvePackageActiveUntil(pkg model.Package) *time.Time {
+	if pkg.IsLifetime {
+		return nil
+	}
+	if pkg.ActiveUntil != nil {
+		t := *pkg.ActiveUntil
+		return &t
+	}
+	durationDays := 30
+	if pkg.ValidityDays > 0 {
+		durationDays = pkg.ValidityDays
+	}
+	t := time.Now().AddDate(0, 0, durationDays)
+	return &t
 }
 
 func DeletePackage(c echo.Context) error {
