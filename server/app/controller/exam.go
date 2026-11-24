@@ -684,6 +684,448 @@ func GetExamSession(c echo.Context) error {
 	})
 }
 
+// GetExamSessionSummary returns lightweight session metadata, accuracy stats, and question map
+// without loading question HTML/images/options/discussions up front.
+func GetExamSessionSummary(c echo.Context) error {
+	id := c.Param("id")
+
+	var session model.ExamSession
+	if err := connection.DB.
+		Preload("User").
+		Preload("Package", func(db *gorm.DB) *gorm.DB {
+			return db.Select("id", "slug", "title", "category", "duration")
+		}).
+		Preload("Answers", func(db *gorm.DB) *gorm.DB {
+			return db.Order("id asc")
+		}).
+		Where("id = ?", id).
+		First(&session).Error; err != nil {
+		return c.JSON(http.StatusNotFound, map[string]interface{}{
+			"status":  false,
+			"message": "Session not found",
+		})
+	}
+
+	// Collect unique question IDs and load ONLY id + type (no heavy HTML/JSON)
+	questionIDSet := make(map[uint]bool)
+	questionIDs := make([]uint, 0, len(session.Answers))
+	for _, ans := range session.Answers {
+		if !questionIDSet[ans.QuestionID] {
+			questionIDSet[ans.QuestionID] = true
+			questionIDs = append(questionIDs, ans.QuestionID)
+		}
+	}
+
+	type qTypeRow struct {
+		ID   uint
+		Type string
+	}
+	qTypes := make(map[uint]string, len(questionIDs))
+	if len(questionIDs) > 0 {
+		var rows []qTypeRow
+		connection.DB.Model(&model.PackageQuestion{}).
+			Select("id", "type").
+			Where("id IN ?", questionIDs).
+			Find(&rows)
+		for _, r := range rows {
+			qTypes[r.ID] = r.Type
+		}
+	}
+
+	type ReviewGroupSummary struct {
+		Key             string `json:"key"`
+		QuestionID      uint   `json:"question_id"`
+		SubQuestionID   *uint  `json:"sub_question_id,omitempty"`
+		Type            string `json:"type"`
+		Status          string `json:"status"` // correct | wrong | partial | empty
+		LinkedSubIndex  int    `json:"linked_sub_index,omitempty"`
+		LinkedGroupSize int    `json:"linked_group_size,omitempty"`
+	}
+
+	isAnswerEmpty := func(raw string) bool {
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" || trimmed == "[]" || trimmed == "{}" || trimmed == "null" {
+			return true
+		}
+		var arr []int
+		if err := json.Unmarshal([]byte(trimmed), &arr); err == nil {
+			return len(arr) == 0
+		}
+		var obj map[string][]int
+		if err := json.Unmarshal([]byte(trimmed), &obj); err == nil {
+			for _, v := range obj {
+				if len(v) > 0 {
+					return false
+				}
+			}
+			return true
+		}
+		return false
+	}
+
+	// Pre-count linked sub-questions per parent
+	linkedCounts := make(map[uint]int)
+	for _, ans := range session.Answers {
+		if qTypes[ans.QuestionID] == "linked" {
+			linkedCounts[ans.QuestionID]++
+		}
+	}
+
+	total := len(session.Answers)
+	benar := 0
+	kosong := 0
+	for _, ans := range session.Answers {
+		if ans.IsCorrect {
+			benar++
+		} else if isAnswerEmpty(ans.SelectedOptionsJSON) {
+			kosong++
+		}
+	}
+	salah := total - benar - kosong
+	if salah < 0 {
+		salah = 0
+	}
+
+	// Build grouped map entries matching Review.tsx grouping logic
+	type groupAgg struct {
+		summary    ReviewGroupSummary
+		total      int
+		correctCnt int
+		emptyCnt   int
+	}
+	groups := make([]*groupAgg, 0, len(session.Answers))
+	groupedByQID := make(map[uint]*groupAgg)
+	linkedIndices := make(map[uint]int)
+
+	for _, ans := range session.Answers {
+		qType := qTypes[ans.QuestionID]
+		if qType == "" {
+			if ans.SubQuestionID != nil {
+				qType = "nested"
+			} else {
+				qType = "single"
+			}
+		}
+		empty := isAnswerEmpty(ans.SelectedOptionsJSON)
+
+		if qType == "linked" {
+			curIdx := linkedIndices[ans.QuestionID]
+			linkedIndices[ans.QuestionID] = curIdx + 1
+			var subPtr *uint
+			subKey := fmt.Sprintf("%d_%d", ans.QuestionID, curIdx)
+			if ans.SubQuestionID != nil {
+				v := *ans.SubQuestionID
+				subPtr = &v
+				subKey = fmt.Sprintf("%d_%d", ans.QuestionID, v)
+			}
+			agg := &groupAgg{
+				summary: ReviewGroupSummary{
+					Key:             subKey,
+					QuestionID:      ans.QuestionID,
+					SubQuestionID:   subPtr,
+					Type:            "linked",
+					LinkedSubIndex:  curIdx,
+					LinkedGroupSize: linkedCounts[ans.QuestionID],
+				},
+				total: 1,
+			}
+			if ans.IsCorrect {
+				agg.correctCnt = 1
+			}
+			if empty {
+				agg.emptyCnt = 1
+			}
+			groups = append(groups, agg)
+		} else if ans.SubQuestionID != nil {
+			agg, exists := groupedByQID[ans.QuestionID]
+			if !exists {
+				agg = &groupAgg{
+					summary: ReviewGroupSummary{
+						Key:        fmt.Sprintf("%d", ans.QuestionID),
+						QuestionID: ans.QuestionID,
+						Type:       qType,
+					},
+				}
+				groupedByQID[ans.QuestionID] = agg
+				groups = append(groups, agg)
+			}
+			agg.total++
+			if ans.IsCorrect {
+				agg.correctCnt++
+			}
+			if empty {
+				agg.emptyCnt++
+			}
+		} else {
+			agg := &groupAgg{
+				summary: ReviewGroupSummary{
+					Key:        fmt.Sprintf("%d", ans.QuestionID),
+					QuestionID: ans.QuestionID,
+					Type:       qType,
+				},
+				total: 1,
+			}
+			if ans.IsCorrect {
+				agg.correctCnt = 1
+			}
+			if empty {
+				agg.emptyCnt = 1
+			}
+			groups = append(groups, agg)
+		}
+	}
+
+	groupSummaries := make([]ReviewGroupSummary, 0, len(groups))
+	for _, g := range groups {
+		status := "wrong"
+		if g.total == 0 || g.emptyCnt == g.total {
+			status = "empty"
+		} else if g.correctCnt == g.total {
+			status = "correct"
+		} else if g.correctCnt > 0 {
+			status = "partial"
+		}
+		g.summary.Status = status
+		groupSummaries = append(groupSummaries, g.summary)
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"status": true,
+		"data": map[string]interface{}{
+			"id":         session.ID,
+			"score":      session.Score,
+			"is_testing": session.IsTesting,
+			"created_at": session.CreatedAt,
+			"package":    session.Package,
+			"user":       session.User,
+			"stats": map[string]int{
+				"total":  total,
+				"benar":  benar,
+				"salah":  salah,
+				"kosong": kosong,
+			},
+			"groups": groupSummaries,
+		},
+	})
+}
+
+// GetExamSessionQuestionDetail returns enriched AnswerDetail rows for a single question (or linked sub-question).
+func GetExamSessionQuestionDetail(c echo.Context) error {
+	sessionID := c.Param("id")
+	questionIDParam := c.Param("questionId")
+	subQuestionIDParam := c.QueryParam("sub_question_id")
+
+	var questionID uint
+	if _, err := fmt.Sscanf(questionIDParam, "%d", &questionID); err != nil || questionID == 0 {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{"status": false, "message": "Invalid question ID"})
+	}
+
+	var sessionAnswers []model.ExamAnswer
+	ansQuery := connection.DB.Where("session_id = ? AND question_id = ?", sessionID, questionID)
+	if subQuestionIDParam != "" {
+		var subID uint
+		if _, err := fmt.Sscanf(subQuestionIDParam, "%d", &subID); err == nil && subID > 0 {
+			ansQuery = ansQuery.Where("sub_question_id = ?", subID)
+		}
+	}
+	if err := ansQuery.Order("id asc").Find(&sessionAnswers).Error; err != nil || len(sessionAnswers) == 0 {
+		return c.JSON(http.StatusNotFound, map[string]interface{}{"status": false, "message": "Answer not found"})
+	}
+
+	type AnswerDetail struct {
+		ID              uint        `json:"id"`
+		QuestionID      uint        `json:"question_id"`
+		SubQuestionID   *uint       `json:"sub_question_id"`
+		SelectedOptions []int       `json:"selected_options"`
+		IsCorrect       bool        `json:"is_correct"`
+		PointsEarned    float64     `json:"points_earned"`
+		MaxPoints       float64     `json:"max_points"`
+		QuestionText    string      `json:"question_text"`
+		QuestionTitle   string      `json:"question_title"`
+		QuestionType    string      `json:"question_type"`
+		ScoringMethod   string      `json:"scoring_method"`
+		Options         []string    `json:"options"`
+		CorrectAnswers  []int       `json:"correct_answers"`
+		Discussion      string      `json:"discussion"`
+		Rows            interface{} `json:"rows,omitempty"`
+		RowAnswers      interface{} `json:"row_answers,omitempty"`
+		ParentQuestion  string      `json:"parent_question,omitempty"`
+		ParentTitle     string      `json:"parent_title,omitempty"`
+		ParentType      string      `json:"parent_type,omitempty"`
+		ParentOptions   []string    `json:"parent_options,omitempty"`
+	}
+
+	var parent model.PackageQuestion
+	parentFound := connection.DB.Preload("SubQuestions", func(db *gorm.DB) *gorm.DB {
+		return db.Order("sort_order asc, id asc")
+	}).Where("id = ?", questionID).First(&parent).Error == nil
+
+	var parentOpts []string
+	if parentFound {
+		json.Unmarshal([]byte(parent.OptionsJSON), &parentOpts)
+	}
+
+	enriched := make([]AnswerDetail, 0, len(sessionAnswers))
+
+	// Table type: rebuild cleanly from current sub-questions
+	if parentFound && parent.Type == "table" {
+		if len(parentOpts) == 0 {
+			parentOpts = []string{"Benar", "Salah"}
+		}
+		ansBySubID := make(map[uint][]int, len(sessionAnswers))
+		var firstAnsID uint
+		for i, a := range sessionAnswers {
+			if i == 0 {
+				firstAnsID = a.ID
+			}
+			if a.SubQuestionID != nil {
+				var opts []int
+				json.Unmarshal([]byte(a.SelectedOptionsJSON), &opts)
+				if opts == nil {
+					opts = []int{}
+				}
+				ansBySubID[*a.SubQuestionID] = opts
+			}
+		}
+		for _, sub := range parent.SubQuestions {
+			subCorrect := parseCorrectJSON(sub.CorrectJSON)
+			var subOpts []string
+			json.Unmarshal([]byte(sub.OptionsJSON), &subOpts)
+			if len(subOpts) == 0 {
+				subOpts = parentOpts
+			}
+			selectedOpts := ansBySubID[sub.ID]
+			if selectedOpts == nil {
+				selectedOpts = []int{}
+			}
+			totalIncorrect := len(subOpts) - len(subCorrect)
+			if totalIncorrect < 0 {
+				totalIncorrect = 0
+			}
+			pts, isCorrect := calculateScoreMulti(sub.Type, selectedOpts, subCorrect, sub.Points, "all_or_nothing", totalIncorrect)
+			subID := sub.ID
+			enriched = append(enriched, AnswerDetail{
+				ID:              firstAnsID,
+				QuestionID:      parent.ID,
+				SubQuestionID:   &subID,
+				SelectedOptions: selectedOpts,
+				IsCorrect:       isCorrect,
+				PointsEarned:    pts,
+				MaxPoints:       sub.Points,
+				QuestionText:    sub.Question,
+				QuestionTitle:   parent.Title,
+				QuestionType:    sub.Type,
+				Options:         subOpts,
+				CorrectAnswers:  subCorrect,
+				Discussion:      sub.Discussion,
+				ParentQuestion:  parent.Question,
+				ParentTitle:     parent.Title,
+				ParentType:      parent.Type,
+				ParentOptions:   parentOpts,
+			})
+		}
+
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"status": true,
+			"data": map[string]interface{}{
+				"answers": enriched,
+			},
+		})
+	}
+
+	subByID := make(map[uint]model.PackageSubQuestion)
+	if parentFound {
+		for _, s := range parent.SubQuestions {
+			subByID[s.ID] = s
+		}
+	}
+
+	for _, ans := range sessionAnswers {
+		detail := AnswerDetail{
+			ID:            ans.ID,
+			QuestionID:    ans.QuestionID,
+			SubQuestionID: ans.SubQuestionID,
+			IsCorrect:     ans.IsCorrect,
+			PointsEarned:  ans.PointsEarned,
+		}
+		json.Unmarshal([]byte(ans.SelectedOptionsJSON), &detail.SelectedOptions)
+		if detail.SelectedOptions == nil {
+			detail.SelectedOptions = []int{}
+		}
+
+		if ans.SubQuestionID != nil && parentFound {
+			detail.ParentQuestion = parent.Question
+			detail.ParentTitle = parent.Title
+			detail.QuestionTitle = parent.Title
+			detail.ParentType = parent.Type
+			detail.ParentOptions = parentOpts
+
+			if sub, ok := subByID[*ans.SubQuestionID]; ok {
+				detail.QuestionText = sub.Question
+				detail.QuestionType = sub.Type
+				if sub.Title != "" {
+					detail.QuestionTitle = sub.Title
+				}
+				detail.Discussion = sub.Discussion
+				detail.MaxPoints = sub.Points
+				detail.ScoringMethod = sub.ScoringMethod
+
+				var opts []string
+				json.Unmarshal([]byte(sub.OptionsJSON), &opts)
+				if len(opts) == 0 && len(parentOpts) > 0 {
+					opts = parentOpts
+				}
+				detail.Options = opts
+				detail.CorrectAnswers = parseCorrectJSON(sub.CorrectJSON)
+
+				if sub.RowsJSON != "" && sub.RowsJSON != "[]" {
+					var subRows []tableRowPayload
+					json.Unmarshal([]byte(sub.RowsJSON), &subRows)
+					detail.Rows = subRows
+
+					var rowAnsMap map[string][]int
+					if err := json.Unmarshal([]byte(ans.SelectedOptionsJSON), &rowAnsMap); err == nil {
+						detail.RowAnswers = rowAnsMap
+					}
+				}
+			}
+		} else if parentFound {
+			detail.QuestionText = parent.Question
+			detail.QuestionTitle = parent.Title
+			detail.QuestionType = parent.Type
+			detail.ScoringMethod = parent.ScoringMethod
+			detail.Discussion = parent.Discussion
+			detail.MaxPoints = parent.Points
+			detail.Options = parentOpts
+			detail.CorrectAnswers = parseCorrectJSON(parent.CorrectJSON)
+		}
+
+		if len(detail.CorrectAnswers) > 0 && detail.MaxPoints > 0 {
+			totalIncorrect := len(detail.Options) - len(detail.CorrectAnswers)
+			if totalIncorrect < 0 {
+				totalIncorrect = 0
+			}
+			detail.PointsEarned, detail.IsCorrect = calculateScoreMulti(
+				detail.QuestionType,
+				detail.SelectedOptions,
+				detail.CorrectAnswers,
+				detail.MaxPoints,
+				detail.ScoringMethod,
+				totalIncorrect,
+			)
+		}
+
+		enriched = append(enriched, detail)
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"status": true,
+		"data": map[string]interface{}{
+			"answers": enriched,
+		},
+	})
+}
+
 func GetAllExamSessions(c echo.Context) error {
 	page := 1
 	limit := 10
