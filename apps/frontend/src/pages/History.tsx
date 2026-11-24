@@ -44,42 +44,62 @@ const HistoryPage: React.FC = () => {
   const [pendingExams, setPendingExams] = useState<any[]>([]);
 
   useEffect(() => {
-    if (!payload?.user_id) return;
-    setLoading(true);
-    getAdminExamSessions(false, 1, 100, '', payload.user_id)
-      .then((res) => {
-        setData(res.items || []);
-      })
-      .catch(() => message.error('Gagal memuat riwayat ujian'))
-      .finally(() => setLoading(false));
+    const currentUserId = payload?.user_id;
+    if (!currentUserId) {
+      setData([]);
+      setPendingExams([]);
+      setAnalysisData(null);
+      return;
+    }
 
-    // Fetch existing analysis
-    getProgressAnalysis(payload.user_id).then((res) => {
-      if (res) {
+    let cancelled = false;
+    setLoading(true);
+    setData([]);
+    setPendingExams([]);
+    setAnalysisData(null);
+
+    getAdminExamSessions(false, 1, 100, '', currentUserId)
+      .then((res) => {
+        if (cancelled) return;
+        const ownSessions = (res.items || []).filter(
+          (item: any) => Number(item.user_id ?? item.user?.id) === Number(currentUserId)
+        );
+        setData(ownSessions);
+      })
+      .catch(() => {
+        if (!cancelled) message.error('Gagal memuat riwayat ujian');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    // Fetch existing analysis for logged-in user
+    getProgressAnalysis(currentUserId).then((res) => {
+      if (!cancelled && res) {
         setAnalysisData(res);
       }
     }).catch(() => {});
 
-    // Fetch pending exams from localStorage
+    // Fetch pending exams from localStorage scoped strictly to logged-in user_id
     const loadPendingExams = async () => {
       try {
         const allPackages = await getPackages();
+        const userPrefix = `exam_u${currentUserId}_`;
         const pending: any[] = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
-          if (key && key.startsWith('exam_') && key.endsWith('_time')) {
-            const slug = key.replace('exam_', '').replace('_time', '');
+          if (key && key.startsWith(userPrefix) && key.endsWith('_time')) {
+            const slug = key.slice(userPrefix.length, -'_time'.length);
             const timeStr = localStorage.getItem(key);
             if (timeStr && parseInt(timeStr, 10) > 0) {
               const pkg = allPackages.find(p => p.slug === slug);
               if (pkg) {
-                // Also get saved answers count for info
                 let answeredCount = 0;
                 try {
-                  const ansStr = localStorage.getItem(`exam_${slug}_answers`);
+                  const ansStr = localStorage.getItem(`${userPrefix}${slug}_answers`);
                   if (ansStr) {
                     const ansObj = JSON.parse(ansStr);
-                    answeredCount = Object.keys(ansObj).filter(k => ansObj[k].length > 0).length;
+                    answeredCount = Object.keys(ansObj).filter(k => Array.isArray(ansObj[k]) && ansObj[k].length > 0).length;
                   }
                 } catch (e) {}
                 pending.push({ ...pkg, time_remaining: parseInt(timeStr, 10), answered_count: answeredCount });
@@ -87,12 +107,18 @@ const HistoryPage: React.FC = () => {
             }
           }
         }
-        setPendingExams(pending);
+        if (!cancelled) {
+          setPendingExams(pending);
+        }
       } catch (err) {
         console.error('Failed to load pending exams', err);
       }
     };
     loadPendingExams();
+
+    return () => {
+      cancelled = true;
+    };
   }, [payload?.user_id]);
 
   const handleAnalisisClick = () => {
@@ -293,6 +319,7 @@ const HistoryPage: React.FC = () => {
                         },
                       ]}
                       dataSource={pendingExams}
+                      rowKey="slug"
                       pagination={false}
                       scroll={{ x: 'max-content' }}
                       className="weightless-table mb-8"
@@ -308,6 +335,7 @@ const HistoryPage: React.FC = () => {
                 <Table
                   columns={columns}
                   dataSource={data}
+                  rowKey="id"
                   pagination={{ pageSize: 5 }}
                   scroll={{ x: 'max-content' }}
                   className="weightless-table"

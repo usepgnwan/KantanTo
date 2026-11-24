@@ -45,16 +45,19 @@ const ExamSimulation: React.FC = () => {
     if (!payload) navigate('/login', { replace: true, state: { from: `/exam/${slug}` } });
   }, [payload, navigate, slug]);
 
-  // localStorage keys scoped per exam slug
-  const lsKey = (suffix: string) => `exam_${slug}_${suffix}`;
+  // localStorage keys scoped per logged-in user_id + exam slug
+  const userScope = payload?.user_id ? `u${payload.user_id}` : '';
+  const lsKey = (suffix: string) => `exam_${userScope}_${slug}_${suffix}`;
 
-  // Restore state from localStorage (if a previous session exists for this slug)
+  // Restore state from localStorage (scoped to current user + slug)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(() => {
-    try { return Number(localStorage.getItem(`exam_${slug}_index`) ?? 0); } catch { return 0; }
+    if (!userScope) return 0;
+    try { return Number(localStorage.getItem(`exam_${userScope}_${slug}_index`) ?? 0); } catch { return 0; }
   });
   const [timeRemaining, setTimeRemaining] = useState<number>(() => {
+    if (!userScope) return 15 * 60;
     try {
-      const saved = localStorage.getItem(`exam_${slug}_time`);
+      const saved = localStorage.getItem(`exam_${userScope}_${slug}_time`);
       return saved !== null ? Number(saved) : 15 * 60;
     } catch { return 15 * 60; }
   });
@@ -62,8 +65,9 @@ const ExamSimulation: React.FC = () => {
   // Map of questionId -> array of selected option indexes
   // For table questions, key is namespaced as "parentId_subId"
   const [answers, setAnswers] = useState<Record<string, number[]>>(() => {
+    if (!userScope) return {};
     try {
-      const saved = localStorage.getItem(`exam_${slug}_answers`);
+      const saved = localStorage.getItem(`exam_${userScope}_${slug}_answers`);
       return saved ? JSON.parse(saved) : {};
     } catch { return {}; }
   });
@@ -72,8 +76,9 @@ const ExamSimulation: React.FC = () => {
     answersRef.current = answers;
   }, [answers]);
   const [doubtfulQuestions, setDoubtfulQuestions] = useState<Record<string, boolean>>(() => {
+    if (!userScope) return {};
     try {
-      const saved = localStorage.getItem(`exam_${slug}_doubtful`);
+      const saved = localStorage.getItem(`exam_${userScope}_${slug}_doubtful`);
       return saved ? JSON.parse(saved) : {};
     } catch { return {}; }
   });
@@ -140,25 +145,29 @@ const ExamSimulation: React.FC = () => {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [loading, questionManifest.length]);
 
-  // Persist answers to localStorage whenever they change
+  // Persist answers to localStorage whenever they change (scoped per user)
   useEffect(() => {
+    if (!userScope) return;
     try { localStorage.setItem(lsKey('answers'), JSON.stringify(answers)); } catch { }
-  }, [answers]);
+  }, [answers, userScope]);
 
   // Persist doubtful marks
   useEffect(() => {
+    if (!userScope) return;
     try { localStorage.setItem(lsKey('doubtful'), JSON.stringify(doubtfulQuestions)); } catch { }
-  }, [doubtfulQuestions]);
+  }, [doubtfulQuestions, userScope]);
 
   // Persist current question index
   useEffect(() => {
+    if (!userScope) return;
     try { localStorage.setItem(lsKey('index'), String(currentQuestionIndex)); } catch { }
-  }, [currentQuestionIndex]);
+  }, [currentQuestionIndex, userScope]);
 
   // Persist time remaining (updated every second)
   useEffect(() => {
+    if (!userScope) return;
     try { localStorage.setItem(lsKey('time'), String(timeRemaining)); } catch { }
-  }, [timeRemaining]);
+  }, [timeRemaining, userScope]);
 
   // Countdown Timer Effect
   useEffect(() => {
