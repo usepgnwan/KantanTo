@@ -73,9 +73,47 @@ const normalizeVoucher = (v: any): Voucher => ({
     : undefined,
 });
 
+export interface PaginatedVoucherResponse {
+  total: number;
+  rows: Voucher[];
+  currentPage: number;
+  perPage: number;
+  from: number;
+  to: number;
+  lastPage: number;
+}
+
 export const getVouchers = async (): Promise<Voucher[]> => {
   const response = await api.get('/vouchers');
   return unwrapList(response.data).map(normalizeVoucher);
+};
+
+export const getVouchersPaginated = async (
+  page = 1,
+  limit = 10,
+  search?: string
+): Promise<PaginatedVoucherResponse> => {
+  const params: Record<string, any> = { page, limit };
+  const trimmed = search?.trim();
+  if (trimmed) {
+    params.code = trimmed;
+    params.search = trimmed;
+  }
+  const response = await api.get('/vouchers', { params });
+  const payload = response.data?.data ?? response.data ?? {};
+  const rawRows = Array.isArray(payload?.rows)
+    ? payload.rows
+    : unwrapList(response.data);
+  const rows = rawRows.map(normalizeVoucher);
+  return {
+    total: Number(payload?.total ?? rows.length),
+    rows,
+    currentPage: Number(payload?.currentPage ?? page),
+    perPage: Number(payload?.perPage ?? limit),
+    from: Number(payload?.from ?? (rows.length > 0 ? (page - 1) * limit + 1 : 0)),
+    to: Number(payload?.to ?? ((page - 1) * limit + rows.length)),
+    lastPage: Number(payload?.lastPage ?? Math.max(1, Math.ceil((payload?.total ?? rows.length) / limit))),
+  };
 };
 
 export const createVoucher = async (payload: Partial<Voucher>): Promise<Voucher> => {

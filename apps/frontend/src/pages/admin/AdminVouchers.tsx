@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { getVouchers, createVoucher, updateVoucher, deleteVoucher, Voucher, VoucherUsage, getVoucherUsageHistoryAPI } from '../../services/voucherService';
+import React, { useState, useEffect, useCallback } from 'react';
+import { getVouchersPaginated, createVoucher, updateVoucher, deleteVoucher, Voucher, VoucherUsage, getVoucherUsageHistoryAPI } from '../../services/voucherService';
 import { getPackages, PackageListItem } from '../../services/packageService';
 import AdminLayout from '../../layouts/AdminLayout';
 import {
@@ -30,6 +30,10 @@ const AdminVouchers: React.FC = () => {
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
   const [packages, setPackages] = useState<PackageListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
+  const [searchQuery, setSearchQuery] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [usageHistory, setUsageHistory] = useState<VoucherUsage[]>([]);
@@ -45,17 +49,18 @@ const AdminVouchers: React.FC = () => {
     return 'active';
   };
 
-  const fetchVouchers = async () => {
+  const fetchVouchers = useCallback(async (page = currentPage, limit = perPage, search = searchQuery) => {
     setLoading(true);
     try {
-      const data = await getVouchers();
-      setVouchers(data);
+      const res = await getVouchersPaginated(page, limit, search);
+      setVouchers(res.rows);
+      setTotal(res.total);
     } catch (error) {
       message.error('Gagal memuat data voucher');
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentPage, perPage, searchQuery]);
 
   const fetchPackages = async () => {
     try {
@@ -66,10 +71,16 @@ const AdminVouchers: React.FC = () => {
     }
   };
 
-  React.useEffect(() => {
-    fetchVouchers();
+  useEffect(() => {
     fetchPackages();
   }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchVouchers(currentPage, perPage, searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [currentPage, perPage, searchQuery, fetchVouchers]);
 
   const openCreate = () => {
     setEditTarget(null);
@@ -151,7 +162,11 @@ const AdminVouchers: React.FC = () => {
     try {
       await deleteVoucher(id);
       message.success('Voucher berhasil dihapus');
-      fetchVouchers();
+      if (vouchers.length === 1 && currentPage > 1) {
+        setCurrentPage(prev => prev - 1);
+      } else {
+        fetchVouchers();
+      }
     } catch (error) {
       message.error('Gagal menghapus voucher');
     }
@@ -337,18 +352,39 @@ const AdminVouchers: React.FC = () => {
           </div>
 
           <Card className="rounded-[2.5rem] border-none shadow-md overflow-hidden bg-white p-0">
-            <div className="p-4 border-b border-on-surface/5">
+            <div className="p-4 border-b border-on-surface/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <Input
-                prefix={<SearchOutlined className="opacity-20" />}
+                prefix={<SearchOutlined className="opacity-30" />}
                 placeholder="Cari kode voucher..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                allowClear
                 className="max-w-xs rounded-xl"
               />
+              <Text className="text-xs text-on-surface/50 font-medium">
+                Total {total} voucher
+              </Text>
             </div>
             <Table
               columns={columns}
               dataSource={vouchers}
+              rowKey={(record) => String(record.id ?? record.key ?? record.code)}
               loading={loading}
-              pagination={{ pageSize: 10 }}
+              pagination={{
+                current: currentPage,
+                pageSize: perPage,
+                total,
+                showSizeChanger: true,
+                pageSizeOptions: ['10', '20', '50', '100'],
+                showTotal: (t, range) => `${range[0]}-${range[1]} dari ${t} voucher`,
+                onChange: (page, size) => {
+                  setCurrentPage(page);
+                  setPerPage(size);
+                },
+              }}
               className="weightless-table"
             />
           </Card>

@@ -29,11 +29,14 @@ func GetVouchers(c echo.Context) error {
 		Model: &model.Voucher{},
 	}
 	db := connection.DB
-	query := db.Model(&model.Voucher{})
+	query := db.Model(&model.Voucher{}).Order("id desc")
 
-	code := c.QueryParam("code")
-	if code != "" {
-		query = query.Where("code ILIKE ?", "%"+code+"%")
+	search := strings.TrimSpace(c.QueryParam("search"))
+	if search == "" {
+		search = strings.TrimSpace(c.QueryParam("code"))
+	}
+	if search != "" {
+		query = query.Where("code ILIKE ?", "%"+search+"%")
 	}
 
 	result := data.Paginate(query, c)
