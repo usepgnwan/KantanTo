@@ -16,6 +16,7 @@ import AppLayout from '../layouts/AppLayout';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import PackageDetailHeader from '../components/organisms/PackageDetailHeader';
+import PackageCard from '../components/molecules/PackageCard';
 import QuestionGrid from '../components/molecules/QuestionGrid';
 import ResourceCard from '../components/molecules/ResourceCard';
 import {
@@ -335,98 +336,32 @@ const PackageDetailPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {packageData.bundled_packages.map((sub, idx) => (
-              <Card
+              <PackageCard
                 key={sub.id}
-                styles={{ body: { padding: 0 } }}
-                className="weightless-card border border-surface-container hover:border-purple-400 transition-all rounded-2xl overflow-hidden shadow-sm flex flex-col"
-              >
-                {/* Cover Sub-Paket */}
-                <div className="relative aspect-[16/9] w-full bg-gradient-to-br from-purple-100 via-blue-50 to-indigo-100 dark:from-purple-950/60 dark:to-zinc-800 overflow-hidden">
-                  {sub.thumbnail ? (
-                    <img
-                      src={sub.thumbnail}
-                      alt={sub.title || `Sub-Paket #${idx + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-purple-600/60 dark:text-purple-300/60">
-                      <GiftOutlined className="text-3xl mb-1" />
-                      <span className="text-xs font-black uppercase tracking-widest">Paket #{idx + 1}</span>
-                    </div>
-                  )}
-                  <div className="absolute top-3 left-3 flex items-center gap-1.5 flex-wrap">
-                    <Tag className="m-0 border-none bg-slate-900/75 text-white backdrop-blur-sm font-black text-[10px] px-2 py-0.5 rounded-lg">
-                      #{idx + 1}
-                    </Tag>
-                    {sub.category && (
-                      <Tag className="m-0 border-none bg-purple-600/90 text-white backdrop-blur-sm font-bold text-[10px] px-2 py-0.5 rounded-lg">
-                        {sub.category}
-                      </Tag>
-                    )}
-                  </div>
-                  {sub.duration > 0 && (
-                    <Tag className="absolute top-3 right-3 m-0 border-none bg-white/90 dark:bg-zinc-900/90 text-on-surface font-bold text-[10px] px-2 py-0.5 rounded-lg shadow-sm">
-                      {sub.duration} Menit
-                    </Tag>
-                  )}
-                </div>
-
-                {/* Detail Informasi Sub-Paket */}
-                <div className="p-4 flex-1 flex flex-col">
-                  <h4 className="font-black text-on-surface text-base leading-snug mb-1.5 line-clamp-2">
-                    {sub.title || `Sub-Paket #${idx + 1}`}
-                  </h4>
-
-                  {sub.description && (
-                    <p className="text-xs text-on-surface/60 line-clamp-2 mb-3 leading-relaxed">
-                      {sub.description}
-                    </p>
-                  )}
-
-                  {((sub.classes && sub.classes.length > 0) || (sub.subjects && sub.subjects.length > 0)) && (
-                    <div className="flex items-center gap-1 flex-wrap mb-3">
-                      {sub.classes?.map((cls) => (
-                        <Tag key={cls} className="m-0 border-none rounded-md bg-on-surface/5 text-on-surface/60 font-bold text-[10px] px-2">
-                          {cls}
-                        </Tag>
-                      ))}
-                      {sub.subjects?.map((subj) => (
-                        <Tag key={subj} className="m-0 border-none rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 font-bold text-[10px] px-2">
-                          {subj}
-                        </Tag>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="mt-auto pt-3 border-t border-surface-container flex items-center justify-between gap-2">
-                    <Space size={4} wrap>
-                      <Tag className="rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-none font-bold text-[10px] px-2 m-0">
-                        {sub.questions_count || 0} Soal
-                      </Tag>
-                      {sub.materials_count > 0 && (
-                        <Tag className="rounded-full bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-none font-bold text-[10px] px-2 m-0">
-                          {sub.materials_count} Materi
-                        </Tag>
-                      )}
-                      {sub.videos_count > 0 && (
-                        <Tag className="rounded-full bg-red-50 dark:bg-red-900/30 text-red-500 dark:text-red-400 border-none font-bold text-[10px] px-2 m-0">
-                          {sub.videos_count} Video
-                        </Tag>
-                      )}
-                    </Space>
-                    <Button
-                      size="small"
-                      type="link"
-                      className="font-bold text-primary p-0 shrink-0"
-                      onClick={() => navigate(`/paket/${sub.slug}`)}
-                    >
-                      Buka Detail &rarr;
-                    </Button>
-                  </div>
-                </div>
-              </Card>
+                id={sub.slug}
+                slug={sub.slug}
+                title={sub.title || `Sub-Paket #${idx + 1}`}
+                image={sub.thumbnail || fallbackVideoThumbnail}
+                price={sub.price || 0}
+                originalPrice={0}
+                rating={5}
+                studentCount={0}
+                duration={sub.duration > 0 ? `${sub.duration} Menit` : 'Tryout'}
+                category={sub.category || 'Tryout'}
+                classes={sub.classes || []}
+                subjects={sub.subjects || []}
+                isPopular={(sub.questions_count || 0) > 0}
+                isOwned={hasAccess}
+                is_lifetime={sub.is_lifetime}
+                validity_days={sub.validity_days}
+                active_until={sub.active_until}
+                max_exam_attempts={sub.max_exam_attempts}
+                questions_count={sub.questions_count}
+                materials_count={sub.materials_count}
+                videos_count={sub.videos_count}
+              />
             ))}
           </div>
         </div>
